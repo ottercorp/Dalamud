@@ -241,7 +241,22 @@ namespace Dalamud.Game {
 
             throw new KeyNotFoundException($"Can't find a signature of {signature}");
         }
+        public IntPtr ScanReversed(IntPtr baseAddress, int size, string signature) {
+            var needle = SigToNeedle(signature);
 
+            unsafe {
+                var pCursor = (byte*)baseAddress.ToPointer();
+                var pBottom = (byte*)(baseAddress - size + needle.Length);
+                while (pCursor > pBottom) {
+                    if (IsMatch(pCursor, needle)) return (IntPtr)pCursor;
+
+                    // Advance an offset
+                    pCursor -= 1;
+                }
+            }
+
+            throw new KeyNotFoundException($"Can't find a signature of {signature}");
+        }
         public IntPtr ResolveRelativeAddress(IntPtr nextInstAddr, int relOffset) {
             if (Is32BitProcess) throw new NotSupportedException("32 bit is not supported.");
 
