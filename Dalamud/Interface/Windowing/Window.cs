@@ -1,6 +1,5 @@
 using System.Numerics;
 
-using Dalamud.Configuration.Internal;
 using Dalamud.Game.ClientState.Keys;
 using ImGuiNET;
 
@@ -110,7 +109,13 @@ namespace Dalamud.Interface.Windowing
         public bool IsOpen
         {
             get => this.internalIsOpen;
-            set => this.internalIsOpen = value;
+            set
+            {
+                this.internalIsOpen = value;
+
+                if (value == false)
+                    this.IsFocused = false;
+            }
         }
 
         /// <summary>
@@ -169,8 +174,6 @@ namespace Dalamud.Interface.Windowing
                 {
                     this.internalLastIsOpen = this.internalIsOpen;
                     this.OnClose();
-
-                    this.IsFocused = false;
                 }
 
                 return;
@@ -201,8 +204,7 @@ namespace Dalamud.Interface.Windowing
                 this.IsFocused = ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows);
 
                 var escapeDown = Service<KeyState>.Get()[VirtualKey.ESCAPE];
-                var isAllowed = Service<DalamudConfiguration>.Get().IsFocusManagementEnabled;
-                if (escapeDown && this.IsFocused && isAllowed && !wasEscPressedLastFrame && this.RespectCloseHotkey)
+                if (escapeDown && this.IsFocused && !wasEscPressedLastFrame && this.RespectCloseHotkey)
                 {
                     this.IsOpen = false;
                     wasEscPressedLastFrame = true;
@@ -221,20 +223,20 @@ namespace Dalamud.Interface.Windowing
                 ImGui.PopID();
         }
 
-        // private void CheckState()
-        // {
-        //     if (this.internalLastIsOpen != this.internalIsOpen)
-        //     {
-        //         if (this.internalIsOpen)
-        //         {
-        //             this.OnOpen();
-        //         }
-        //         else
-        //         {
-        //             this.OnClose();
-        //         }
-        //     }
-        // }
+        private void CheckState()
+        {
+            if (this.internalLastIsOpen != this.internalIsOpen)
+            {
+                if (this.internalIsOpen)
+                {
+                    this.OnOpen();
+                }
+                else
+                {
+                    this.OnClose();
+                }
+            }
+        }
 
         private void ApplyConditionals()
         {

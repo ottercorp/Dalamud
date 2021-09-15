@@ -48,8 +48,10 @@ namespace Dalamud.Game.Internal
             var uiModuleRequestMainCommandAddress = sigScanner.ScanText("40 53 56 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 48 8B 01 8B DA 48 8B F1 FF 90 ?? ?? ?? ??");
             this.hookUiModuleRequestMainCommand = new Hook<UiModuleRequestMainCommand>(uiModuleRequestMainCommandAddress, this.UiModuleRequestMainCommandDetour);
 
-            var atkUnitBaseReceiveGlobalEventAddress = sigScanner.ScanText("48 89 5C 24 ?? 48 89 7C 24 ?? 55 41 56 41 57 48 8B EC 48 83 EC 50 44 0F B7 F2 ");
-            this.hookAtkUnitBaseReceiveGlobalEvent = new Hook<AtkUnitBaseReceiveGlobalEvent>(atkUnitBaseReceiveGlobalEventAddress, this.AtkUnitBaseReceiveGlobalEventDetour);
+            var atkUnitBaseReceiveGlobalEventAddress =
+                sigScanner.ScanText("48 89 5C 24 ?? 48 89 7C 24 ?? 55 41 56 41 57 48 8B EC 48 83 EC 50 44 0F B7 F2 ");
+            this.hookAtkUnitBaseReceiveGlobalEvent =
+                new Hook<AtkUnitBaseReceiveGlobalEvent>(atkUnitBaseReceiveGlobalEventAddress, this.AtkUnitBaseReceiveGlobalEventDetour);
         }
 
         private delegate void AgentHudOpenSystemMenuPrototype(void* thisPtr, AtkValue* atkValueArgs, uint menuSize);
@@ -74,26 +76,15 @@ namespace Dalamud.Game.Internal
 
         private IntPtr AtkUnitBaseReceiveGlobalEventDetour(AtkUnitBase* thisPtr, ushort cmd, uint a3, IntPtr a4, uint* a5)
         {
-            // Log.Information("{0}: cmd#{1} a3#{2} - HasAnyFocus:{3}", Marshal.PtrToStringAnsi(new IntPtr(thisPtr->Name)), cmd, a3, WindowSystem.HasAnyWindowSystemFocus);
-
             // "Close Addon"
-            if (cmd == 12 && WindowSystem.HasAnyWindowSystemFocus && Service<DalamudConfiguration>.Get().IsFocusManagementEnabled)
-            {
-                Log.Verbose($"Cancelling global event CloseAddon command due to WindowSystem {WindowSystem.FocusedWindowSystemNamespace}");
+            if (cmd == 12 && WindowSystem.HasAnyWindowSystemFocus)
                 return IntPtr.Zero;
-            }
 
             return this.hookAtkUnitBaseReceiveGlobalEvent.Original(thisPtr, cmd, a3, a4, a5);
         }
 
         private void AgentHudOpenSystemMenuDetour(void* thisPtr, AtkValue* atkValueArgs, uint menuSize)
         {
-            if (WindowSystem.HasAnyWindowSystemFocus && Service<DalamudConfiguration>.Get().IsFocusManagementEnabled)
-            {
-                Log.Verbose($"Cancelling OpenSystemMenu due to WindowSystem {WindowSystem.FocusedWindowSystemNamespace}");
-                return;
-            }
-
             var configuration = Service<DalamudConfiguration>.Get();
 
             if (!configuration.DoButtonsSystemMenu)

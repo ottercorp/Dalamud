@@ -1,6 +1,4 @@
 using System;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -22,10 +20,8 @@ using Dalamud.Interface.Internal;
 using Dalamud.IoC.Internal;
 using Dalamud.Plugin.Internal;
 using Dalamud.Plugin.Ipc.Internal;
-using HarmonyLib;
 using Serilog;
 using Serilog.Core;
-using Serilog.Events;
 
 #if DEBUG
 [assembly: InternalsVisibleTo("Dalamud.CorePlugin")]
@@ -57,16 +53,11 @@ namespace Dalamud
         /// <param name="configuration">The Dalamud configuration.</param>
         public Dalamud(DalamudStartInfo info, LoggingLevelSwitch loggingLevelSwitch, ManualResetEvent finishSignal, DalamudConfiguration configuration)
         {
-            this.ApplyProcessPatch();
-
             Service<Dalamud>.Set(this);
             Service<DalamudStartInfo>.Set(info);
             Service<DalamudConfiguration>.Set(configuration);
 
             this.LogLevelSwitch = loggingLevelSwitch;
-
-            // TODO: Just for testing, force verbose logging
-            this.LogLevelSwitch.MinimumLevel = LogEventLevel.Verbose;
 
             this.unloadSignal = new ManualResetEvent(false);
             this.unloadSignal.Reset();
@@ -171,19 +162,6 @@ namespace Dalamud
                 Service<NetworkHandlers>.Set();
                 Log.Information("[T2] NH OK!");
 
-                try
-                {
-                    Service<DataManager>.Set().Initialize(this.AssetDirectory.FullName);
-                }
-                catch (Exception e)
-                {
-                    Log.Error(e, "Could not initialize DataManager.");
-                    this.Unload();
-                    return;
-                }
-
-                Log.Information("[T2] Data OK!");
-
                 var clientState = Service<ClientState>.Set();
                 Log.Information("[T2] CS OK!");
 
@@ -222,6 +200,19 @@ namespace Dalamud
                 {
                     Log.Information(e, "Could not init IME.");
                 }
+
+                try
+                {
+                    Service<DataManager>.Set().Initialize(this.AssetDirectory.FullName);
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e, "Could not initialize DataManager.");
+                    this.Unload();
+                    return;
+                }
+
+                Log.Information("[T2] Data OK!");
 
 #pragma warning disable CS0618 // Type or member is obsolete
                 Service<SeStringManager>.Set();
@@ -268,8 +259,6 @@ namespace Dalamud
 
                 try
                 {
-                    _ = pluginManager.SetPluginReposFromConfigAsync(false);
-
                     pluginManager.OnInstalledPluginsChanged += Troubleshooting.LogTroubleshooting;
 
                     Log.Information("[T3] PM OK!");
@@ -391,35 +380,6 @@ namespace Dalamud
 
             var oldFilter = NativeFunctions.SetUnhandledExceptionFilter(releaseFilter);
             Log.Debug("Reset ExceptionFilter, old: {0}", oldFilter);
-        }
-
-        /// <summary>
-        /// Patch method for the class Process.Handle. This patch facilitates fixing Reloaded so that it
-        /// uses pseudo-handles to access memory, to prevent permission errors.
-        /// It should never be called manually.
-        /// </summary>
-        /// <param name="__instance">The equivalent of `this`.</param>
-        /// <param name="__result">The result from the original method.</param>
-        [SuppressMessage("StyleCop.CSharp.NamingRules", "SA1313:Parameter names should begin with lower-case letter", Justification = "Enforced naming for special injected parameters")]
-        private static void ProcessHandlePatch(Process __instance, ref IntPtr __result)
-        {
-            if (__instance.Id == Environment.ProcessId)
-            {
-                __result = (IntPtr)0xFFFFFFFF;
-            }
-
-            // Log.Verbose($"Process.Handle // {__instance.ProcessName} // {__result:X}");
-        }
-
-        private void ApplyProcessPatch()
-        {
-            var harmony = new Harmony("goatcorp.dalamud");
-
-            var targetType = typeof(Process);
-
-            var handleTarget = AccessTools.PropertyGetter(targetType, nameof(Process.Handle));
-            var handlePatch = AccessTools.Method(typeof(Dalamud), nameof(Dalamud.ProcessHandlePatch));
-            harmony.Patch(handleTarget, postfix: new(handlePatch));
         }
     }
 }

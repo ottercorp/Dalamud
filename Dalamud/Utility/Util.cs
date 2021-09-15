@@ -210,7 +210,7 @@ namespace Dalamud.Utility
         /// </summary>
         /// <param name="url">A url to be fucked.</param>
         /// <returns>A fucked url.</returns>
-        public static string? FuckGFW(string? url)
+        public static string FuckGFW(string url)
         {
             if (url == null) return null;
             url = Regex.Replace(url, @"^https:\/\/raw\.githubusercontent\.com", "https://raw.fastgit.org");

@@ -217,6 +217,7 @@ namespace Dalamud.Interface.Internal.Windows
             }
 
             ImGui.PushFont(InterfaceManager.MonoFont);
+            ImGui.PushFont(InterfaceManager.DefaultFont);
 
             var childPos = ImGui.GetWindowPos();
             var childDrawList = ImGui.GetWindowDrawList();
@@ -263,6 +264,7 @@ namespace Dalamud.Interface.Internal.Windows
                 clipper.End();
             }
 
+            ImGui.PopFont();
             ImGui.PopFont();
 
             ImGui.PopStyleVar();

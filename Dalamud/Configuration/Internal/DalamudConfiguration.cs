@@ -170,11 +170,6 @@ namespace Dalamud.Configuration.Internal
         public bool IsGamepadNavigationEnabled { get; set; } = true;
 
         /// <summary>
-        /// Gets or sets a value indicating whether or not focus management is enabled.
-        /// </summary>
-        public bool IsFocusManagementEnabled { get; set; } = true;
-
-        /// <summary>
         /// Gets or sets a value indicating whether or not the anti-anti-debug check is enabled on startup.
         /// </summary>
         public bool IsAntiAntiDebugEnabled { get; set; } = false;

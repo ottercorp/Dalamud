@@ -37,7 +37,7 @@ namespace Dalamud.Game.Network.Internal
 
             this.uploader = new UniversalisMarketBoardUploader();
 
-            Service<GameNetwork>.Get().NetworkMessage += this.OnNetworkMessage;
+            Service<GameNetwork>.Get().OnNetworkMessage += this.OnNetworkMessage;
         }
 
         /// <summary>

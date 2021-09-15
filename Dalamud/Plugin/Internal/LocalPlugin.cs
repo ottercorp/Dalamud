@@ -49,8 +49,11 @@ namespace Dalamud.Plugin.Internal
                     config.PreferSharedTypes = true;
                 });
 
+            Version assemblyVersion;
+
             try
             {
+                // BadImageFormatException
                 this.pluginAssembly = this.loader.LoadDefaultAssembly();
             }
             catch (Exception ex)
@@ -63,17 +66,7 @@ namespace Dalamud.Plugin.Internal
                 throw new InvalidPluginException(this.DllFile);
             }
 
-            try
-            {
-                this.pluginType = this.pluginAssembly.GetTypes().FirstOrDefault(type => type.IsAssignableTo(typeof(IDalamudPlugin)));
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                Log.Error(ex, $"Could not load one or more types when searching for IDalamudPlugin: {this.DllFile.FullName}");
-                // Something blew up when parsing types, but we still want to look for IDalamudPlugin. Let Load() handle the error.
-                this.pluginType = ex.Types.FirstOrDefault(type => type.IsAssignableTo(typeof(IDalamudPlugin)));
-            }
-
+            this.pluginType = this.pluginAssembly.GetTypes().FirstOrDefault(type => type.IsAssignableTo(typeof(IDalamudPlugin)));
             if (this.pluginType == default)
             {
                 this.pluginAssembly = null;
@@ -84,7 +77,7 @@ namespace Dalamud.Plugin.Internal
                 throw new InvalidPluginException(this.DllFile);
             }
 
-            var assemblyVersion = this.pluginAssembly.GetName().Version;
+            assemblyVersion = this.pluginAssembly.GetName().Version;
 
             // Files that may or may not exist
             this.manifestFile = LocalPluginManifest.GetManifestFile(this.DllFile);
@@ -190,7 +183,7 @@ namespace Dalamud.Plugin.Internal
             this.instance?.Dispose();
             this.instance = null;
 
-            this.DalamudInterface?.Dispose();
+            this.DalamudInterface.Dispose();
             this.DalamudInterface = null;
 
             this.pluginType = null;
@@ -288,7 +281,7 @@ namespace Dalamud.Plugin.Internal
                 // Update the location for the Location and CodeBase patches
                 PluginManager.PluginLocations[this.pluginType.Assembly.FullName] = new(this.DllFile);
 
-                this.DalamudInterface = new DalamudPluginInterface(this.pluginAssembly.GetName().Name!, reason, this.IsDev);
+                this.DalamudInterface = new DalamudPluginInterface(this.pluginAssembly.GetName().Name!, reason);
 
                 var ioc = Service<ServiceContainer>.Get();
                 this.instance = ioc.Create(this.pluginType, this.DalamudInterface) as IDalamudPlugin;

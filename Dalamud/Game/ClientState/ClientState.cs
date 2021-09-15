@@ -125,7 +125,6 @@ namespace Dalamud.Game.ClientState
         /// </summary>
         public void Enable()
         {
-            Service<Condition>.Get().Enable();
             Service<GamepadState>.Get().Enable();
             this.setupTerritoryTypeHook.Enable();
         }
@@ -136,7 +135,6 @@ namespace Dalamud.Game.ClientState
         public void Dispose()
         {
             this.setupTerritoryTypeHook.Dispose();
-            Service<Condition>.Get().Dispose();
             Service<GamepadState>.Get().Dispose();
             Service<Framework>.Get().Update -= this.FrameworkOnOnUpdateEvent;
             Service<NetworkHandlers>.Get().CfPop -= this.NetworkHandlersOnCfPop;

@@ -7,7 +7,7 @@
 
 int wmain(int argc, char** argv)
 {
-    #ifndef NDEBUG
+    #if !defined(NDEBUG)
     ConsoleSetup(L"Dalamud.Injector");
     #endif
 
@@ -43,7 +43,7 @@ int wmain(int argc, char** argv)
 
     // =========================================================================== //
 
-    #ifndef NDEBUG
+    #if !defined(NDEBUG)
     FreeConsole();
     #endif
 

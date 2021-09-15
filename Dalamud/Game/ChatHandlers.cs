@@ -113,7 +113,6 @@ namespace Dalamud.Game
         private readonly DalamudLinkPayload openInstallerWindowLink;
 
         private bool hasSeenLoadingMsg;
-        private bool hasAutoUpdatedPlugins;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ChatHandlers"/> class.
@@ -189,9 +188,6 @@ namespace Dalamud.Game
             if (clientState.LocalPlayer != null && clientState.TerritoryType == 0 && !this.hasSeenLoadingMsg)
                 this.PrintWelcomeMessage();
 
-            if (!this.hasAutoUpdatedPlugins)
-                this.AutoUpdatePlugins();
-
 #if !DEBUG && false
             if (!this.hasSeenLoadingMsg)
                 return;
@@ -234,6 +230,28 @@ namespace Dalamud.Game
             var linkMatch = this.urlRegex.Match(message.TextValue);
             if (linkMatch.Value.Length > 0)
                 this.LastLink = linkMatch.Value;
+
+            // Handle all of this with SeString some day
+            /*
+            if ((this.HandledChatTypeColors.ContainsKey(type) || type == XivChatType.Say || type == XivChatType.Shout ||
+                type == XivChatType.Alliance || type == XivChatType.TellOutgoing || type == XivChatType.Yell)) {
+                var italicsStart = message.TextValue.IndexOf("*", StringComparison.InvariantCulture);
+                var italicsEnd = message.TextValue.IndexOf("*", italicsStart + 1, StringComparison.InvariantCulture);
+
+                var messageString = message.TextValue;
+
+                while (italicsEnd != -1) {
+                    var it = MakeItalics(
+                        messageString.Substring(italicsStart, italicsEnd - italicsStart + 1).Replace("*", ""));
+                    messageString = messageString.Remove(italicsStart, italicsEnd - italicsStart + 1);
+                    messageString = messageString.Insert(italicsStart, it);
+                    italicsStart = messageString.IndexOf("*");
+                    italicsEnd = messageString.IndexOf("*", italicsStart + 1);
+                }
+
+                message.RawData = Encoding.UTF8.GetBytes(messageString);
+            }
+            */
         }
 
         private void PrintWelcomeMessage()
@@ -242,6 +260,7 @@ namespace Dalamud.Game
             var configuration = Service<DalamudConfiguration>.Get();
             var pluginManager = Service<PluginManager>.Get();
             var dalamudInterface = Service<DalamudInterface>.Get();
+            var notifications = Service<NotificationManager>.Get();
 
             var assemblyVersion = Assembly.GetAssembly(typeof(ChatHandlers)).GetName().Version.ToString();
 
@@ -271,47 +290,31 @@ namespace Dalamud.Game
                 configuration.Save();
             }
 
-            this.hasSeenLoadingMsg = true;
-        }
-
-        private void AutoUpdatePlugins()
-        {
-            var chatGui = Service<ChatGui>.Get();
-            var configuration = Service<DalamudConfiguration>.Get();
-            var pluginManager = Service<PluginManager>.Get();
-            var notifications = Service<NotificationManager>.Get();
-
-            if (!pluginManager.ReposReady || pluginManager.InstalledPlugins.Count == 0 || pluginManager.AvailablePlugins.Count == 0)
+            Task.Run(() => pluginManager.UpdatePluginsAsync(!configuration.AutoUpdatePlugins))
+                .ContinueWith(t =>
             {
-                // Plugins aren't ready yet.
-                return;
-            }
-
-            this.hasAutoUpdatedPlugins = true;
-
-            Task.Run(() => pluginManager.UpdatePluginsAsync(!configuration.AutoUpdatePlugins)).ContinueWith(task =>
-            {
-                if (task.IsFaulted)
+                if (t.IsFaulted)
                 {
-                    Log.Error(task.Exception, Loc.Localize("DalamudPluginUpdateCheckFail", "Could not check for plugin updates."));
-                    return;
+                    Log.Error(t.Exception, Loc.Localize("DalamudPluginUpdateCheckFail", "Could not check for plugin updates."));
                 }
-
-                var updatedPlugins = task.Result;
-                if (updatedPlugins != null && updatedPlugins.Any())
+                else
                 {
-                    if (configuration.AutoUpdatePlugins)
-                    {
-                        pluginManager.PrintUpdatedPlugins(updatedPlugins, Loc.Localize("DalamudPluginAutoUpdate", "Auto-update:"));
-                        notifications.AddNotification(Loc.Localize("NotificationUpdatedPlugins", "{0} of your plugins were updated.").Format(updatedPlugins.Count), Loc.Localize("NotificationAutoUpdate", "Auto-Update"), NotificationType.Info);
-                    }
-                    else
-                    {
-                        var data = Service<DataManager>.Get();
+                    var updatedPlugins = t.Result;
 
-                        chatGui.PrintChat(new XivChatEntry
+                    if (updatedPlugins != null && updatedPlugins.Any())
+                    {
+                        if (configuration.AutoUpdatePlugins)
                         {
-                            Message = new SeString(new List<Payload>()
+                            pluginManager.PrintUpdatedPlugins(updatedPlugins, Loc.Localize("DalamudPluginAutoUpdate", "Auto-update:"));
+                            notifications.AddNotification(Loc.Localize("NotificationUpdatedPlugins", "{0} of your plugins were updated.").Format(updatedPlugins.Count), Loc.Localize("NotificationAutoUpdate", "Auto-Update"), NotificationType.Info);
+                        }
+                        else
+                        {
+                            var data = Service<DataManager>.Get();
+
+                            chatGui.PrintChat(new XivChatEntry
+                            {
+                                Message = new SeString(new List<Payload>()
                                 {
                                     new TextPayload(Loc.Localize("DalamudPluginUpdateRequired", "One or more of your plugins needs to be updated. Please use the /xlplugins command in-game to update them!")),
                                     new TextPayload("  ["),
@@ -322,11 +325,14 @@ namespace Dalamud.Game
                                     new UIForegroundPayload(0),
                                     new TextPayload("]"),
                                 }),
-                            Type = XivChatType.Urgent,
-                        });
+                                Type = XivChatType.Urgent,
+                            });
+                        }
                     }
                 }
             });
+
+            this.hasSeenLoadingMsg = true;
         }
     }
 }

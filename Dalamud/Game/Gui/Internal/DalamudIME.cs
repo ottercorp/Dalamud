@@ -38,17 +38,12 @@ namespace Dalamud.Game.Gui.Internal
         internal bool IsEnabled { get; private set; }
 
         /// <summary>
-        /// Gets the index of the first imm candidate in relation to the full list.
-        /// </summary>
-        internal CandidateList ImmCandNative { get; private set; } = default;
-
-        /// <summary>
         /// Gets the imm candidates.
         /// </summary>
         internal List<string> ImmCand { get; private set; } = new();
 
         /// <summary>
-        /// Gets the selected imm component.
+        /// Gets the imm component.
         /// </summary>
         internal string ImmComp { get; private set; } = string.Empty;
 
@@ -115,47 +110,45 @@ namespace Dalamud.Game.Gui.Internal
                                         return 0;
 
                                     var size = ImmGetCandidateListW(hIMC, 0, IntPtr.Zero, 0);
-                                    if (size == 0)
-                                        break;
-
-                                    var candlistPtr = Marshal.AllocHGlobal((int)size);
-                                    size = ImmGetCandidateListW(hIMC, 0, candlistPtr, (uint)size);
-
-                                    var candlist = this.ImmCandNative = Marshal.PtrToStructure<CandidateList>(candlistPtr);
-                                    var pageSize = candlist.PageSize;
-                                    var candCount = candlist.Count;
-
-                                    if (pageSize > 0 && candCount > 1)
+                                    if (size > 0)
                                     {
-                                        var dwOffsets = new int[candCount];
-                                        for (var i = 0; i < candCount; i++)
+                                        var candlistPtr = Marshal.AllocHGlobal((int)size);
+                                        size = ImmGetCandidateListW(hIMC, 0, candlistPtr, (uint)size);
+
+                                        var candlist = Marshal.PtrToStructure<CandidateList>(candlistPtr);
+                                        var pageSize = candlist.PageSize;
+                                        var candCount = candlist.Count;
+                                        if (pageSize > 0 && candCount > 1)
                                         {
-                                            dwOffsets[i] = Marshal.ReadInt32(candlistPtr + ((i + 6) * sizeof(int)));
-                                        }
+                                            var dwOffsets = new int[candCount];
+                                            for (var i = 0; i < candCount; i++)
+                                                dwOffsets[i] = Marshal.ReadInt32(candlistPtr + ((i + 6) * sizeof(int)));
 
-                                        var pageStart = candlist.PageStart;
+                                            var pageStart = candlist.PageStart;
+                                            // var pageEnd = pageStart + pageSize;
 
-                                        var cand = new string[pageSize];
-                                        this.ImmCand.Clear();
+                                            var cand = new string[pageSize];
+                                            this.ImmCand.Clear();
 
-                                        for (var i = 0; i < pageSize; i++)
-                                        {
-                                            var offStart = dwOffsets[i + pageStart];
-                                            var offEnd = i + pageStart + 1 < candCount ? dwOffsets[i + pageStart + 1] : size;
-
-                                            var pStrStart = candlistPtr + (int)offStart;
-                                            var pStrEnd = candlistPtr + (int)offEnd;
-
-                                            var len = (int)(pStrEnd.ToInt64() - pStrStart.ToInt64());
-                                            if (len > 0)
+                                            for (var i = 0; i < pageSize; i++)
                                             {
-                                                var candBytes = new byte[len];
-                                                Marshal.Copy(pStrStart, candBytes, 0, len);
+                                                var offStart = dwOffsets[i + pageStart];
+                                                var offEnd = i + pageStart + 1 < candCount ? dwOffsets[i + pageStart + 1] : size;
 
-                                                var candStr = Encoding.Unicode.GetString(candBytes);
-                                                cand[i] = candStr;
+                                                var pStrStart = candlistPtr + (int)offStart;
+                                                var pStrEnd = candlistPtr + (int)offEnd;
 
-                                                this.ImmCand.Add(candStr);
+                                                var len = (int)(pStrEnd.ToInt64() - pStrStart.ToInt64());
+                                                if (len > 0)
+                                                {
+                                                    var candBytes = new byte[len];
+                                                    Marshal.Copy(pStrStart, candBytes, 0, len);
+
+                                                    var candStr = Encoding.Unicode.GetString(candBytes);
+                                                    cand[i] = candStr;
+
+                                                    this.ImmCand.Add(candStr);
+                                                }
                                             }
                                         }
 
@@ -165,16 +158,12 @@ namespace Dalamud.Game.Gui.Internal
                                     break;
                                 case IMECommand.OpenCandidate:
                                     this.ToggleWindow(true);
-                                    this.ImmCandNative = default;
                                     this.ImmCand.Clear();
                                     break;
-
                                 case IMECommand.CloseCandidate:
                                     this.ToggleWindow(false);
-                                    this.ImmCandNative = default;
                                     this.ImmCand.Clear();
                                     break;
-
                                 default:
                                     break;
                             }
@@ -199,7 +188,6 @@ namespace Dalamud.Game.Gui.Internal
                                 io.AddInputCharactersUTF8(lpstr);
 
                                 this.ImmComp = string.Empty;
-                                this.ImmCandNative = default;
                                 this.ImmCand.Clear();
                                 this.ToggleWindow(false);
                             }
