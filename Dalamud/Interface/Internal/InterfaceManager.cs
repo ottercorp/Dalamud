@@ -474,12 +474,12 @@ namespace Dalamud.Interface.Internal
                 GCHandleType.Pinned);
             IconFont = ImGui.GetIO().Fonts.AddFontFromFileTTF(fontPathIcon, 17.0f, null, iconRangeHandle.AddrOfPinnedObject());
 
-            var fontPathMono = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "Inconsolata-Regular.ttf");
+            var fontPathMono = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "sarasa-mono-sc-nerd-regular.ttf");
 
             if (!File.Exists(fontPathMono))
                 ShowFontError(fontPathMono);
 
-            MonoFont = ImGui.GetIO().Fonts.AddFontFromFileTTF(fontPathMono, 16.0f);
+            MonoFont = ImGui.GetIO().Fonts.AddFontFromFileTTF(fontPathMono, 16.0f, null, ImGui.GetIO().Fonts.GetGlyphRangesChineseFull());
 
             Log.Verbose("[FONT] Invoke OnBuildFonts");
             this.BuildFonts?.Invoke();
