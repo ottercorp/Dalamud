@@ -188,13 +188,24 @@ namespace Dalamud.Injector
             var pid = -1;
             if (arg != default)
             {
-                pid = int.Parse(arg);
+                pid = arg.StartsWith("0x") ? Convert.ToInt32(arg, 16) : Convert.ToInt32(arg);
             }
 
             switch (pid)
             {
                 case -1:
-                    process = Process.GetProcessesByName("ffxiv_dx11").FirstOrDefault();
+                    process = Process.GetProcessesByName("ffxiv_dx11").FirstOrDefault(i =>
+                    {
+                        for (var j = 0; j < i.Modules.Count; j++)
+                        {
+                            if (i.Modules[j].ModuleName == "Dalamud.dll")
+                            {
+                                return false;
+                            }
+                        }
+
+                        return true;
+                    });
 
                     if (process == default)
                     {
@@ -224,6 +235,7 @@ namespace Dalamud.Injector
                     break;
             }
 
+            Console.WriteLine($"process: {process} - {process?.Id}");
             return process;
         }
 
