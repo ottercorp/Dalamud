@@ -13,6 +13,7 @@ using Dalamud.Game.ClientState.GamePad;
 using Dalamud.Game.ClientState.JobGauge;
 using Dalamud.Game.ClientState.JobGauge.Enums;
 using Dalamud.Game.ClientState.JobGauge.Types;
+using Dalamud.Game.ClientState.Keys;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
@@ -22,6 +23,7 @@ using Dalamud.Game.Gui;
 using Dalamud.Game.Gui.FlyText;
 using Dalamud.Game.Gui.Toast;
 using Dalamud.Game.Text;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Interface.Windowing;
 using Dalamud.Memory;
@@ -131,6 +133,7 @@ namespace Dalamud.Interface.Internal.Windows
             FlyText,
             ImGui,
             Tex,
+            KeyState,
             Gamepad,
         }
 
@@ -162,9 +165,9 @@ namespace Dalamud.Interface.Internal.Windows
             };
 
             dataKind = dataKind.Replace(" ", string.Empty).ToLower();
-            var matched = Enum.GetValues(typeof(DataKind))
-                .Cast<DataKind>()
-                .Where(k => Enum.GetName(typeof(DataKind), k).Replace("_", string.Empty).ToLower() == dataKind)
+
+            var matched = Enum.GetValues<DataKind>()
+                .Where(kind => Enum.GetName(kind).Replace("_", string.Empty).ToLower() == dataKind)
                 .FirstOrDefault();
 
             if (matched != default)
@@ -173,7 +176,7 @@ namespace Dalamud.Interface.Internal.Windows
             }
             else
             {
-                Service<ChatGui>.Get().PrintError("/xldata: Invalid Data Type");
+                Service<ChatGui>.Get().PrintError($"/xldata: Invalid data type {dataKind}");
             }
         }
 
@@ -286,6 +289,10 @@ namespace Dalamud.Interface.Internal.Windows
 
                         case DataKind.Tex:
                             this.DrawTex();
+                            break;
+
+                        case DataKind.KeyState:
+                            this.DrawKeyState();
                             break;
 
                         case DataKind.Gamepad:
@@ -674,7 +681,7 @@ namespace Dalamud.Interface.Internal.Windows
             var condition = Service<Condition>.Get();
 
 #if DEBUG
-            ImGui.Text($"ptr: 0x{condition.ConditionArrayBase.ToInt64():X}");
+            ImGui.Text($"ptr: 0x{condition.Address.ToInt64():X}");
 #endif
 
             ImGui.Text("Current Conditions:");
@@ -1082,6 +1089,10 @@ namespace Dalamud.Interface.Internal.Windows
 
             ImGui.Separator();
 
+            ImGui.TextUnformatted($"WindowSystem.TimeSinceLastAnyFocus: {WindowSystem.TimeSinceLastAnyFocus.TotalMilliseconds:0}ms");
+
+            ImGui.Separator();
+
             if (ImGui.Button("Add random notification"))
             {
                 var rand = new Random();
@@ -1144,6 +1155,32 @@ namespace Dalamud.Interface.Internal.Windows
                 ImGuiHelpers.ScaledDummy(5);
                 Util.ShowObject(this.debugTex);
             }
+        }
+
+        private void DrawKeyState()
+        {
+            var keyState = Service<KeyState>.Get();
+
+            ImGui.Columns(4);
+
+            var i = 0;
+            foreach (var vkCode in keyState.GetValidVirtualKeys())
+            {
+                var code = (int)vkCode;
+                var value = keyState[code];
+
+                ImGui.PushStyleColor(ImGuiCol.Text, value ? ImGuiColors.HealerGreen : ImGuiColors.DPSRed);
+
+                ImGui.Text($"{vkCode} ({code})");
+
+                ImGui.PopStyleColor();
+
+                i++;
+                if (i % 24 == 0)
+                    ImGui.NextColumn();
+            }
+
+            ImGui.Columns(1);
         }
 
         private void DrawGamepad()

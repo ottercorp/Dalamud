@@ -36,7 +36,8 @@ namespace Dalamud.Plugin
         /// </summary>
         /// <param name="pluginName">The internal name of the plugin.</param>
         /// <param name="reason">The reason the plugin was loaded.</param>
-        internal DalamudPluginInterface(string pluginName, PluginLoadReason reason)
+        /// <param name="isDev">A value indicating whether this is a dev plugin.</param>
+        internal DalamudPluginInterface(string pluginName, PluginLoadReason reason, bool isDev)
         {
             var configuration = Service<DalamudConfiguration>.Get();
             var dataManager = Service<DataManager>.Get();
@@ -47,6 +48,10 @@ namespace Dalamud.Plugin
             this.pluginName = pluginName;
             this.configs = Service<PluginManager>.Get().PluginConfigs;
             this.Reason = reason;
+            this.IsDev = isDev;
+
+            this.LoadTime = DateTime.Now;
+            this.LoadTimeUTC = DateTime.UtcNow;
 
             this.GeneralChatType = configuration.GeneralChatType;
             this.Sanitizer = new Sanitizer(dataManager.Language);
@@ -82,6 +87,26 @@ namespace Dalamud.Plugin
         /// Gets the reason this plugin was loaded.
         /// </summary>
         public PluginLoadReason Reason { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether this is a dev plugin.
+        /// </summary>
+        public bool IsDev { get; }
+
+        /// <summary>
+        /// Gets the time that this plugin was loaded.
+        /// </summary>
+        public DateTime LoadTime { get; }
+
+        /// <summary>
+        /// Gets the UTC time that this plugin was loaded.
+        /// </summary>
+        public DateTime LoadTimeUTC { get; }
+
+        /// <summary>
+        /// Gets the timespan delta from when this plugin was loaded.
+        /// </summary>
+        public TimeSpan LoadTimeDelta => DateTime.Now - this.LoadTime;
 
         /// <summary>
         /// Gets the directory Dalamud assets are stored in.

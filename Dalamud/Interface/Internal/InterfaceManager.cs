@@ -15,6 +15,7 @@ using Dalamud.Game.Gui.Internal;
 using Dalamud.Game.Internal.DXGI;
 using Dalamud.Hooking;
 using Dalamud.Hooking.Internal;
+using Dalamud.Interface.Internal.ManagedAsserts;
 using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
@@ -48,7 +49,7 @@ namespace Dalamud.Interface.Internal
         private readonly Hook<SetCursorDelegate> setCursorHook;
 
         private readonly ManualResetEvent fontBuildSignal;
-        private readonly ISwapChainAddressResolver address;
+        private readonly SwapChainVtableResolver address;
         private RawDX11Scene? scene;
 
         // can't access imgui IO before first present call
@@ -66,27 +67,8 @@ namespace Dalamud.Interface.Internal
 
             this.fontBuildSignal = new ManualResetEvent(false);
 
-            try
-            {
-                var sigResolver = new SwapChainSigResolver();
-                sigResolver.Setup(scanner);
-
-                Log.Verbose("Found SwapChain via signatures.");
-
-                this.address = sigResolver;
-            }
-            catch (KeyNotFoundException)
-            {
-                // The SigScanner method fails on wine/proton since DXGI is not a real DLL. We fall back to vtable to detect our Present function address.
-                Log.Debug("Could not get SwapChain address via sig method, falling back to vtable");
-
-                var vtableResolver = new SwapChainVtableResolver();
-                vtableResolver.Setup(scanner);
-
-                Log.Verbose("Found SwapChain via vtable.");
-
-                this.address = vtableResolver;
-            }
+            this.address = new SwapChainVtableResolver();
+            this.address.Setup(scanner);
 
             try
             {
@@ -133,9 +115,14 @@ namespace Dalamud.Interface.Internal
         private delegate void InstallRTSSHook();
 
         /// <summary>
-        /// This event gets called by a plugin UiBuilder when read
+        /// This event gets called each frame to facilitate ImGui drawing.
         /// </summary>
         public event RawDX11Scene.BuildUIDelegate Draw;
+
+        /// <summary>
+        /// This event gets called when ResizeBuffers is called.
+        /// </summary>
+        public event Action ResizeBuffers;
 
         /// <summary>
         /// Gets or sets an action that is executed when fonts are rebuilt.
@@ -487,12 +474,12 @@ namespace Dalamud.Interface.Internal
                 GCHandleType.Pinned);
             IconFont = ImGui.GetIO().Fonts.AddFontFromFileTTF(fontPathIcon, 17.0f, null, iconRangeHandle.AddrOfPinnedObject());
 
-            var fontPathMono = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "Inconsolata-Regular.ttf");
+            var fontPathMono = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "sarasa-mono-sc-nerd-regular.ttf");
 
             if (!File.Exists(fontPathMono))
                 ShowFontError(fontPathMono);
 
-            MonoFont = ImGui.GetIO().Fonts.AddFontFromFileTTF(fontPathMono, 16.0f);
+            MonoFont = ImGui.GetIO().Fonts.AddFontFromFileTTF(fontPathMono, 17.0f, null, ImGui.GetIO().Fonts.GetGlyphRangesChineseFull());
 
             Log.Verbose("[FONT] Invoke OnBuildFonts");
             this.BuildFonts?.Invoke();
@@ -544,6 +531,8 @@ namespace Dalamud.Interface.Internal
 #if DEBUG
             Log.Verbose($"Calling resizebuffers swap@{swapChain.ToInt64():X}{bufferCount} {width} {height} {newFormat} {swapChainFlags}");
 #endif
+
+            this.ResizeBuffers?.Invoke();
 
             // We have to ensure we're working with the main swapchain,
             // as viewports might be resizing as well
@@ -641,8 +630,12 @@ namespace Dalamud.Interface.Internal
             this.lastWantCapture = this.LastImGuiIoPtr.WantCaptureMouse;
 
             WindowSystem.HasAnyWindowSystemFocus = false;
+            WindowSystem.FocusedWindowSystemNamespace = string.Empty;
 
+            var snap = ImGuiManagedAsserts.GetSnapshot();
             this.Draw?.Invoke();
+            ImGuiManagedAsserts.ReportProblems("Dalamud Core", snap);
+
             Service<NotificationManager>.Get().Draw();
         }
     }

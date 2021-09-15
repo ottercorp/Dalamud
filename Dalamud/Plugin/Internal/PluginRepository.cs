@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Net.Http;
@@ -29,9 +30,6 @@ namespace Dalamud.Plugin.Internal
             this.PluginMasterUrl = pluginMasterUrl;
             this.IsThirdParty = pluginMasterUrl != DalamudPluginsMasterUrl;
             this.IsEnabled = isEnabled;
-
-            // No need to wait for this
-            Task.Run(this.ReloadPluginMasterAsync);
         }
 
         /// <summary>
@@ -57,7 +55,7 @@ namespace Dalamud.Plugin.Internal
         /// <summary>
         /// Gets the plugin master list of available plugins.
         /// </summary>
-        public ReadOnlyCollection<RemotePluginManifest> PluginMaster { get; private set; }
+        public ReadOnlyCollection<RemotePluginManifest>? PluginMaster { get; private set; }
 
         /// <summary>
         /// Gets the initialization state of the plugin repository.
@@ -68,19 +66,25 @@ namespace Dalamud.Plugin.Internal
         /// Reload the plugin master asynchronously in a task.
         /// </summary>
         /// <returns>The new state.</returns>
-        public Task ReloadPluginMasterAsync()
+        public async Task ReloadPluginMasterAsync()
         {
             this.State = PluginRepositoryState.InProgress;
             this.PluginMaster = new List<RemotePluginManifest>().AsReadOnly();
 
-            return Task.Run(() =>
+            try
             {
                 Log.Information($"Fetching repo: {this.PluginMasterUrl}");
                 using var client = new HttpClient();
-                using var response = client.GetAsync(this.PluginMasterUrl).Result;
-                var data = response.Content.ReadAsStringAsync().Result;
+                using var response = await client.GetAsync(this.PluginMasterUrl);
+                var data = await response.Content.ReadAsStringAsync();
 
                 var pluginMaster = JsonConvert.DeserializeObject<List<RemotePluginManifest>>(data);
+
+                if (pluginMaster == null)
+                {
+                    throw new Exception("Deserialized PluginMaster was null.");
+                }
+
                 pluginMaster.Sort((pm1, pm2) => pm1.Name.CompareTo(pm2.Name));
 
                 // Set the source for each remote manifest. Allows for checking if is 3rd party.
@@ -90,19 +94,15 @@ namespace Dalamud.Plugin.Internal
                 }
 
                 this.PluginMaster = pluginMaster.AsReadOnly();
-            }).ContinueWith(task =>
+
+                Log.Debug($"Successfully fetched repo: {this.PluginMasterUrl}");
+                this.State = PluginRepositoryState.Success;
+            }
+            catch (Exception ex)
             {
-                if (task.IsCompletedSuccessfully)
-                {
-                    Log.Debug($"Successfully fetched repo: {this.PluginMasterUrl}");
-                    this.State = PluginRepositoryState.Success;
-                }
-                else
-                {
-                    Log.Error(task.Exception, $"PluginMaster failed: {this.PluginMasterUrl}");
-                    this.State = PluginRepositoryState.Fail;
-                }
-            });
+                Log.Error(ex, $"PluginMaster failed: {this.PluginMasterUrl}");
+                this.State = PluginRepositoryState.Fail;
+            }
         }
     }
 }

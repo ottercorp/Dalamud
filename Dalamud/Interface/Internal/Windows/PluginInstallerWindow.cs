@@ -50,6 +50,8 @@ namespace Dalamud.Interface.Internal.Windows
         private readonly TextureWrap troubleIcon;
         private readonly TextureWrap updateIcon;
 
+        private readonly HttpClient httpClient = new();
+
         #region Image Tester State
 
         private string[] testerImagePaths = new string[5];
@@ -68,7 +70,7 @@ namespace Dalamud.Interface.Internal.Windows
         private string errorModalMessage = string.Empty;
 
         private int updatePluginCount = 0;
-        private List<PluginUpdateStatus> updatedPlugins;
+        private List<PluginUpdateStatus>? updatedPlugins;
 
         private List<RemotePluginManifest> pluginListAvailable = new();
         private List<LocalPlugin> pluginListInstalled = new();
@@ -164,7 +166,7 @@ namespace Dalamud.Interface.Internal.Windows
         {
             var pluginManager = Service<PluginManager>.Get();
 
-            Task.Run(pluginManager.ReloadPluginMasters);
+            _ = pluginManager.ReloadPluginMastersAsync();
 
             this.updatePluginCount = 0;
             this.updatedPlugins = null;
@@ -852,16 +854,16 @@ namespace Dalamud.Interface.Internal.Windows
             ImGui.Image(iconTex.ImGuiHandle, iconSize);
             ImGui.SameLine();
 
-            if (trouble)
-            {
-                ImGui.SetCursorPos(cursorBeforeImage);
-                ImGui.Image(this.troubleIcon.ImGuiHandle, iconSize);
-                ImGui.SameLine();
-            }
-            else if (updateAvailable)
+            if (updateAvailable)
             {
                 ImGui.SetCursorPos(cursorBeforeImage);
                 ImGui.Image(this.updateIcon.ImGuiHandle, iconSize);
+                ImGui.SameLine();
+            }
+            else if (trouble)
+            {
+                ImGui.SetCursorPos(cursorBeforeImage);
+                ImGui.Image(this.troubleIcon.ImGuiHandle, iconSize);
                 ImGui.SameLine();
             }
 
@@ -1185,7 +1187,10 @@ namespace Dalamud.Interface.Internal.Windows
                 // Available commands (if loaded)
                 if (plugin.IsLoaded)
                 {
-                    var commands = commandManager.Commands.Where(cInfo => cInfo.Value.ShowInHelp && cInfo.Value.LoaderAssemblyName == plugin.Manifest.InternalName);
+                    var commands = commandManager.Commands
+                        .Where(cInfo => cInfo.Value.ShowInHelp && cInfo.Value.LoaderAssemblyName == plugin.Manifest.InternalName)
+                        .ToArray();
+
                     if (commands.Any())
                     {
                         ImGui.Dummy(ImGuiHelpers.ScaledVector2(10f, 10f));
@@ -1357,7 +1362,7 @@ namespace Dalamud.Interface.Internal.Windows
             {
                 this.installStatus = OperationStatus.InProgress;
 
-                Task.Run(() => pluginManager.UpdateSinglePluginAsync(update, true, false))
+                Task.Run(async () => await pluginManager.UpdateSinglePluginAsync(update, true, false))
                     .ContinueWith(task =>
                     {
                         // There is no need to set as Complete for an individual plugin installation
@@ -1374,7 +1379,12 @@ namespace Dalamud.Interface.Internal.Windows
             }
 
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip(Locs.PluginButtonToolTip_UpdateSingle(update.UpdateManifest.AssemblyVersion.ToString()));
+            {
+                var updateVersion = update.UseTesting
+                    ? update.UpdateManifest.TestingAssemblyVersion
+                    : update.UpdateManifest.AssemblyVersion;
+                ImGui.SetTooltip(Locs.PluginButtonToolTip_UpdateSingle(updateVersion.ToString()));
+            }
         }
 
         private void DrawOpenPluginSettingsButton(LocalPlugin plugin)
@@ -1741,11 +1751,9 @@ namespace Dalamud.Interface.Internal.Windows
 
             Log.Verbose($"Icon from {Util.FuckGFW(url)}");
 
-            var client = new HttpClient();
-
-            if (url != null)
+            if (!string.IsNullOrWhiteSpace(url))
             {
-                var data = await client.GetAsync(Util.FuckGFW(url));
+                var data = await this.httpClient.GetAsync(Util.FuckGFW(url));
                 if (data.StatusCode == HttpStatusCode.NotFound)
                     return;
 
@@ -1780,8 +1788,6 @@ namespace Dalamud.Interface.Internal.Windows
 
             this.pluginImagesMap.Add(manifest.InternalName, (false, null));
 
-            var client = new HttpClient();
-
             var urls = GetPluginImageUrls(manifest, isThirdParty, pluginManager.UseTesting(manifest));
             var didAny = false;
 
@@ -1796,7 +1802,7 @@ namespace Dalamud.Interface.Internal.Windows
                 var pluginImages = new TextureWrap[urls.Count];
                 for (var i = 0; i < urls.Count; i++)
                 {
-                    var data = await client.GetAsync(Util.FuckGFW(urls[i]));
+                    var data = await this.httpClient.GetAsync(Util.FuckGFW(urls[i]));
 
                     Serilog.Log.Information($"Download from {Util.FuckGFW(urls[i])}");
 
@@ -1928,7 +1934,7 @@ namespace Dalamud.Interface.Internal.Windows
 
             public static string PluginContext_DeletePluginConfig => Loc.Localize("InstallerDeletePluginConfig", "Reset plugin");
 
-            public static string PluginContext_DeletePluginConfigReload => Loc.Localize("InstallerDeletePluginConfig", "Reset plugin settings & reload");
+            public static string PluginContext_DeletePluginConfigReload => Loc.Localize("InstallerDeletePluginConfigReload", "Reset plugin settings & reload");
 
             #endregion
 
@@ -1992,7 +1998,7 @@ namespace Dalamud.Interface.Internal.Windows
 
             public static string Notifications_PluginNotInstalledTitle => Loc.Localize("NotificationsPluginNotInstalledTitle", "Plugin not installed!");
 
-            public static string Notifications_PluginNotInstalled(string name) => Loc.Localize("NotificationsPluginInstalled", "'{0}' failed to install.").Format(name);
+            public static string Notifications_PluginNotInstalled(string name) => Loc.Localize("NotificationsPluginNotInstalled", "'{0}' failed to install.").Format(name);
 
             public static string Notifications_NoUpdatesFoundTitle => Loc.Localize("NotificationsNoUpdatesFoundTitle", "No updates found!");
 

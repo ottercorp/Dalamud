@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
+using Dalamud.Interface.Internal.ManagedAsserts;
 using ImGuiNET;
+using Serilog;
 
 namespace Dalamud.Interface.Windowing
 {
@@ -11,7 +13,11 @@ namespace Dalamud.Interface.Windowing
     /// </summary>
     public class WindowSystem
     {
+        private static DateTimeOffset lastAnyFocus;
+
         private readonly List<Window> windows = new();
+
+        private string lastFocusedWindowName = string.Empty;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WindowSystem"/> class.
@@ -26,7 +32,17 @@ namespace Dalamud.Interface.Windowing
         /// Gets a value indicating whether any <see cref="WindowSystem"/> contains any <see cref="Window"/>
         /// that has focus and is not marked to be excluded from consideration.
         /// </summary>
-        public static bool HasAnyWindowSystemFocus { get; internal set; }
+        public static bool HasAnyWindowSystemFocus { get; internal set; } = false;
+
+        /// <summary>
+        /// Gets the name of the currently focused window system that is redirecting normal escape functionality.
+        /// </summary>
+        public static string FocusedWindowSystemNamespace { get; internal set; } = string.Empty;
+
+        /// <summary>
+        /// Gets the timespan since the last time any window was focused.
+        /// </summary>
+        public static TimeSpan TimeSinceLastAnyFocus => DateTimeOffset.Now - lastAnyFocus;
 
         /// <summary>
         /// Gets a value indicating whether any window in this <see cref="WindowSystem"/> has focus and is
@@ -83,14 +99,38 @@ namespace Dalamud.Interface.Windowing
 #if DEBUG
                 // Log.Verbose($"[WS{(hasNamespace ? "/" + this.Namespace : string.Empty)}] Drawing {window.WindowName}");
 #endif
+                var snapshot = ImGuiManagedAsserts.GetSnapshot();
 
                 window.DrawInternal();
+
+                var source = ($"{this.Namespace}::" ?? string.Empty) + window.WindowName;
+                ImGuiManagedAsserts.ReportProblems(source, snapshot);
             }
 
-            this.HasAnyFocus = this.windows.Any(x => x.IsFocused && x.RespectCloseHotkey);
+            var focusedWindow = this.windows.FirstOrDefault(x => x.IsFocused && x.RespectCloseHotkey);
+            this.HasAnyFocus = focusedWindow != default;
 
             if (this.HasAnyFocus)
+            {
+                if (this.lastFocusedWindowName != focusedWindow.WindowName)
+                {
+                    Log.Verbose($"WindowSystem \"{this.Namespace}\" Window \"{focusedWindow.WindowName}\" has focus now");
+                    this.lastFocusedWindowName = focusedWindow.WindowName;
+                }
+
                 HasAnyWindowSystemFocus = true;
+                FocusedWindowSystemNamespace = this.Namespace;
+
+                lastAnyFocus = DateTimeOffset.Now;
+            }
+            else
+            {
+                if (this.lastFocusedWindowName != string.Empty)
+                {
+                    Log.Verbose($"WindowSystem \"{this.Namespace}\" Window \"{this.lastFocusedWindowName}\" lost focus");
+                    this.lastFocusedWindowName = string.Empty;
+                }
+            }
 
             if (hasNamespace)
                 ImGui.PopID();
