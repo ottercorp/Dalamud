@@ -103,7 +103,7 @@ namespace Dalamud
             var logPath = Path.Combine(baseDirectory, "dalamud.log");
             var oldPath = Path.Combine(baseDirectory, "dalamud.log.old");
 #else
-            var logPath = Path.Combine(baseDirectory, "..", "Logs", $"{DateTime.Now.ToString("u").Replace(':', '.')}.log");
+            var logPath = Path.Combine(baseDirectory, "logs", $"dalamud {DateTime.Now.ToString("O").Replace(':','-')}.log");
             var oldPath = Path.Combine(baseDirectory, "dalamud.log.old");
 #endif
 
