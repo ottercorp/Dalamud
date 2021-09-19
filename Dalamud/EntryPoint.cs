@@ -103,12 +103,12 @@ namespace Dalamud
             var logPath = Path.Combine(baseDirectory, "dalamud.log");
             var oldPath = Path.Combine(baseDirectory, "dalamud.log.old");
 #else
-            var logPath = Path.Combine(baseDirectory, "logs", $"dalamud {DateTime.Now.ToString("O").Replace(':','-')}.log");
+            var logPath = Path.Combine(baseDirectory, "dalamud.log");
             var oldPath = Path.Combine(baseDirectory, "dalamud.log.old");
 #endif
 
-            //CullLogFile(logPath, oldPath, 1 * 1024 * 1024);
-            //CullLogFile(oldPath, null, 10 * 1024 * 1024);
+            CullLogFile(logPath, oldPath, 1 * 1024 * 1024);
+            CullLogFile(oldPath, null, 10 * 1024 * 1024);
 
             var levelSwitch = new LoggingLevelSwitch(LogEventLevel.Verbose);
             Log.Logger = new LoggerConfiguration()
