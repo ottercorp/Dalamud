@@ -202,8 +202,6 @@ namespace Dalamud.Interface.Internal.Windows
             this.DownloadPluginIcons();
         }
 
-        private static Vector2 GetButtonSize(string text) => ImGui.CalcTextSize(text) + (ImGui.GetStyle().FramePadding * 2);
-
         private static string? GetPluginIconUrl(PluginManifest manifest, bool isThirdParty, bool isTesting)
         {
             if (isThirdParty)
@@ -287,7 +285,7 @@ namespace Dalamud.Interface.Internal.Windows
             var pluginManager = Service<PluginManager>.Get();
 
             var windowSize = ImGui.GetWindowContentRegionMax();
-            var placeholderButtonSize = GetButtonSize("placeholder");
+            var placeholderButtonSize = ImGuiHelpers.GetButtonSize("placeholder");
 
             ImGui.Separator();
 
@@ -312,7 +310,7 @@ namespace Dalamud.Interface.Internal.Windows
             }
 
             var closeText = Locs.FooterButton_Close;
-            var closeButtonSize = GetButtonSize(closeText);
+            var closeButtonSize = ImGuiHelpers.GetButtonSize(closeText);
 
             ImGui.SameLine(windowSize.X - closeButtonSize.X - 20);
             if (ImGui.Button(closeText))
