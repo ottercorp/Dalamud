@@ -479,7 +479,7 @@ namespace Dalamud.Interface.Internal
             if (!File.Exists(fontPathMono))
                 ShowFontError(fontPathMono);
 
-            MonoFont = ImGui.GetIO().Fonts.AddFontFromFileTTF(fontPathMono, 16.0f, null, ImGui.GetIO().Fonts.GetGlyphRangesChineseFull());
+            MonoFont = ImGui.GetIO().Fonts.AddFontFromFileTTF(fontPathMono, 16.0f, null, chineseRangeHandle.AddrOfPinnedObject());
 
             Log.Verbose("[FONT] Invoke OnBuildFonts");
             this.BuildFonts?.Invoke();
