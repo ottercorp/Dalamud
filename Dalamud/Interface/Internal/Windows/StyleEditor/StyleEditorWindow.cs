@@ -380,8 +380,12 @@ namespace Dalamud.Interface.Internal.Windows.StyleEditor
             var data = Service<DataManager>.Get();
             var names = data.GetExcelSheet<BNpcName>();
             var rng = new Random();
-
-            return names.ElementAt(rng.Next(0, names.Count() - 1)).Singular.RawString;
+			string randomName;
+			do
+			{
+				randomName = names.ElementAt(rng.Next(0, names.Count() - 1)).Singular.RawString;
+			} while (string.IsNullOrWhiteSpace(randomName));
+			return randomName;
         }
 
         private void SaveStyle()
