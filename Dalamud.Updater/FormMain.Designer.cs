@@ -50,6 +50,7 @@ namespace Dalamud.Updater
             this.progressBar1 = new System.Windows.Forms.ProgressBar();
             this.progressBar2 = new System.Windows.Forms.ProgressBar();
             this.labelVer = new System.Windows.Forms.Label();
+            this.ButtonProxySetting = new System.Windows.Forms.Button();
             this.contextMenuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -58,7 +59,7 @@ namespace Dalamud.Updater
             this.buttonCheckForUpdate.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.buttonCheckForUpdate.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonCheckForUpdate.Location = new System.Drawing.Point(12, 126);
+            this.buttonCheckForUpdate.Location = new System.Drawing.Point(12, 125);
             this.buttonCheckForUpdate.Name = "buttonCheckForUpdate";
             this.buttonCheckForUpdate.Size = new System.Drawing.Size(196, 40);
             this.buttonCheckForUpdate.TabIndex = 0;
@@ -81,7 +82,7 @@ namespace Dalamud.Updater
             this.buttonCheckRuntime.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.buttonCheckRuntime.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonCheckRuntime.Location = new System.Drawing.Point(12, 47);
+            this.buttonCheckRuntime.Location = new System.Drawing.Point(11, 47);
             this.buttonCheckRuntime.Name = "buttonCheckRuntime";
             this.buttonCheckRuntime.Size = new System.Drawing.Size(196, 40);
             this.buttonCheckRuntime.TabIndex = 0;
@@ -95,10 +96,11 @@ namespace Dalamud.Updater
             this.comboBoxFFXIV.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.comboBoxFFXIV.FormattingEnabled = true;
             this.comboBoxFFXIV.ImeMode = System.Windows.Forms.ImeMode.On;
-            this.comboBoxFFXIV.Location = new System.Drawing.Point(12, 205);
+            this.comboBoxFFXIV.Location = new System.Drawing.Point(11, 240);
             this.comboBoxFFXIV.Name = "comboBoxFFXIV";
             this.comboBoxFFXIV.Size = new System.Drawing.Size(196, 23);
             this.comboBoxFFXIV.TabIndex = 2;
+            this.comboBoxFFXIV.SelectedIndexChanged += new System.EventHandler(this.comboBoxFFXIV_SelectedIndexChanged);
             this.comboBoxFFXIV.Click += new System.EventHandler(this.comboBoxFFXIV_Clicked);
             // 
             // buttonInject
@@ -106,7 +108,7 @@ namespace Dalamud.Updater
             this.buttonInject.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.buttonInject.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonInject.Location = new System.Drawing.Point(12, 234);
+            this.buttonInject.Location = new System.Drawing.Point(11, 269);
             this.buttonInject.Name = "buttonInject";
             this.buttonInject.Size = new System.Drawing.Size(196, 89);
             this.buttonInject.TabIndex = 0;
@@ -117,7 +119,7 @@ namespace Dalamud.Updater
             // linkLabel1
             // 
             this.linkLabel1.AutoSize = true;
-            this.linkLabel1.Location = new System.Drawing.Point(159, 326);
+            this.linkLabel1.Location = new System.Drawing.Point(159, 361);
             this.linkLabel1.Name = "linkLabel1";
             this.linkLabel1.Size = new System.Drawing.Size(64, 15);
             this.linkLabel1.TabIndex = 3;
@@ -139,7 +141,7 @@ namespace Dalamud.Updater
             // linkLabel2
             // 
             this.linkLabel2.AutoSize = true;
-            this.linkLabel2.Location = new System.Drawing.Point(-1, 326);
+            this.linkLabel2.Location = new System.Drawing.Point(-1, 361);
             this.linkLabel2.Name = "linkLabel2";
             this.linkLabel2.Size = new System.Drawing.Size(59, 15);
             this.linkLabel2.TabIndex = 3;
@@ -150,7 +152,7 @@ namespace Dalamud.Updater
             // checkBoxAutoInject
             // 
             this.checkBoxAutoInject.AutoSize = true;
-            this.checkBoxAutoInject.Location = new System.Drawing.Point(130, 180);
+            this.checkBoxAutoInject.Location = new System.Drawing.Point(130, 215);
             this.checkBoxAutoInject.Name = "checkBoxAutoInject";
             this.checkBoxAutoInject.Size = new System.Drawing.Size(78, 19);
             this.checkBoxAutoInject.TabIndex = 4;
@@ -194,7 +196,7 @@ namespace Dalamud.Updater
             // checkBoxAutoStart
             // 
             this.checkBoxAutoStart.AutoSize = true;
-            this.checkBoxAutoStart.Location = new System.Drawing.Point(15, 180);
+            this.checkBoxAutoStart.Location = new System.Drawing.Point(15, 215);
             this.checkBoxAutoStart.Name = "checkBoxAutoStart";
             this.checkBoxAutoStart.Size = new System.Drawing.Size(78, 19);
             this.checkBoxAutoStart.TabIndex = 5;
@@ -219,17 +221,31 @@ namespace Dalamud.Updater
             // labelVer
             // 
             this.labelVer.AutoSize = true;
-            this.labelVer.Location = new System.Drawing.Point(87, 326);
+            this.labelVer.Location = new System.Drawing.Point(87, 361);
             this.labelVer.Name = "labelVer";
             this.labelVer.Size = new System.Drawing.Size(44, 15);
             this.labelVer.TabIndex = 8;
             this.labelVer.Text = "default";
             // 
+            // ButtonProxySetting
+            // 
+            this.ButtonProxySetting.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.ButtonProxySetting.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.ButtonProxySetting.Location = new System.Drawing.Point(12, 172);
+            this.ButtonProxySetting.Name = "ButtonProxySetting";
+            this.ButtonProxySetting.Size = new System.Drawing.Size(196, 40);
+            this.ButtonProxySetting.TabIndex = 9;
+            this.ButtonProxySetting.Text = "代理设置";
+            this.ButtonProxySetting.UseVisualStyleBackColor = true;
+            this.ButtonProxySetting.Click += new System.EventHandler(this.buttonProxySetting_Click);
+            // 
             // FormMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(220, 341);
+            this.ClientSize = new System.Drawing.Size(220, 384);
+            this.Controls.Add(this.ButtonProxySetting);
             this.Controls.Add(this.labelVer);
             this.Controls.Add(this.progressBar2);
             this.Controls.Add(this.progressBar1);
@@ -278,6 +294,7 @@ namespace Dalamud.Updater
         private System.Windows.Forms.ProgressBar progressBar1;
         private System.Windows.Forms.ProgressBar progressBar2;
         private System.Windows.Forms.Label labelVer;
+        private System.Windows.Forms.Button ButtonProxySetting;
     }
 }
 

@@ -38,6 +38,10 @@ namespace Dalamud.Updater
         private DirectoryInfo[] runtimePaths;
         private string RuntimeVersion = "5.0.6";
 
+        private bool useProxy = false;
+        public string proxyHost = "";
+        public string proxyPort = "";
+
         public static string GetAppSettings(string key, string def = null)
         {
             try
@@ -130,6 +134,12 @@ namespace Dalamud.Updater
             {
                 this.checkBoxAcce.Checked = true;
             }
+            if (GetAppSettings("UseProxy", "false") == "true")
+            {
+                this.useProxy = true;
+            }
+            this.proxyHost = GetAppSettings("ProxyHost", "");
+            this.proxyPort = GetAppSettings("ProxyPort", "");
         }
 
         private void InitializeDeleteShit()
@@ -143,7 +153,8 @@ namespace Dalamud.Updater
 
         private void InitializePIDCheck()
         {
-            var thread = new Thread(() => {
+            var thread = new Thread(() =>
+            {
                 while (this.isThreadRunning)
                 {
                     var newPidList = Process.GetProcessesByName("ffxiv_dx11").ToList()
@@ -153,7 +164,8 @@ namespace Dalamud.Updater
                     var oldHash = String.Join(", ", oldPidList).GetHashCode();
                     if (oldHash != newHash && this.comboBoxFFXIV.IsHandleCreated)
                     {
-                        this.comboBoxFFXIV.Invoke((MethodInvoker)delegate {
+                        this.comboBoxFFXIV.Invoke((MethodInvoker)delegate
+                        {
                             // Running on the UI thread
                             comboBoxFFXIV.Items.Clear();
                             comboBoxFFXIV.Items.AddRange(newPidList);
@@ -190,7 +202,9 @@ namespace Dalamud.Updater
             AutoUpdater.InstalledVersion = getVersion();
             labelVer.Text = $"v{Assembly.GetExecutingAssembly().GetName().Version}";
             UpdateRuntimePaths();
-            new Thread(() => {
+
+            new Thread(() =>
+            {
                 Thread.Sleep(5000);
                 if (runtimePaths.Any(p => !p.Exists))
                 {
@@ -203,7 +217,7 @@ namespace Dalamud.Updater
                         return;
                 }
             }).Start();
-            
+
         }
         private void FormMain_Disposed(object sender, EventArgs e)
         {
@@ -470,6 +484,7 @@ namespace Dalamud.Updater
                 runtimePath.Create();
             }
 
+            CheckAndSetProxy();
 
             WebClient client1 = new WebClient();
             client1.DownloadProgressChanged += new DownloadProgressChangedEventHandler(client1_DownloadProgressChanged);
@@ -538,7 +553,8 @@ namespace Dalamud.Updater
                     TryDownloadRuntime(runtimePath, RuntimeVersion);
                 else
                     return;
-            } else
+            }
+            else
             {
                 var choice = MessageBox.Show("运行库已存在，是否强制下载？", "下载运行库",
                                 MessageBoxButtons.YesNo,
@@ -559,7 +575,8 @@ namespace Dalamud.Updater
                 {
                     var pid = int.Parse((string)this.comboBoxFFXIV.SelectedItem);
                     Process.GetProcessById(pid).Kill();
-                } else
+                }
+                else
                 {
                     return;
                 }
@@ -571,6 +588,7 @@ namespace Dalamud.Updater
                 updateUrl = OverwriteUpdate;
             if (this.checkBoxAcce.Checked)
                 updateUrl = updateUrl.Replace("/update", "/acce_update").Replace("ap-nanjing", "accelerate");
+            CheckAndSetProxy();
             AutoUpdater.Start(updateUrl);
         }
 
@@ -639,7 +657,7 @@ namespace Dalamud.Updater
 
         private void ButtonInject_Click(object sender, EventArgs e)
         {
-            if(this.comboBoxFFXIV.SelectedItem != null)
+            if (this.comboBoxFFXIV.SelectedItem != null)
             {
                 var pid = this.comboBoxFFXIV.SelectedItem.ToString();
                 Inject(int.Parse(pid));
@@ -678,6 +696,50 @@ namespace Dalamud.Updater
         private void checkBoxAcce_CheckedChanged(object sender, EventArgs e)
         {
             AddOrUpdateAppSettings("Accelerate", checkBoxAcce.Checked ? "true" : "false");
+        }
+
+        private void comboBoxFFXIV_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void buttonProxySetting_Click(object sender, EventArgs e)
+        {
+            var settingform = new ProxySetting(useProxy, proxyHost, proxyPort);
+            if (settingform.ShowDialog() == DialogResult.OK)
+            {
+                useProxy = settingform.useProxy;
+                proxyHost = settingform.proxyHost;
+                proxyPort = settingform.proxyPort;
+                AddOrUpdateAppSettings("UseProxy", useProxy ? "true" : "false");
+                AddOrUpdateAppSettings("ProxyHost", proxyHost);
+                AddOrUpdateAppSettings("ProxyPort", proxyPort);
+            }
+        }
+
+        private void CheckAndSetProxy()
+        {
+
+            try
+            {
+                if (useProxy)
+                {
+                    WebProxy WP = new WebProxy(proxyHost, int.Parse(proxyPort));
+                    WebRequest.DefaultWebProxy = WP;
+                    AutoUpdater.Proxy = WP;
+                }
+                else
+                {
+                    AutoUpdater.Proxy = null;
+                    WebRequest.DefaultWebProxy = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("请检查代理设置", "代理错误",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+            }
         }
 
     }

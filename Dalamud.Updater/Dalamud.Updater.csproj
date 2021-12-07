@@ -80,6 +80,12 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ProxySetting.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="ProxySetting.Designer.cs">
+      <DependentUpon>ProxySetting.cs</DependentUpon>
+    </Compile>
     <Compile Include="SystemHelper.cs" />
     <EmbeddedResource Include="FormMain.resx">
       <DependentUpon>FormMain.cs</DependentUpon>
@@ -94,6 +100,9 @@
       <DependentUpon>Resources.resx</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
+    <EmbeddedResource Include="ProxySetting.resx">
+      <DependentUpon>ProxySetting.cs</DependentUpon>
+    </EmbeddedResource>
     <None Include="app.manifest" />
     <None Include="ILMerge.props" />
     <None Include="packages.config" />
