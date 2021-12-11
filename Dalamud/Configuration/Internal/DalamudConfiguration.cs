@@ -246,6 +246,21 @@ namespace Dalamud.Configuration.Internal
         public bool DisableRmtFiltering { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether or not the system default proxy should be used.
+        /// </summary>
+        public bool UseSystemProxy { get; set; }
+
+        /// <summary>
+        /// Gets or sets the proxy host address.
+        /// </summary>
+        public string ProxyHost { get; set; } = "127.0.0.1";
+
+        /// <summary>
+        /// Gets or sets the proxy port.
+        /// </summary>
+        public int ProxyPort { get; set; } = 1080;
+
+        /// <summary>
         /// Load a configuration from the provided path.
         /// </summary>
         /// <param name="path">The path to load the configuration file from.</param>

@@ -24,6 +24,7 @@ using Dalamud.Logging.Internal;
 using Dalamud.Plugin.Internal;
 using Dalamud.Plugin.Ipc.Internal;
 using Dalamud.Support;
+using Dalamud.Utility;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -249,6 +250,18 @@ namespace Dalamud
             try
             {
                 Log.Information("[T3] START!");
+
+                var configuration = Service<DalamudConfiguration>.Get();
+                try
+                {
+                    if (string.IsNullOrEmpty(configuration.ProxyHost))
+                        configuration.ProxyHost = "127.0.0.1";
+                    Util.SetProxy(configuration.UseSystemProxy, configuration.ProxyHost, configuration.ProxyPort);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Proxy failed.");
+                }
 
                 var pluginManager = Service<PluginManager>.Set();
                 Service<CallGate>.Set();

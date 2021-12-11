@@ -13,6 +13,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Internal;
+using Dalamud.Utility;
 using ImGuiNET;
 
 namespace Dalamud.Interface.Internal.Windows
@@ -64,6 +65,10 @@ namespace Dalamud.Interface.Internal.Windows
         private bool doButtonsSystemMenu;
         private bool disableRmtFiltering;
 
+        private bool useSystemProxy;
+        private string proxyHost = string.Empty;
+        private int proxyPort;
+
         #region Experimental
 
         private bool doPluginTest;
@@ -105,6 +110,10 @@ namespace Dalamud.Interface.Internal.Windows
             this.autoUpdatePlugins = configuration.AutoUpdatePlugins;
             this.doButtonsSystemMenu = configuration.DoButtonsSystemMenu;
             this.disableRmtFiltering = configuration.DisableRmtFiltering;
+
+            this.useSystemProxy = configuration.UseSystemProxy;
+            this.proxyHost = configuration.ProxyHost;
+            this.proxyPort = configuration.ProxyPort;
 
             this.languages = Localization.ApplicableLangCodes.Prepend("en").ToArray();
             try
@@ -364,7 +373,24 @@ namespace Dalamud.Interface.Internal.Windows
 
             ImGuiHelpers.ScaledDummy(12);
 
+            this.ProxySetting();
+
+            ImGuiHelpers.ScaledDummy(12);
+
             ImGui.TextColored(ImGuiColors.DalamudGrey, "Total memory used by Dalamud & Plugins: " + FormatBytes(GC.GetTotalMemory(false)));
+        }
+
+        private void ProxySetting() {
+                ImGui.Checkbox("Use System Proxy" , ref this.useSystemProxy);
+                if (!this.useSystemProxy)
+                {
+                    ImGui.Text("Proxy Host:");
+                    ImGui.SameLine();
+                    ImGui.InputText("##proxyHost", ref this.proxyHost, 65535);
+                    ImGui.Text("Proxy Port:");
+                    ImGui.SameLine();
+                    ImGui.InputInt("##proxyPort", ref this.proxyPort);
+                }
         }
 
         private void FuckGFWAddDefault()
@@ -938,6 +964,12 @@ namespace Dalamud.Interface.Internal.Windows
             configuration.AutoUpdatePlugins = this.autoUpdatePlugins;
             configuration.DoButtonsSystemMenu = this.doButtonsSystemMenu;
             configuration.DisableRmtFiltering = this.disableRmtFiltering;
+
+            configuration.UseSystemProxy = this.useSystemProxy;
+            configuration.ProxyHost = this.proxyHost;
+            configuration.ProxyPort = this.proxyPort;
+
+            Util.SetProxy(configuration.UseSystemProxy, configuration.ProxyHost, configuration.ProxyPort);
 
             configuration.Save();
 

@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -372,5 +374,17 @@ namespace Dalamud.Utility
 
             return Check1() || Check2() || Check3();
         }
+
+        /// <summary>
+        /// Set the proxy.
+        /// </summary>
+        /// <param name="useSystemProxy">Use system proxy</param>
+        /// <param name="proxyHost">The proxy host.</param>
+        /// <param name="proxyPort">The proxy port.</param>
+        public static void SetProxy(bool useSystemProxy, string proxyHost = "", int proxyPort = 0) {
+                var proxy = useSystemProxy ? WebRequest.GetSystemWebProxy() : new WebProxy(proxyHost, proxyPort);
+                WebRequest.DefaultWebProxy = proxy;
+                HttpClient.DefaultProxy = proxy;
+            }
     }
 }
