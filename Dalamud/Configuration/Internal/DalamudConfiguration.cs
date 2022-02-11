@@ -248,7 +248,7 @@ namespace Dalamud.Configuration.Internal
         /// <summary>
         /// Gets or sets a value indicating whether or not the system default proxy should be used.
         /// </summary>
-        public bool UseSystemProxy { get; set; }
+        public bool UseSystemProxy { get; set; }=true;
 
         /// <summary>
         /// Gets or sets the proxy host address.

@@ -382,9 +382,14 @@ namespace Dalamud.Utility
         /// <param name="proxyHost">The proxy host.</param>
         /// <param name="proxyPort">The proxy port.</param>
         public static void SetProxy(bool useSystemProxy, string proxyHost = "", int proxyPort = 0) {
-                var proxy = useSystemProxy ? WebRequest.GetSystemWebProxy() : new WebProxy(proxyHost, proxyPort);
-                WebRequest.DefaultWebProxy = proxy;
-                HttpClient.DefaultProxy = proxy;
+            var proxy = useSystemProxy ? WebRequest.GetSystemWebProxy() : new WebProxy(proxyHost, proxyPort);
+            if (useSystemProxy)
+                Log.Information($"Current proxy is default proxy of system.");
+            else {
+                Log.Information($"Current proxy is {proxyHost}:{proxyPort}.");
+            }
+            WebRequest.DefaultWebProxy = proxy;
+            HttpClient.DefaultProxy = proxy;
             }
     }
 }

@@ -254,8 +254,6 @@ namespace Dalamud
                 var configuration = Service<DalamudConfiguration>.Get();
                 try
                 {
-                    if (string.IsNullOrEmpty(configuration.ProxyHost))
-                        configuration.ProxyHost = "127.0.0.1";
                     Util.SetProxy(configuration.UseSystemProxy, configuration.ProxyHost, configuration.ProxyPort);
                 }
                 catch (Exception ex)
