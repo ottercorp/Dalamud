@@ -40,7 +40,6 @@ namespace Dalamud.Updater
             this.buttonInject = new System.Windows.Forms.Button();
             this.linkLabel1 = new System.Windows.Forms.LinkLabel();
             this.checkBoxAcce = new System.Windows.Forms.CheckBox();
-            this.linkLabel2 = new System.Windows.Forms.LinkLabel();
             this.checkBoxAutoInject = new System.Windows.Forms.CheckBox();
             this.DalamudUpdaterIcon = new System.Windows.Forms.NotifyIcon(this.components);
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
@@ -50,7 +49,11 @@ namespace Dalamud.Updater
             this.progressBar1 = new System.Windows.Forms.ProgressBar();
             this.progressBar2 = new System.Windows.Forms.ProgressBar();
             this.labelVer = new System.Windows.Forms.Label();
+            this.delayLabel = new System.Windows.Forms.Label();
+            this.second = new System.Windows.Forms.Label();
+            this.delayBox = new System.Windows.Forms.NumericUpDown();
             this.contextMenuStrip1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.delayBox)).BeginInit();
             this.SuspendLayout();
             // 
             // buttonCheckForUpdate
@@ -58,7 +61,7 @@ namespace Dalamud.Updater
             this.buttonCheckForUpdate.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.buttonCheckForUpdate.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonCheckForUpdate.Location = new System.Drawing.Point(12, 126);
+            this.buttonCheckForUpdate.Location = new System.Drawing.Point(11, 121);
             this.buttonCheckForUpdate.Name = "buttonCheckForUpdate";
             this.buttonCheckForUpdate.Size = new System.Drawing.Size(196, 40);
             this.buttonCheckForUpdate.TabIndex = 0;
@@ -81,7 +84,7 @@ namespace Dalamud.Updater
             this.buttonCheckRuntime.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.buttonCheckRuntime.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonCheckRuntime.Location = new System.Drawing.Point(12, 47);
+            this.buttonCheckRuntime.Location = new System.Drawing.Point(12, 43);
             this.buttonCheckRuntime.Name = "buttonCheckRuntime";
             this.buttonCheckRuntime.Size = new System.Drawing.Size(196, 40);
             this.buttonCheckRuntime.TabIndex = 0;
@@ -95,7 +98,7 @@ namespace Dalamud.Updater
             this.comboBoxFFXIV.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.comboBoxFFXIV.FormattingEnabled = true;
             this.comboBoxFFXIV.ImeMode = System.Windows.Forms.ImeMode.On;
-            this.comboBoxFFXIV.Location = new System.Drawing.Point(12, 205);
+            this.comboBoxFFXIV.Location = new System.Drawing.Point(12, 174);
             this.comboBoxFFXIV.Name = "comboBoxFFXIV";
             this.comboBoxFFXIV.Size = new System.Drawing.Size(196, 23);
             this.comboBoxFFXIV.TabIndex = 2;
@@ -106,7 +109,7 @@ namespace Dalamud.Updater
             this.buttonInject.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.buttonInject.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonInject.Location = new System.Drawing.Point(12, 234);
+            this.buttonInject.Location = new System.Drawing.Point(12, 261);
             this.buttonInject.Name = "buttonInject";
             this.buttonInject.Size = new System.Drawing.Size(196, 89);
             this.buttonInject.TabIndex = 0;
@@ -117,12 +120,12 @@ namespace Dalamud.Updater
             // linkLabel1
             // 
             this.linkLabel1.AutoSize = true;
-            this.linkLabel1.Location = new System.Drawing.Point(159, 326);
+            this.linkLabel1.Location = new System.Drawing.Point(140, 353);
             this.linkLabel1.Name = "linkLabel1";
-            this.linkLabel1.Size = new System.Drawing.Size(64, 15);
+            this.linkLabel1.Size = new System.Drawing.Size(77, 15);
             this.linkLabel1.TabIndex = 3;
             this.linkLabel1.TabStop = true;
-            this.linkLabel1.Text = "加入QQ群";
+            this.linkLabel1.Text = "加入QQ频道";
             this.linkLabel1.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel1_LinkClicked);
             // 
             // checkBoxAcce
@@ -136,21 +139,10 @@ namespace Dalamud.Updater
             this.checkBoxAcce.UseVisualStyleBackColor = true;
             this.checkBoxAcce.CheckedChanged += new System.EventHandler(this.checkBoxAcce_CheckedChanged);
             // 
-            // linkLabel2
-            // 
-            this.linkLabel2.AutoSize = true;
-            this.linkLabel2.Location = new System.Drawing.Point(-1, 326);
-            this.linkLabel2.Name = "linkLabel2";
-            this.linkLabel2.Size = new System.Drawing.Size(59, 15);
-            this.linkLabel2.TabIndex = 3;
-            this.linkLabel2.TabStop = true;
-            this.linkLabel2.Text = "投喂小獭";
-            this.linkLabel2.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel2_LinkClicked);
-            // 
             // checkBoxAutoInject
             // 
             this.checkBoxAutoInject.AutoSize = true;
-            this.checkBoxAutoInject.Location = new System.Drawing.Point(130, 180);
+            this.checkBoxAutoInject.Location = new System.Drawing.Point(130, 205);
             this.checkBoxAutoInject.Name = "checkBoxAutoInject";
             this.checkBoxAutoInject.Size = new System.Drawing.Size(78, 19);
             this.checkBoxAutoInject.TabIndex = 4;
@@ -194,7 +186,7 @@ namespace Dalamud.Updater
             // checkBoxAutoStart
             // 
             this.checkBoxAutoStart.AutoSize = true;
-            this.checkBoxAutoStart.Location = new System.Drawing.Point(15, 180);
+            this.checkBoxAutoStart.Location = new System.Drawing.Point(12, 205);
             this.checkBoxAutoStart.Name = "checkBoxAutoStart";
             this.checkBoxAutoStart.Size = new System.Drawing.Size(78, 19);
             this.checkBoxAutoStart.TabIndex = 5;
@@ -204,14 +196,14 @@ namespace Dalamud.Updater
             // 
             // progressBar1
             // 
-            this.progressBar1.Location = new System.Drawing.Point(12, 93);
+            this.progressBar1.Location = new System.Drawing.Point(12, 89);
             this.progressBar1.Name = "progressBar1";
             this.progressBar1.Size = new System.Drawing.Size(195, 10);
             this.progressBar1.TabIndex = 6;
             // 
             // progressBar2
             // 
-            this.progressBar2.Location = new System.Drawing.Point(12, 109);
+            this.progressBar2.Location = new System.Drawing.Point(13, 105);
             this.progressBar2.Name = "progressBar2";
             this.progressBar2.Size = new System.Drawing.Size(195, 10);
             this.progressBar2.TabIndex = 7;
@@ -219,24 +211,52 @@ namespace Dalamud.Updater
             // labelVer
             // 
             this.labelVer.AutoSize = true;
-            this.labelVer.Location = new System.Drawing.Point(87, 326);
+            this.labelVer.Location = new System.Drawing.Point(8, 353);
             this.labelVer.Name = "labelVer";
             this.labelVer.Size = new System.Drawing.Size(44, 15);
             this.labelVer.TabIndex = 8;
             this.labelVer.Text = "default";
             // 
+            // delayLabel
+            // 
+            this.delayLabel.AutoSize = true;
+            this.delayLabel.Location = new System.Drawing.Point(12, 232);
+            this.delayLabel.Name = "delayLabel";
+            this.delayLabel.Size = new System.Drawing.Size(59, 15);
+            this.delayLabel.TabIndex = 10;
+            this.delayLabel.Text = "延迟注入";
+            // 
+            // second
+            // 
+            this.second.AutoSize = true;
+            this.second.Location = new System.Drawing.Point(188, 232);
+            this.second.Name = "second";
+            this.second.Size = new System.Drawing.Size(20, 15);
+            this.second.TabIndex = 11;
+            this.second.Text = "秒";
+            // 
+            // delayBox
+            // 
+            this.delayBox.Location = new System.Drawing.Point(77, 229);
+            this.delayBox.Name = "delayBox";
+            this.delayBox.Size = new System.Drawing.Size(104, 23);
+            this.delayBox.TabIndex = 12;
+            this.delayBox.ValueChanged += new System.EventHandler(this.delayBox_ValueChanged);
+            // 
             // FormMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(220, 341);
+            this.ClientSize = new System.Drawing.Size(220, 368);
+            this.Controls.Add(this.delayBox);
+            this.Controls.Add(this.second);
+            this.Controls.Add(this.delayLabel);
             this.Controls.Add(this.labelVer);
             this.Controls.Add(this.progressBar2);
             this.Controls.Add(this.progressBar1);
             this.Controls.Add(this.checkBoxAutoStart);
             this.Controls.Add(this.checkBoxAutoInject);
             this.Controls.Add(this.checkBoxAcce);
-            this.Controls.Add(this.linkLabel2);
             this.Controls.Add(this.linkLabel1);
             this.Controls.Add(this.comboBoxFFXIV);
             this.Controls.Add(this.labelVersion);
@@ -254,6 +274,7 @@ namespace Dalamud.Updater
             this.Load += new System.EventHandler(this.FormMain_Load);
             this.Disposed += new System.EventHandler(this.FormMain_Disposed);
             this.contextMenuStrip1.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.delayBox)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -268,7 +289,6 @@ namespace Dalamud.Updater
         private System.Windows.Forms.Button buttonInject;
         private System.Windows.Forms.LinkLabel linkLabel1;
         private System.Windows.Forms.CheckBox checkBoxAcce;
-        private System.Windows.Forms.LinkLabel linkLabel2;
         private System.Windows.Forms.CheckBox checkBoxAutoInject;
         private System.Windows.Forms.NotifyIcon DalamudUpdaterIcon;
         private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
@@ -278,6 +298,9 @@ namespace Dalamud.Updater
         private System.Windows.Forms.ProgressBar progressBar1;
         private System.Windows.Forms.ProgressBar progressBar2;
         private System.Windows.Forms.Label labelVer;
+        private System.Windows.Forms.Label delayLabel;
+        private System.Windows.Forms.Label second;
+        private System.Windows.Forms.NumericUpDown delayBox;
     }
 }
 

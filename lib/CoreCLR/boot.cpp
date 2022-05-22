@@ -25,14 +25,8 @@ void ConsoleTeardown()
 
 std::optional<CoreCLR> g_clr;
 
-std::wstring ExePath() {
-    TCHAR buffer[MAX_PATH] = { 0 };
-    GetModuleFileName(NULL, buffer, MAX_PATH);
-    std::wstring::size_type pos = std::wstring(buffer).find_last_of(L"\\/");
-    return std::wstring(buffer).substr(0, pos);
-}
-
 int InitializeClrAndGetEntryPoint(
+    void* calling_module,
     std::wstring runtimeconfig_path,
     std::wstring module_path,
     std::wstring entrypoint_assembly_name,
@@ -40,7 +34,7 @@ int InitializeClrAndGetEntryPoint(
     std::wstring entrypoint_delegate_type_name,
     void** entrypoint_fn)
 {
-    g_clr = CoreCLR();
+    g_clr.emplace(calling_module);
 
     int result;
     SetEnvironmentVariable(L"DOTNET_MULTILEVEL_LOOKUP", L"0");
@@ -63,7 +57,6 @@ int InitializeClrAndGetEntryPoint(
     }
     else
     {
-        /*
         result = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, nullptr, &_appdata);
 
         if (result != 0)
@@ -71,10 +64,9 @@ int InitializeClrAndGetEntryPoint(
             printf("Error: Unable to get RoamingAppData path (err=%d)\n", result);
             return result;
         }
-        */
 
         std::filesystem::path fs_app_data(module_path);
-        dotnet_path = _wcsdup(fs_app_data.parent_path().append("..").append("XIVLauncher").append("runtime").c_str());
+        dotnet_path = _wcsdup(fs_app_data.parent_path().append("..").append("..").append("..").append("runtime").c_str());
     }
 
     // =========================================================================== //
@@ -99,7 +91,7 @@ int InitializeClrAndGetEntryPoint(
     printf("Loading hostfxr... ");
     if ((result = g_clr->load_hostfxr(&init_parameters)) != 0)
     {
-        printf("\nError: Failed to load the `hostfxr` library (err=%d)\n", result);
+        printf("\nError: Failed to load the `hostfxr` library (err=0x%08x)\n", result);
         return result;
     }
     printf("Done!\n");

@@ -5,15 +5,18 @@
 #include "nethost/nethost.h"
 
 class CoreCLR {
-    public:
-    explicit CoreCLR();
+    void* const m_calling_module;
+
+public:
+    explicit CoreCLR(void* calling_module);
     ~CoreCLR() = default;
 
     int load_hostfxr();
     int load_hostfxr(const get_hostfxr_parameters* parameters);
 
-    bool load_runtime(const std::wstring& runtime_config_path);
-    bool load_runtime(
+    int load_runtime(const std::wstring& runtime_config_
+    );
+    int load_runtime(
         const std::wstring& runtime_config_path,
         const struct hostfxr_initialize_parameters* parameters);
 
@@ -32,7 +35,7 @@ class CoreCLR {
         void* reserved,
         void** delegate) const;
 
-    private:
+private:
     /* HostFXR delegates. */
     hostfxr_initialize_for_runtime_config_fn m_hostfxr_initialize_for_runtime_config_fptr{};
     hostfxr_get_runtime_delegate_fn m_hostfxr_get_runtime_delegate_fptr{};
@@ -43,4 +46,5 @@ class CoreCLR {
     /* Helper functions. */
     static uint64_t load_library(const wchar_t* path);
     static uint64_t get_export(void* h, const char* name);
+
 };

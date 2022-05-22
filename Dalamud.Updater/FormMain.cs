@@ -104,6 +104,7 @@ namespace Dalamud.Updater
             InitializeDeleteShit();
             InitializeConfig();
             labelVersion.Text = string.Format("卫月版本 : {0}", getVersion());
+            delayBox.Value = (decimal)this.injectDelaySeconds;
             string[] strArgs = Environment.GetCommandLineArgs();
             if (strArgs.Length >= 2 && strArgs[1].Equals("-startup"))
             {
@@ -640,11 +641,7 @@ namespace Dalamud.Updater
 
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
-            Process.Start("https://jq.qq.com/?_wv=1027&k=agTNLSBJ");
-        }
-        private void linkLabel2_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
-        {
-            Process.Start("https://afdian.net/@bluefissure");
+            Process.Start("https://qun.qq.com/qqweb/qunpro/share?_wv=3&_wwv=128&inviteCode=CZtWN&from=181074&biz=ka&shareSource=5");
         }
 
         private string GeneratingDalamudStartInfo(Process process)
@@ -757,5 +754,10 @@ namespace Dalamud.Updater
             AddOrUpdateAppSettings("Accelerate", checkBoxAcce.Checked ? "true" : "false");
         }
 
+        private void delayBox_ValueChanged(object sender, EventArgs e)
+        {
+            this.injectDelaySeconds = (double)delayBox.Value;
+            AddOrUpdateAppSettings("InjectDelaySeconds", this.injectDelaySeconds.ToString());
+        }
     }
 }
