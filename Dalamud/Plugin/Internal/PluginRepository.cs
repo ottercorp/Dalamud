@@ -15,7 +15,7 @@ namespace Dalamud.Plugin.Internal
     /// </summary>
     internal class PluginRepository
     {
-        private const string DalamudPluginsMasterUrl = "https://dalamudplugins-1253720819.cos.ap-nanjing.myqcloud.com/cn-api5/pluginmaster.json";
+        private const string DalamudPluginsMasterUrl = "https://bypass.ffxiv.wang/dalamudplugins/cn-api5/pluginmaster.json";
 
         private static readonly ModuleLog Log = new("PLUGINR");
 

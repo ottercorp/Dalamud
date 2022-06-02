@@ -43,7 +43,7 @@ namespace Dalamud.Interface.Internal.Windows
         public const int PluginIconHeight = 512;
 
         // TODO: Change back to master after release
-        private const string MainRepoImageUrl = "https://dalamudplugins-1253720819.cos.ap-nanjing.myqcloud.com/cn-api5/plugins/{1}/images/{2}";
+        private const string MainRepoImageUrl = "https://bypass.ffxiv.wang/dalamudplugins/cn-api5/plugins/{1}/images/{2}";
 
         private readonly HttpClient httpClient = new();
 
