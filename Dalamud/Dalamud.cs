@@ -94,6 +94,7 @@ namespace Dalamud
         {
             try
             {
+                /*
                 try
                 {
                     var res = AssetManager.EnsureAssets(this.AssetDirectory);
@@ -110,6 +111,7 @@ namespace Dalamud
                     this.Unload();
                     return;
                 }
+                */
 
                 SerilogEventSink.Instance.LogLine += SerilogOnLogLine;
 
