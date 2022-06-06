@@ -94,25 +94,6 @@ namespace Dalamud
         {
             try
             {
-                /*
-                try
-                {
-                    var res = AssetManager.EnsureAssets(this.AssetDirectory);
-                    if (!res)
-                    {
-                        Log.Error("One or more assets failed to download.");
-                        this.Unload();
-                        return;
-                    }
-                }
-                catch (Exception e)
-                {
-                    Log.Error(e, "Error in asset task.");
-                    this.Unload();
-                    return;
-                }
-                */
-
                 SerilogEventSink.Instance.LogLine += SerilogOnLogLine;
 
                 Service<ServiceContainer>.Set();
