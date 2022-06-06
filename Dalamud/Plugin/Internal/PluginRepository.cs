@@ -74,8 +74,7 @@ namespace Dalamud.Plugin.Internal
             {
                 Log.Information($"Fetching repo: {this.PluginMasterUrl}");
 
-                // ?ticks causes a cache invalidation. Get a fresh repo every time.
-                using var response = await Util.HttpClient.GetAsync(this.PluginMasterUrl + "?" + DateTime.Now.Ticks);
+                using var response = await Util.HttpClient.GetAsync(this.PluginMasterUrl);
                 response.EnsureSuccessStatusCode();
 
                 var data = await response.Content.ReadAsStringAsync();
