@@ -34,56 +34,56 @@ jobs:
           name: dalamud-artifact
           path: bin\Release
   
-  # deploy_stg:
-  #   name: Deploy dalamud-distrib staging
-  #   if: ${{ github.ref == 'refs/heads/master' && github.event_name == 'push' }}
-  #   needs: build
-  #   runs-on: windows-latest
-  #   steps:
-  #   - uses: actions/checkout@v2
-  #     with:
-  #       repository: goatcorp/dalamud-distrib
-  #       ssh-key: ${{ secrets.DEPLOY_SSH }}
-  #   - uses: actions/download-artifact@v2
-  #     with:
-  #       name: dalamud-artifact
-  #       path: .\scratch
+  deploy_stg:
+    name: Deploy dalamud-distrib staging
+    if: ${{ github.ref == 'refs/heads/master' && github.event_name == 'push' }}
+    needs: build
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        repository: ottercorp/dalamud-distrib
+        ssh-key: ${{ secrets.DEPLOY_SSH }}
+    - uses: actions/download-artifact@v2
+      with:
+        name: dalamud-artifact
+        path: .\scratch
 
-  #   - name: Generate dalamud-distrib version file
-  #     shell: pwsh
-  #     run: |
-  #       Compress-Archive .\scratch\* .\canary.zip  # Recreate the release zip
+    - name: Generate dalamud-distrib version file
+      shell: pwsh
+      run: |
+        Compress-Archive .\scratch\* .\canary.zip  # Recreate the release zip
         
-  #       $dllBytes = [System.IO.File]::ReadAllBytes("$(Get-Location)\scratch\Dalamud.dll")
-  #       $assembly = [System.Reflection.Assembly]::Load($dllBytes)
-  #       $newVersion = $assembly.GetCustomAttributes([System.Reflection.AssemblyMetadataAttribute]) | Where { $_.GetType() -eq [System.Reflection.AssemblyMetadataAttribute] } | Select -First 1 | Select -ExpandProperty "Value"
-  #       Remove-Item -Force -Recurse .\scratch
+        $dllBytes = [System.IO.File]::ReadAllBytes("$(Get-Location)\scratch\Dalamud.dll")
+        $assembly = [System.Reflection.Assembly]::Load($dllBytes)
+        $newVersion = $assembly.GetCustomAttributes([System.Reflection.AssemblyMetadataAttribute]) | Where { $_.GetType() -eq [System.Reflection.AssemblyMetadataAttribute] } | Select -First 1 | Select -ExpandProperty "Value"
+        Remove-Item -Force -Recurse .\scratch
 
-  #       $versionData = Get-Content .\stg\version | ConvertFrom-Json
-  #       $oldVersion = $versionData.AssemblyVersion
-  #       if ($oldVersion -eq $newVersion) {
-  #         Remove-Item .\canary.zip
-  #       } else {
-  #         Move-Item -Force .\canary.zip .\stg\latest.zip
-  #         $versionData.AssemblyVersion = $newVersion
-  #         $versionData | ConvertTo-Json -Compress | Out-File .\stg\version
-  #       }
+        $versionData = Get-Content .\stg\version | ConvertFrom-Json
+        $oldVersion = $versionData.AssemblyVersion
+        if ($oldVersion -eq $newVersion) {
+          Remove-Item .\canary.zip
+        } else {
+          Move-Item -Force .\canary.zip .\stg\latest.zip
+          $versionData.AssemblyVersion = $newVersion
+          $versionData | ConvertTo-Json -Compress | Out-File .\stg\version
+        }
         
-  #       echo "DVER=${newVersion}" >> $Env:GITHUB_ENV
+        echo "DVER=${newVersion}" >> $Env:GITHUB_ENV
         
-  #   - name: Commit changes
-  #     shell: bash
-  #     env:
-  #       DEPLOY_SSH: ${{ secrets.DEPLOY_SSH }}
-  #       GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
-  #     run: |
-  #       eval "$(ssh-agent -s)"
-  #       ssh-add - <<< "${DEPLOY_SSH}"
+    - name: Commit changes
+      shell: bash
+      env:
+        DEPLOY_SSH: ${{ secrets.DEPLOY_SSH }}
+        GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+      run: |
+        eval "$(ssh-agent -s)"
+        ssh-add - <<< "${DEPLOY_SSH}"
         
-  #       git config --global user.name "Actions User"
-  #       git config --global user.email "actions@github.com"
+        git config --global user.name "Actions User"
+        git config --global user.email "actions@github.com"
         
-  #       git add .
-  #       git commit -m "[CI] Update staging for ${DVER}" || true
+        git add .
+        git commit -m "[CI] Update staging for ${DVER}" || true
         
-  #       git push origin main || true
+        git push origin main || true
