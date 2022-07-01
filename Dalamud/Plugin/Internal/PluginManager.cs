@@ -302,10 +302,11 @@ namespace Dalamud.Plugin.Internal
         /// Reload the PluginMaster for each repo, filter, and event that the list has updated.
         /// </summary>
         /// <param name="notify">Whether to notify that available plugins have changed afterwards.</param>
+        /// <param name="skipCache">Skip MemoryCache.</param>
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-        public async Task ReloadPluginMastersAsync(bool notify = true)
+        public async Task ReloadPluginMastersAsync(bool notify = true, bool skipCache = true)
         {
-            await Task.WhenAll(this.Repos.Select(repo => repo.ReloadPluginMasterAsync()));
+            await Task.WhenAll(this.Repos.Select(repo => repo.ReloadPluginMasterAsync(skipCache)));
 
             this.RefilterPluginMasters(notify);
         }
