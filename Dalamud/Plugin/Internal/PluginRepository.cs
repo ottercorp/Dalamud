@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 using Dalamud.Logging.Internal;
 using Dalamud.Plugin.Internal.Types;
 using Dalamud.Utility;
+using Microsoft.Extensions.Caching.Abstractions;
+using Microsoft.Extensions.Caching.InMemory;
 using Newtonsoft.Json;
 
 namespace Dalamud.Plugin.Internal
@@ -19,6 +22,10 @@ namespace Dalamud.Plugin.Internal
 
         private static readonly ModuleLog Log = new("PLUGINR");
 
+        private static InMemoryCacheHandler handler = InitHandler();
+
+        private static HttpClient httpClient = new(handler);
+
         /// <summary>
         /// Initializes a new instance of the <see cref="PluginRepository"/> class.
         /// </summary>
@@ -29,6 +36,13 @@ namespace Dalamud.Plugin.Internal
             this.PluginMasterUrl = pluginMasterUrl;
             this.IsThirdParty = Utility.Util.FuckGFW(pluginMasterUrl) != Utility.Util.FuckGFW(DalamudPluginsMasterUrl);
             this.IsEnabled = isEnabled;
+        }
+
+        private static InMemoryCacheHandler InitHandler()
+        {
+            var httpClientHandler = new HttpClientHandler();
+            var cacheExpirationPerHttpResponseCode = CacheExpirationProvider.CreateSimple(TimeSpan.FromHours(3), TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(0));
+            return new InMemoryCacheHandler(httpClientHandler, cacheExpirationPerHttpResponseCode);
         }
 
         /// <summary>
@@ -64,8 +78,9 @@ namespace Dalamud.Plugin.Internal
         /// <summary>
         /// Reload the plugin master asynchronously in a task.
         /// </summary>
+        /// <param name="skipCache">Skip MemoryCache.</param>
         /// <returns>The new state.</returns>
-        public async Task ReloadPluginMasterAsync()
+        public async Task ReloadPluginMasterAsync(bool skipCache = true)
         {
             this.State = PluginRepositoryState.InProgress;
             this.PluginMaster = new List<RemotePluginManifest>().AsReadOnly();
@@ -74,7 +89,12 @@ namespace Dalamud.Plugin.Internal
             {
                 Log.Information($"Fetching repo: {this.PluginMasterUrl}");
 
-                using var response = await Util.HttpClient.GetAsync(this.PluginMasterUrl);
+                if (skipCache)
+                {
+                    handler.InvalidateCache(new Uri(this.PluginMasterUrl));
+                }
+
+                using var response = await httpClient.GetAsync(this.PluginMasterUrl);
                 response.EnsureSuccessStatusCode();
 
                 var data = await response.Content.ReadAsStringAsync();
@@ -96,6 +116,10 @@ namespace Dalamud.Plugin.Internal
                 this.PluginMaster = pluginMaster.AsReadOnly();
 
                 Log.Debug($"Successfully fetched repo: {this.PluginMasterUrl}");
+
+                var stats = handler.StatsProvider.GetStatistics().Total;
+                Log.Information($"Cache: {stats.TotalRequests}/{stats.CacheHit}/{stats.CacheMiss}");
+
                 this.State = PluginRepositoryState.Success;
             }
             catch (Exception ex)
