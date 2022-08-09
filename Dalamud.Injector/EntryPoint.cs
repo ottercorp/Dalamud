@@ -299,6 +299,8 @@ namespace Dalamud.Injector
                 clientLanguage = ClientLanguage.French;
             else if (languageStr[0..(len = Math.Min(languageStr.Length, (key = "français").Length))] == key[0..len])
                 clientLanguage = ClientLanguage.French;
+            else if (languageStr[0..(len = Math.Min(languageStr.Length, (key = "chinesesimplified").Length))] == key[0..len])
+                clientLanguage = ClientLanguage.ChineseSimplified;
             else if (int.TryParse(languageStr, out var languageInt) && Enum.IsDefined((ClientLanguage)languageInt))
                 clientLanguage = (ClientLanguage)languageInt;
             else

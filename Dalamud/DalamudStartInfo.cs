@@ -77,7 +77,7 @@ namespace Dalamud
         /// <summary>
         /// Gets or sets the language of the game client.
         /// </summary>
-        public ClientLanguage Language { get; set; } = ClientLanguage.English;
+        public ClientLanguage Language { get; set; } = ClientLanguage.ChineseSimplified;
 
         /// <summary>
         /// Gets or sets the current game version code.
