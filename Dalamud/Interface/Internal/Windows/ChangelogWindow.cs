@@ -23,16 +23,16 @@ namespace Dalamud.Interface.Internal.Windows
         public const string WarrantsChangelogForMajorMinor = "6.4.";
 
         private const string ChangeLog =
-            @"• Updated Dalamud for compatibility with Patch 6.1.
+            @"• 更新了 Dalamud 以与版本 6.1 兼容。
 
-If you note any issues or need help, please check the FAQ, and reach out on our Discord if you need help
-Thanks and have fun!";
+如果您发现任何问题或需要帮助，请查看常见问题解答，如果您需要帮助，请联系我们的 QQ频道
+谢谢，玩得开心！";
 
         private const string UpdatePluginsInfo =
-            @"• All of your plugins were disabled automatically, due to this update. This is normal.
-• Open the plugin installer, then click 'update plugins'. Updated plugins should update and then re-enable themselves.
-   => Please keep in mind that not all of your plugins may already be updated for the new version.
-   => If some plugins are displayed with a red cross in the 'Installed Plugins' tab, they may not yet be available.";
+            @"• 由于此更新，您的所有插件都被自动禁用。 这个是正常的。
+• 打开插件安装程序，然后单击“更新插件”。更新的插件应该更新然后重新启用自己。
+    => 请记住，并非所有插件都已针对新版本进行了更新。
+    => 如果某些插件在“已安装插件”选项卡中显示为红色叉号，则它们可能尚不可用。";
 
         private readonly string assemblyVersion = Util.AssemblyVersion;
 
@@ -118,7 +118,7 @@ Thanks and have fun!";
             if (ImGui.IsItemHovered())
             {
                 ImGui.PopFont();
-                ImGui.SetTooltip("加入我们的 Discord 服务器");
+                ImGui.SetTooltip("加入我们的 Discord 服务器（国际服）");
                 ImGui.PushFont(UiBuilder.IconFont);
             }
 
