@@ -608,8 +608,6 @@ namespace Dalamud.Interface.Internal
                     ShowFontError(fontPathSc);
                 Log.Verbose("[FONT] fontPathSc = {0}", fontPathSc);
 
-                var fontPathKr = null;
-
                 // Default font
                 Log.Verbose("[FONT] SetupFonts - Default font");
                 var fontInfo = new TargetFontModification(
@@ -628,22 +626,13 @@ namespace Dalamud.Interface.Internal
                 }
                 else
                 {
-                    var japaneseRangeHandle = GCHandle.Alloc(GlyphRangesJapanese.GlyphRanges, GCHandleType.Pinned);
-                    garbageList.Add(japaneseRangeHandle);
+                    var chineseRangeHandle = GCHandle.Alloc(GlyphRangesChinese.GlyphRanges, GCHandleType.Pinned);
+                    garbageList.Add(chineseRangeHandle);
 
-                    fontConfig.GlyphRanges = japaneseRangeHandle.AddrOfPinnedObject();
+                    fontConfig.GlyphRanges = chineseRangeHandle.AddrOfPinnedObject();
                     fontConfig.PixelSnapH = true;
-                    DefaultFont = ioFonts.AddFontFromFileTTF(fontPathJp, fontConfig.SizePixels, fontConfig);
+                    DefaultFont = ioFonts.AddFontFromFileTTF(fontPathSc, fontConfig.SizePixels, fontConfig);
                     this.loadedFontInfo[DefaultFont] = fontInfo;
-                }
-
-                if (fontPathKr != null && Service<DalamudConfiguration>.Get().EffectiveLanguage == "ko")
-                {
-                    fontConfig.MergeMode = true;
-                    fontConfig.GlyphRanges = ioFonts.GetGlyphRangesKorean();
-                    fontConfig.PixelSnapH = true;
-                    ioFonts.AddFontFromFileTTF(fontPathKr, fontConfig.SizePixels, fontConfig);
-                    fontConfig.MergeMode = false;
                 }
 
                 // FontAwesome icon font
@@ -742,7 +731,7 @@ namespace Dalamud.Interface.Internal
                             garbageList.Add(rangeHandle);
                             fontConfig.PixelSnapH = true;
 
-                            var sizedFont = ioFonts.AddFontFromFileTTF(fontPathJp, fontSize * io.FontGlobalScale, fontConfig, rangeHandle.AddrOfPinnedObject());
+                            var sizedFont = ioFonts.AddFontFromFileTTF(fontPathSc, fontSize * io.FontGlobalScale, fontConfig, rangeHandle.AddrOfPinnedObject());
                             this.loadedFontInfo[sizedFont] = fontInfo;
                             foreach (var request in requests)
                                 request.FontInternal = sizedFont;

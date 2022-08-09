@@ -672,7 +672,7 @@ namespace Dalamud.Interface.Internal.Windows
 
             ImGui.Columns(5);
             ImGui.SetColumnWidth(0, 18 + (5 * ImGuiHelpers.GlobalScale));
-            var totalTextWidth = ImGui.GetWindowContentRegionWidth() - (18 + 16 + 14) - ((5 + 45 + 26) * ImGuiHelpers.GlobalScale);
+            var totalTextWidth = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X) - (18 + 16 + 14) - ((5 + 45 + 26) * ImGuiHelpers.GlobalScale);
             ImGui.SetColumnWidth(1, totalTextWidth / 2);
             ImGui.SetColumnWidth(2, totalTextWidth / 2);
             ImGui.SetColumnWidth(3, 16 + (45 * ImGuiHelpers.GlobalScale));

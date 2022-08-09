@@ -45,7 +45,6 @@ namespace Dalamud.Interface.Internal.Windows
         // TODO: Change back to master after release
         private const string MainRepoImageUrl = "https://bypass.ffxiv.wang/dalamudplugins/cn-api5/plugins/{1}/images/{2}";
 
-        private readonly HttpClient httpClient = new();
         private const string MainRepoDip17ImageUrl = "https://raw.githubusercontent.com/ottercorp/PluginDistD17/main/{0}/{1}/images/{2}";
 
         private readonly BlockingCollection<Tuple<ulong, Func<Task>>> downloadQueue = new();

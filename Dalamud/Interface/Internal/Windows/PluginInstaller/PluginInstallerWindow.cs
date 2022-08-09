@@ -177,7 +177,7 @@ namespace Dalamud.Interface.Internal.Windows.PluginInstaller
         {
             var pluginManager = Service<PluginManager>.Get();
 
-            _ = pluginManager.ReloadPluginMastersAsync(true, false);
+            _ = pluginManager.ReloadPluginMastersAsync();
             _ = this.dalamudChangelogManager.ReloadChangelogAsync();
 
             this.searchText = string.Empty;
