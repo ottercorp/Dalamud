@@ -28,9 +28,9 @@ namespace Dalamud.Configuration.Internal
         public static bool DalamudForceMinHook { get; } = GetEnvironmentVariable("DALAMUD_FORCE_MINHOOK");
 
         /// <summary>
-        /// Gets a value indicating whether or not Dalamud should wait for a debugger to be attached when initializing.
+        /// Gets a value indicating whether or not Dalamud context menus should be disabled.
         /// </summary>
-        public static bool DalamudWaitForDebugger { get; } = GetEnvironmentVariable("DALAMUD_WAIT_DEBUGGER");
+        public static bool DalamudDoContextMenu { get; } = GetEnvironmentVariable("DALAMUD_ENABLE_CONTEXTMENU");
 
         private static bool GetEnvironmentVariable(string name)
             => bool.Parse(Environment.GetEnvironmentVariable(name) ?? "false");

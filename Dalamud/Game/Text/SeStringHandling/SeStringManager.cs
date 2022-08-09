@@ -1,10 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 
-using Dalamud.Data;
-using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Lumina.Excel.GeneratedSheets;
@@ -16,13 +12,12 @@ namespace Dalamud.Game.Text.SeStringHandling
     /// </summary>
     [PluginInterface]
     [InterfaceVersion("1.0")]
+    [ServiceManager.BlockingEarlyLoadedService]
     [Obsolete("This class is obsolete. Please use the static methods on SeString instead.")]
-    public sealed class SeStringManager
+    public sealed class SeStringManager : IServiceType
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SeStringManager"/> class.
-        /// </summary>
-        internal SeStringManager()
+        [ServiceManager.ServiceConstructor]
+        private SeStringManager()
         {
         }
 

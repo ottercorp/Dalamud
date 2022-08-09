@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-
+using System.Text.RegularExpressions;
 using Dalamud.Game;
 using Newtonsoft.Json;
 using Reloaded.Memory.Buffers;
@@ -38,7 +39,6 @@ namespace Dalamud.Injector
         public static void Main(int argc, IntPtr argvPtr)
         {
             List<string> args = new(argc);
-            Init(args);
 
             unsafe
             {
@@ -46,6 +46,9 @@ namespace Dalamud.Injector
                 for (var i = 0; i < argc; i++)
                     args.Add(Marshal.PtrToStringUni(argv[i]));
             }
+
+            Init(args);
+            args.Remove("-v"); // Remove "verbose" flag
 
             if (args.Count >= 2 && args[1].ToLowerInvariant() == "launch-test")
             {
@@ -80,6 +83,16 @@ namespace Dalamud.Injector
             }
 
             startInfo = ExtractAndInitializeStartInfoFromArguments(startInfo, args);
+            // Remove already handled arguments
+            args.Remove("--console");
+            args.Remove("--msgbox1");
+            args.Remove("--msgbox2");
+            args.Remove("--msgbox3");
+            args.Remove("--etw");
+            args.Remove("--veh");
+            args.Remove("--veh-full");
+            args.Remove("--no-plugin");
+            args.Remove("--no-3rd-plugin");
 
             var mainCommand = args[1].ToLowerInvariant();
             if (mainCommand.Length > 0 && mainCommand.Length <= 6 && "inject"[..mainCommand.Length] == mainCommand)
@@ -100,10 +113,23 @@ namespace Dalamud.Injector
             }
         }
 
+        private static string GetLogPath(string filename)
+        {
+            var baseDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+#if DEBUG
+            var logPath = Path.Combine(baseDirectory, $"{filename}.log");
+#else
+            var logPath = Path.Combine(baseDirectory, "..", "..", "..", $"{filename}.log");
+#endif
+
+            return logPath;
+        }
+
         private static void Init(List<string> args)
         {
+            InitLogging(args.Any(x => x == "-v"));
             InitUnhandledException(args);
-            InitLogging();
 
             var cwd = new FileInfo(Assembly.GetExecutingAssembly().Location).Directory;
             if (cwd.FullName != Directory.GetCurrentDirectory())
@@ -125,7 +151,6 @@ namespace Dalamud.Injector
                     Console.WriteLine("Command line error: {0}", clex.Message);
                     Console.WriteLine();
                     ProcessHelpCommand(args);
-                    Environment.Exit(-1);
                 }
                 else if (Log.Logger == null)
                 {
@@ -133,48 +158,29 @@ namespace Dalamud.Injector
                 }
                 else if (exObj is Exception ex)
                 {
-                    Log.Error(ex, "A fatal error has occurred.");
+                    Log.Error(ex, "A fatal error has occurred");
                 }
                 else
                 {
-                    Log.Error($"A fatal error has occurred: {eventArgs.ExceptionObject}");
+                    Log.Error("A fatal error has occurred: {Exception}", eventArgs.ExceptionObject.ToString());
                 }
-
-#if DEBUG
-                var caption = "Debug Error";
-                var message =
-                    $"Couldn't inject.\nMake sure that Dalamud was not injected into your target process " +
-                    $"as a release build before and that the target process can be accessed with VM_WRITE permissions.\n\n" +
-                    $"{eventArgs.ExceptionObject}";
-#else
-                var caption = "XIVLauncher Error";
-                var message =
-                    "Failed to inject the XIVLauncher in-game addon.\nPlease try restarting your game and your PC.\n" +
-                    "If this keeps happening, please report this error.";
-#endif
-                _ = MessageBoxW(IntPtr.Zero, message, caption, MessageBoxType.IconError | MessageBoxType.Ok);
 
                 Environment.Exit(-1);
             };
         }
 
-        private static void InitLogging()
+        private static void InitLogging(bool verbose)
         {
-            var baseDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-
 #if DEBUG
-            var logPath = Path.Combine(baseDirectory, "dalamud.injector.log");
-#else
-            var logPath = Path.Combine(baseDirectory, "..", "..", "..", "dalamud.injector.log");
+            verbose = true;
 #endif
 
-            var levelSwitch = new LoggingLevelSwitch();
+            var levelSwitch = new LoggingLevelSwitch
+            {
+                MinimumLevel = verbose ? LogEventLevel.Verbose : LogEventLevel.Information,
+            };
 
-#if DEBUG
-            levelSwitch.MinimumLevel = LogEventLevel.Verbose;
-#else
-            levelSwitch.MinimumLevel = LogEventLevel.Information;
-#endif
+            var logPath = GetLogPath("dalamud.injector");
 
             CullLogFile(logPath, 1 * 1024 * 1024);
 
@@ -236,8 +242,7 @@ namespace Dalamud.Injector
             int len;
             string key;
 
-            if (startInfo == null)
-                startInfo = new();
+            startInfo ??= new DalamudStartInfo();
 
             var workingDirectory = startInfo.WorkingDirectory;
             var configurationPath = startInfo.ConfigurationPath;
@@ -288,30 +293,43 @@ namespace Dalamud.Injector
                 clientLanguage = ClientLanguage.Japanese;
             else if (languageStr[0..(len = Math.Min(languageStr.Length, (key = "german").Length))] == key[0..len])
                 clientLanguage = ClientLanguage.German;
-            else if (languageStr[0..(len = Math.Min(languageStr.Length, (key = "deutsche").Length))] == key[0..len])
+            else if (languageStr[0..(len = Math.Min(languageStr.Length, (key = "deutsch").Length))] == key[0..len])
                 clientLanguage = ClientLanguage.German;
             else if (languageStr[0..(len = Math.Min(languageStr.Length, (key = "french").Length))] == key[0..len])
                 clientLanguage = ClientLanguage.French;
             else if (languageStr[0..(len = Math.Min(languageStr.Length, (key = "français").Length))] == key[0..len])
                 clientLanguage = ClientLanguage.French;
-            else if (languageStr[0..(len = Math.Min(languageStr.Length, (key = "ChineseSimplified").Length))] == key[0..len])
-                clientLanguage = ClientLanguage.ChineseSimplified;
             else if (int.TryParse(languageStr, out var languageInt) && Enum.IsDefined((ClientLanguage)languageInt))
                 clientLanguage = (ClientLanguage)languageInt;
             else
                 throw new CommandLineException($"\"{languageStr}\" is not a valid supported language.");
 
-            return new()
-            {
-                WorkingDirectory = workingDirectory,
-                ConfigurationPath = configurationPath,
-                PluginDirectory = pluginDirectory,
-                DefaultPluginDirectory = defaultPluginDirectory,
-                AssetDirectory = assetDirectory,
-                Language = clientLanguage,
-                GameVersion = null,
-                DelayInitializeMs = delayInitializeMs,
-            };
+            startInfo.WorkingDirectory = workingDirectory;
+            startInfo.ConfigurationPath = configurationPath;
+            startInfo.PluginDirectory = pluginDirectory;
+            startInfo.DefaultPluginDirectory = defaultPluginDirectory;
+            startInfo.AssetDirectory = assetDirectory;
+            startInfo.Language = clientLanguage;
+            startInfo.DelayInitializeMs = delayInitializeMs;
+            startInfo.GameVersion = null;
+
+            // Set boot defaults
+            startInfo.BootShowConsole = args.Contains("--console");
+            startInfo.BootEnableEtw = args.Contains("--etw");
+            startInfo.BootLogPath = GetLogPath("dalamud.boot");
+            startInfo.BootEnabledGameFixes = new List<string> { "prevent_devicechange_crashes", "disable_game_openprocess_access_check", "redirect_openprocess", "backup_userdata_save", "clr_failfast_hijack" };
+            startInfo.BootDotnetOpenProcessHookMode = 0;
+            startInfo.BootWaitMessageBox |= args.Contains("--msgbox1") ? 1 : 0;
+            startInfo.BootWaitMessageBox |= args.Contains("--msgbox2") ? 2 : 0;
+            startInfo.BootWaitMessageBox |= args.Contains("--msgbox3") ? 4 : 0;
+            // startInfo.BootVehEnabled = args.Contains("--veh");
+            startInfo.BootVehEnabled = true;
+            startInfo.BootVehFull = args.Contains("--veh-full");
+            startInfo.NoLoadPlugins = args.Contains("--no-plugin");
+            startInfo.NoLoadThirdPartyPlugins = args.Contains("--no-third-plugin");
+            // startInfo.BootUnhookDlls = new List<string>() { "kernel32.dll", "ntdll.dll", "user32.dll" };
+
+            return startInfo;
         }
 
         private static int ProcessHelpCommand(List<string> args, string? particularCommand = default)
@@ -326,7 +344,7 @@ namespace Dalamud.Injector
                 Console.WriteLine("{0} help [command]", exeName);
 
             if (particularCommand is null or "inject")
-                Console.WriteLine("{0} inject [-h/--help] [-a/--all] [--warn] [pid1] [pid2] [pid3] ...", exeName);
+                Console.WriteLine("{0} inject [-h/--help] [-a/--all] [--warn] [--fix-acl] [--se-debug-privilege] [pid1] [pid2] [pid3] ...", exeName);
 
             if (particularCommand is null or "launch")
             {
@@ -334,7 +352,8 @@ namespace Dalamud.Injector
                 Console.WriteLine("{0}        [-g path/to/ffxiv_dx11.exe] [--game=path/to/ffxiv_dx11.exe]", exeSpaces);
                 Console.WriteLine("{0}        [-m entrypoint|inject] [--mode=entrypoint|inject]", exeSpaces);
                 Console.WriteLine("{0}        [--handle-owner=inherited-handle-value]", exeSpaces);
-                Console.WriteLine("{0}        [--without-dalamud]", exeSpaces);
+                Console.WriteLine("{0}        [--without-dalamud] [--no-fix-acl]", exeSpaces);
+                Console.WriteLine("{0}        [--no-wait]", exeSpaces);
                 Console.WriteLine("{0}        [-- game_arg1=value1 game_arg2=value2 ...]", exeSpaces);
             }
 
@@ -342,6 +361,13 @@ namespace Dalamud.Injector
             Console.WriteLine("                               [--dalamud-plugin-directory=path] [--dalamud-dev-plugin-directory=path]");
             Console.WriteLine("                               [--dalamud-asset-directory=path] [--dalamud-delay-initialize=0(ms)]");
             Console.WriteLine("                               [--dalamud-client-language=0-3|j(apanese)|e(nglish)|d|g(erman)|f(rench)]");
+
+            Console.WriteLine("Verbose logging:\t[-v]");
+            Console.WriteLine("Show Console:\t[--console]");
+            Console.WriteLine("Enable ETW:\t[--etw]");
+            Console.WriteLine("Enable VEH:\t[--veh], [--veh-full]");
+            Console.WriteLine("Show messagebox:\t[--msgbox1], [--msgbox2], [--msgbox3]");
+            Console.WriteLine("No plugins:\t[--no-plugin] [--no-3rd-plugin]");
 
             return 0;
         }
@@ -353,6 +379,8 @@ namespace Dalamud.Injector
             var targetProcessSpecified = false;
             var warnManualInjection = false;
             var showHelp = args.Count <= 2;
+            var tryFixAcl = false;
+            var tryClaimSeDebugPrivilege = false;
 
             for (var i = 2; i < args.Count; i++)
             {
@@ -379,6 +407,14 @@ namespace Dalamud.Injector
                 {
                     targetProcessSpecified = true;
                     processes.AddRange(Process.GetProcessesByName("ffxiv_dx11"));
+                }
+                else if (args[i] == "--fix-acl" || args[i] == "--acl-fix")
+                {
+                    tryFixAcl = true;
+                }
+                else if (args[i] == "--se-debug-privilege")
+                {
+                    tryClaimSeDebugPrivilege = true;
                 }
                 else if (args[i] == "--warn")
                 {
@@ -418,8 +454,21 @@ namespace Dalamud.Injector
                 }
             }
 
+            if (tryClaimSeDebugPrivilege)
+            {
+                try
+                {
+                    GameStart.ClaimSeDebug();
+                    Log.Information("SeDebugPrivilege claimed.");
+                }
+                catch (Win32Exception e2)
+                {
+                    Log.Warning(e2, "Failed to claim SeDebugPrivilege");
+                }
+            }
+
             foreach (var process in processes)
-                Inject(process, AdjustStartInfo(dalamudStartInfo, process.MainModule.FileName));
+                Inject(process, AdjustStartInfo(dalamudStartInfo, process.MainModule.FileName), tryFixAcl);
 
             return 0;
         }
@@ -433,6 +482,9 @@ namespace Dalamud.Injector
             var showHelp = args.Count <= 2;
             var handleOwner = IntPtr.Zero;
             var withoutDalamud = false;
+            var noFixAcl = false;
+            var waitForGameWindow = true;
+            var encryptArguments = false;
 
             var parsingGameArgument = false;
             for (var i = 2; i < args.Count; i++)
@@ -449,6 +501,10 @@ namespace Dalamud.Injector
                     useFakeArguments = true;
                 else if (args[i] == "--without-dalamud")
                     withoutDalamud = true;
+                else if (args[i] == "--no-wait")
+                    waitForGameWindow = false;
+                else if (args[i] == "--no-fix-acl" || args[i] == "--no-acl-fix")
+                    noFixAcl = true;
                 else if (args[i] == "-g")
                     gamePath = args[++i];
                 else if (args[i].StartsWith("--game="))
@@ -465,6 +521,43 @@ namespace Dalamud.Injector
                     throw new CommandLineException($"\"{args[i]}\" is not a command line argument.");
             }
 
+            var checksumTable = "fX1pGtdS5CAP4_VL";
+            var argDelimiterRegex = new Regex(" (?<!(?:^|[^ ])(?:  )*)/");
+            var kvDelimiterRegex = new Regex(" (?<!(?:^|[^ ])(?:  )*)=");
+            gameArguments = gameArguments.SelectMany(x =>
+            {
+                if (!x.StartsWith("//**sqex0003") || !x.EndsWith("**//"))
+                    return new List<string>() { x };
+
+                var checksum = checksumTable.IndexOf(x[x.Length - 5]);
+                if (checksum == -1)
+                    return new List<string>() { x };
+
+                var encData = Convert.FromBase64String(x.Substring(12, x.Length - 12 - 5).Replace('-', '+').Replace('_', '/').Replace('*', '='));
+                var rawData = new byte[encData.Length];
+
+                for (var i = (uint)checksum; i < 0x10000u; i += 0x10)
+                {
+                    var bf = new LegacyBlowfish(Encoding.UTF8.GetBytes($"{i << 16:x08}"));
+                    Buffer.BlockCopy(encData, 0, rawData, 0, rawData.Length);
+                    bf.Decrypt(ref rawData);
+                    var rawString = Encoding.UTF8.GetString(rawData).Split('\0', 2).First();
+                    encryptArguments = true;
+                    var args = argDelimiterRegex.Split(rawString).Skip(1).Select(y => string.Join('=', kvDelimiterRegex.Split(y, 2)).Replace("  ", " ")).ToList();
+                    if (!args.Any())
+                        continue;
+                    if (!args.First().StartsWith("T="))
+                        continue;
+                    if (!uint.TryParse(args.First().Substring(2), out var tickCount))
+                        continue;
+                    if (tickCount >> 16 != i)
+                        continue;
+                    return args.Skip(1);
+                }
+
+                return new List<string>() { x };
+            }).ToList();
+
             if (showHelp)
             {
                 ProcessHelpCommand(args, "launch");
@@ -475,6 +568,10 @@ namespace Dalamud.Injector
             if (mode.Length > 0 && mode.Length <= 10 && "entrypoint"[0..mode.Length] == mode)
             {
                 mode = "entrypoint";
+            }
+            else if (mode.Length > 0 && mode.Length <= 6 && "inject"[0..mode.Length] == mode)
+            {
+                mode = "inject";
             }
             else if (mode.Length > 0 && mode.Length <= 6 && "inject"[0..mode.Length] == mode)
             {
@@ -497,8 +594,8 @@ namespace Dalamud.Injector
                 }
                 catch (Exception)
                 {
-                    gamePath = @"C:\Program Files (x86)\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game\ffxiv_dx11.exe";
-                    Log.Warning("Failed to read launcherConfigV3.json. Using default game installation path: {0}", gamePath);
+                    Log.Error("Failed to read launcherConfigV3.json to get the set-up game path, please specify one using -g");
+                    return -1;
                 }
 
                 if (!File.Exists(gamePath))
@@ -548,8 +645,40 @@ namespace Dalamud.Injector
                 });
             }
 
-            var gameArgumentString = string.Join(" ", gameArguments.Select(x => EncodeParameterArgument(x)));
-            var process = NativeAclFix.LaunchGame(Path.GetDirectoryName(gamePath), gamePath, gameArgumentString, (Process p) =>
+            string gameArgumentString;
+            if (encryptArguments)
+            {
+                var rawTickCount = (uint)Environment.TickCount;
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    [System.Runtime.InteropServices.DllImport("c")]
+                    static extern ulong clock_gettime_nsec_np(int clock_id);
+
+                    const int CLOCK_MONOTONIC_RAW = 4;
+                    var rawTickCountFixed = (clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) / 1000000);
+                    Log.Information("ArgumentBuilder::DeriveKey() fixing up rawTickCount from {0} to {1} on macOS", rawTickCount, rawTickCountFixed);
+                    rawTickCount = (uint)rawTickCountFixed;
+                }
+
+                var ticks = rawTickCount & 0xFFFF_FFFFu;
+                var key = ticks & 0xFFFF_0000u;
+                gameArguments.Insert(0, $"T={ticks}");
+
+                var escapeValue = (string x) => x.Replace(" ", "  ");
+                gameArgumentString = gameArguments.Select(x => x.Split('=', 2)).Aggregate(new StringBuilder(), (whole, part) => whole.Append($" /{escapeValue(part[0])} ={escapeValue(part.Length > 1 ? part[1] : string.Empty)}")).ToString();
+                var bf = new LegacyBlowfish(Encoding.UTF8.GetBytes($"{key:x08}"));
+                var ciphertext = bf.Encrypt(Encoding.UTF8.GetBytes(gameArgumentString));
+                var base64Str = Convert.ToBase64String(ciphertext).Replace('+', '-').Replace('/', '_').Replace('=', '*');
+                var checksum = checksumTable[(int)(key >> 16) & 0xF];
+                gameArgumentString = $"//**sqex0003{base64Str}{checksum}**//";
+            }
+            else
+            {
+                gameArgumentString = string.Join(" ", gameArguments.Select(x => EncodeParameterArgument(x)));
+            }
+
+            var process = GameStart.LaunchGame(Path.GetDirectoryName(gamePath), gamePath, gameArgumentString, noFixAcl, (Process p) =>
             {
                 if (!withoutDalamud && mode == "entrypoint")
                 {
@@ -560,14 +689,18 @@ namespace Dalamud.Injector
                         Log.Error("[HOOKS] RewriteRemoteEntryPointW failed");
                         throw new Exception("RewriteRemoteEntryPointW failed");
                     }
+
+                    Log.Verbose("RewriteRemoteEntryPointW called!");
                 }
-            });
+            }, waitForGameWindow);
+
+            Log.Verbose("Game process started with PID {0}", process.Id);
 
             if (!withoutDalamud && mode == "inject")
             {
                 var startInfo = AdjustStartInfo(dalamudStartInfo, gamePath);
                 Log.Information("Using start info: {0}", JsonConvert.SerializeObject(startInfo));
-                Inject(process, startInfo);
+                Inject(process, startInfo, false);
             }
 
             var processHandleForOwner = IntPtr.Zero;
@@ -636,21 +769,26 @@ namespace Dalamud.Injector
             var gameVerStr = File.ReadAllText(Path.Combine(ffxivDir, "ffxivgame.ver"));
             var gameVer = GameVersion.Parse(gameVerStr);
 
-            return new()
+            return new DalamudStartInfo(startInfo)
             {
-                WorkingDirectory = startInfo.WorkingDirectory,
-                ConfigurationPath = startInfo.ConfigurationPath,
-                PluginDirectory = startInfo.PluginDirectory,
-                DefaultPluginDirectory = startInfo.DefaultPluginDirectory,
-                AssetDirectory = startInfo.AssetDirectory,
-                Language = startInfo.Language,
                 GameVersion = gameVer,
-                DelayInitializeMs = startInfo.DelayInitializeMs,
             };
         }
 
-        private static void Inject(Process process, DalamudStartInfo startInfo)
+        private static void Inject(Process process, DalamudStartInfo startInfo, bool tryFixAcl = false)
         {
+            if (tryFixAcl)
+            {
+                try
+                {
+                    GameStart.CopyAclFromSelfToTargetProcess(process.SafeHandle.DangerousGetHandle());
+                }
+                catch (Win32Exception e1)
+                {
+                    Log.Warning(e1, "Failed to copy ACL");
+                }
+            }
+
             var bootName = "Dalamud.Boot.dll";
             var bootPath = Path.GetFullPath(bootName);
 
@@ -668,7 +806,7 @@ namespace Dalamud.Injector
             using var startInfoBuffer = new MemoryBufferHelper(process).CreatePrivateMemoryBuffer(startInfoBytes.Length + 0x8);
             var startInfoAddress = startInfoBuffer.Add(startInfoBytes);
 
-            if (startInfoAddress == IntPtr.Zero)
+            if (startInfoAddress == 0)
                 throw new Exception("Unable to allocate start info JSON");
 
             injector.GetFunctionAddress(bootModule, "Initialize", out var initAddress);

@@ -9,7 +9,6 @@ using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.Gui;
 using Dalamud.Interface.Animation.EasingFunctions;
-using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using ImGuiScene;
@@ -143,7 +142,6 @@ namespace Dalamud.Interface.Internal.Windows
                         }
 
                         if (!ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows |
-                                                   ImGuiHoveredFlags.AllowWhenOverlapped |
                                                    ImGuiHoveredFlags.AllowWhenBlockedByActiveItem))
                         {
                             this.state = State.FadeOut;
@@ -189,7 +187,6 @@ namespace Dalamud.Interface.Internal.Windows
                         ImGui.PopStyleVar();
 
                         var isHover = ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows |
-                                                            ImGuiHoveredFlags.AllowWhenOverlapped |
                                                             ImGuiHoveredFlags.AllowWhenBlockedByActiveItem);
 
                         if (!isHover && this.fadeOutEasing!.IsDone)

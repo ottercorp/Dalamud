@@ -126,9 +126,18 @@ namespace Dalamud.Interface.Style
                 DalamudWhite = new Vector4(1f, 1f, 1f, 1f),
                 DalamudWhite2 = new Vector4(0.878f, 0.878f, 0.878f, 1f),
                 DalamudOrange = new Vector4(1f, 0.709f, 0f, 1f),
+                DalamudYellow = new Vector4(1f, 1f, .4f, 1f),
+                DalamudViolet = new Vector4(0.770f, 0.700f, 0.965f, 1.000f),
                 TankBlue = new Vector4(0f, 0.6f, 1f, 1f),
                 HealerGreen = new Vector4(0f, 0.8f, 0.1333333f, 1f),
                 DPSRed = new Vector4(0.7058824f, 0f, 0f, 1f),
+                ParsedGrey = new Vector4(0.4f, 0.4f, 0.4f, 1f),
+                ParsedGreen = new Vector4(0.117f, 1f, 0f, 1f),
+                ParsedBlue = new Vector4(0f, 0.439f, 1f, 1f),
+                ParsedPurple = new Vector4(0.639f, 0.207f, 0.933f, 1f),
+                ParsedOrange = new Vector4(1f, 0.501f, 0f, 1f),
+                ParsedPink = new Vector4(0.886f, 0.407f, 0.658f, 1f),
+                ParsedGold = new Vector4(0.898f, 0.8f, 0.501f, 1f),
             },
         };
 
@@ -236,9 +245,18 @@ namespace Dalamud.Interface.Style
                 DalamudWhite = new Vector4(1f, 1f, 1f, 1f),
                 DalamudWhite2 = new Vector4(0.878f, 0.878f, 0.878f, 1f),
                 DalamudOrange = new Vector4(1f, 0.709f, 0f, 1f),
+                DalamudYellow = new Vector4(1f, 1f, .4f, 1f),
+                DalamudViolet = new Vector4(0.770f, 0.700f, 0.965f, 1.000f),
                 TankBlue = new Vector4(0f, 0.6f, 1f, 1f),
                 HealerGreen = new Vector4(0f, 0.8f, 0.1333333f, 1f),
                 DPSRed = new Vector4(0.7058824f, 0f, 0f, 1f),
+                ParsedGrey = new Vector4(0.4f, 0.4f, 0.4f, 1f),
+                ParsedGreen = new Vector4(0.117f, 1f, 0f, 1f),
+                ParsedBlue = new Vector4(0f, 0.439f, 1f, 1f),
+                ParsedPurple = new Vector4(0.639f, 0.207f, 0.933f, 1f),
+                ParsedOrange = new Vector4(1f, 0.501f, 0f, 1f),
+                ParsedPink = new Vector4(0.886f, 0.407f, 0.658f, 1f),
+                ParsedGold = new Vector4(0.898f, 0.8f, 0.501f, 1f),
             },
         };
 
@@ -400,9 +418,18 @@ namespace Dalamud.Interface.Style
                 DalamudWhite = ImGuiColors.DalamudWhite,
                 DalamudWhite2 = ImGuiColors.DalamudWhite2,
                 DalamudOrange = ImGuiColors.DalamudOrange,
+                DalamudYellow = ImGuiColors.DalamudYellow,
+                DalamudViolet = ImGuiColors.DalamudViolet,
                 TankBlue = ImGuiColors.TankBlue,
                 HealerGreen = ImGuiColors.HealerGreen,
                 DPSRed = ImGuiColors.DPSRed,
+                ParsedGrey = ImGuiColors.ParsedGrey,
+                ParsedGreen = ImGuiColors.ParsedGreen,
+                ParsedBlue = ImGuiColors.ParsedBlue,
+                ParsedPurple = ImGuiColors.ParsedPurple,
+                ParsedOrange = ImGuiColors.ParsedOrange,
+                ParsedPink = ImGuiColors.ParsedPink,
+                ParsedGold = ImGuiColors.ParsedGold,
             };
 
             return model;
@@ -460,13 +487,41 @@ namespace Dalamud.Interface.Style
         /// <inheritdoc/>
         public override void Push()
         {
-            throw new NotImplementedException();
-        }
+            this.PushStyleHelper(ImGuiStyleVar.Alpha, this.Alpha);
+            this.PushStyleHelper(ImGuiStyleVar.WindowPadding, this.WindowPadding);
+            this.PushStyleHelper(ImGuiStyleVar.WindowRounding, this.WindowRounding);
+            this.PushStyleHelper(ImGuiStyleVar.WindowBorderSize, this.WindowBorderSize);
+            this.PushStyleHelper(ImGuiStyleVar.WindowTitleAlign, this.WindowTitleAlign);
+            this.PushStyleHelper(ImGuiStyleVar.ChildRounding, this.ChildRounding);
+            this.PushStyleHelper(ImGuiStyleVar.ChildBorderSize, this.ChildBorderSize);
+            this.PushStyleHelper(ImGuiStyleVar.PopupRounding, this.PopupRounding);
+            this.PushStyleHelper(ImGuiStyleVar.PopupBorderSize, this.PopupBorderSize);
+            this.PushStyleHelper(ImGuiStyleVar.FramePadding, this.FramePadding);
+            this.PushStyleHelper(ImGuiStyleVar.FrameRounding, this.FrameRounding);
+            this.PushStyleHelper(ImGuiStyleVar.FrameBorderSize, this.FrameBorderSize);
+            this.PushStyleHelper(ImGuiStyleVar.ItemSpacing, this.ItemSpacing);
+            this.PushStyleHelper(ImGuiStyleVar.ItemInnerSpacing, this.ItemInnerSpacing);
+            this.PushStyleHelper(ImGuiStyleVar.CellPadding, this.CellPadding);
+            this.PushStyleHelper(ImGuiStyleVar.IndentSpacing, this.IndentSpacing);
+            this.PushStyleHelper(ImGuiStyleVar.ScrollbarSize, this.ScrollbarSize);
+            this.PushStyleHelper(ImGuiStyleVar.ScrollbarRounding, this.ScrollbarRounding);
+            this.PushStyleHelper(ImGuiStyleVar.GrabMinSize, this.GrabMinSize);
+            this.PushStyleHelper(ImGuiStyleVar.GrabRounding, this.GrabRounding);
+            this.PushStyleHelper(ImGuiStyleVar.TabRounding, this.TabRounding);
+            this.PushStyleHelper(ImGuiStyleVar.ButtonTextAlign, this.ButtonTextAlign);
+            this.PushStyleHelper(ImGuiStyleVar.SelectableTextAlign, this.SelectableTextAlign);
 
-        /// <inheritdoc/>
-        public override void Pop()
-        {
-            throw new NotImplementedException();
+            foreach (var imGuiCol in Enum.GetValues<ImGuiCol>())
+            {
+                if (imGuiCol == ImGuiCol.COUNT)
+                {
+                    continue;
+                }
+
+                this.PushColorHelper(imGuiCol, this.Colors[imGuiCol.ToString()]);
+            }
+
+            this.DonePushing();
         }
     }
 }

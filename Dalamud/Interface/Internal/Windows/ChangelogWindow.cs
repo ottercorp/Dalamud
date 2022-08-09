@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Numerics;
 
@@ -20,31 +19,19 @@ namespace Dalamud.Interface.Internal.Windows
         /// <summary>
         /// Whether the latest update warrants a changelog window.
         /// </summary>
-        public const string WarrantsChangelogForMajorMinor = "6.3.";
+        public const string WarrantsChangelogForMajorMinor = "6.4.";
 
         private const string ChangeLog =
-            @"• 在标题屏幕中添加了一个新菜单，允许您在登录前访问插件安装程序和各种其他插件。
-    => 您可以在“外观”下的设置中禁用此菜单。
-• 为插件添加了一种将信息添加到游戏服务器信息栏的方法（例如当前歌曲、ping 等）。
-    => 如果有任何插件提供此功能，您可以在设置中禁用并重新排序这些信息。
-• 将插件下载服务器切换到自托管解决方案而不是 GitHub，以规避 API 限制、国家/地区限制和不良 ISP 路由，同时添加了代理设置。
-    => 请参阅 卫月框架 常见问题解答 (ottercorp.github.io/faq) 的“插件是否可以安全使用”部分，或者如果您对安全性有疑虑或想了解有关如何设置和运行的详细信息，请联系 Discord 或 QQ。
-    => 游戏中的变更日志/插件安装程序现在也应该更常见，因为新服务从开发人员拉取请求描述中获取变更日志。
-• 插件安装程序中的“可用插件”列表现在还显示已安装的插件，以减少拆分的混乱。 添加了过滤已安装插件的新过滤模式。
-• 插件安装程序中添加了“更改日志”类别，该类别将列出您的插件的所有最新更改，以及 Dalamud 的最新更改。
+            @"• Updated Dalamud for compatibility with Patch 6.1.
 
-如果您发现任何问题或需要帮助，请务必在我们的 Discord 服务器与 QQ群 内提问。
-谢谢，玩得开心！";
+If you note any issues or need help, please check the FAQ, and reach out on our Discord if you need help
+Thanks and have fun!";
 
         private const string UpdatePluginsInfo =
-            @"• 由于此更新，您的所有插件都被自动禁用。 这个是正常的。
-• 打开插件安装程序，然后单击“更新插件”。 更新的插件应该更新然后重新启用自己。
-   => 请记住，并非所有插件都已针对新版本进行了更新。
-   => 如果某些插件在“已安装插件”选项卡中显示为红色叉号，则它们可能尚不可用。
-
-虽然我们用一小部分人对已发布的插件进行了相当大的测试，并相信它们是稳定的，但我们不能向您保证您不会遇到崩溃。
-
-考虑到当前的排队时间，我们现在建议您只使用一组对您来说最重要的插件，这样您就可以继续玩游戏而不是无休止地排队。";
+            @"• All of your plugins were disabled automatically, due to this update. This is normal.
+• Open the plugin installer, then click 'update plugins'. Updated plugins should update and then re-enable themselves.
+   => Please keep in mind that not all of your plugins may already be updated for the new version.
+   => If some plugins are displayed with a red cross in the 'Installed Plugins' tab, they may not yet be available.";
 
         private readonly string assemblyVersion = Util.AssemblyVersion;
 
@@ -83,19 +70,17 @@ namespace Dalamud.Interface.Internal.Windows
 
             ImGui.TextWrapped(ChangeLog);
 
-            /*
             ImGuiHelpers.ScaledDummy(5);
 
             ImGui.TextColored(ImGuiColors.DalamudRed, " !!! 注意 !!!");
 
             ImGui.TextWrapped(UpdatePluginsInfo);
-            */
 
             ImGuiHelpers.ScaledDummy(10);
 
-            ImGui.Text("感谢使用我们的工具！");
+            // ImGui.Text("感谢使用我们的工具！");
 
-            ImGuiHelpers.ScaledDummy(10);
+            // ImGuiHelpers.ScaledDummy(10);
 
             ImGui.PushFont(UiBuilder.IconFont);
 
@@ -144,7 +129,7 @@ namespace Dalamud.Interface.Internal.Windows
                 {
                     Process.Start(new ProcessStartInfo()
                     {
-                        FileName = "https://jq.qq.com/?_wv=1027&k=3un8iHCo",
+                        FileName = "https://qun.qq.com/qqweb/qunpro/share?_wv=3&_wwv=128&appChannel=share&inviteCode=CZtWN&businessType=9&from=181074&biz=ka&shareSource=5",
                         UseShellExecute = true,
                     });
                 }
@@ -157,7 +142,7 @@ namespace Dalamud.Interface.Internal.Windows
             if (ImGui.IsItemHovered())
             {
                 ImGui.PopFont();
-                ImGui.SetTooltip("加入我们的 QQ 群 827725124");
+                ImGui.SetTooltip("加入我们的 QQ 频道");
                 ImGui.PushFont(UiBuilder.IconFont);
             }
 
@@ -165,7 +150,7 @@ namespace Dalamud.Interface.Internal.Windows
 
             if (ImGui.Button(FontAwesomeIcon.Globe.ToIconString()))
             {
-                Util.OpenLink("https://goatcorp.github.io/faq/");
+                Util.OpenLink("https://ottercorp.github.io/faq/");
             }
 
             if (ImGui.IsItemHovered())

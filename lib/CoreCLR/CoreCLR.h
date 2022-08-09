@@ -14,8 +14,7 @@ public:
     int load_hostfxr();
     int load_hostfxr(const get_hostfxr_parameters* parameters);
 
-    int load_runtime(const std::wstring& runtime_config_
-    );
+    int load_runtime(const std::wstring& runtime_config_path);
     int load_runtime(
         const std::wstring& runtime_config_path,
         const struct hostfxr_initialize_parameters* parameters);
@@ -46,5 +45,4 @@ private:
     /* Helper functions. */
     static uint64_t load_library(const wchar_t* path);
     static uint64_t get_export(void* h, const char* name);
-
 };

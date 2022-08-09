@@ -4,8 +4,6 @@ using System.Linq;
 using System.Reflection;
 
 using Dalamud.Game;
-using Dalamud.Game.Internal;
-using Dalamud.Hooking;
 using Dalamud.Hooking.Internal;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Internal;
@@ -127,7 +125,7 @@ namespace Dalamud.Interface.Internal.Windows
 
                     ImGui.Columns(4);
 
-                    ImGui.SetColumnWidth(0, ImGui.GetWindowContentRegionWidth() - 300);
+                    ImGui.SetColumnWidth(0, ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X - 300);
                     ImGui.SetColumnWidth(1, 100f);
                     ImGui.SetColumnWidth(2, 100f);
                     ImGui.SetColumnWidth(3, 100f);
@@ -181,7 +179,7 @@ namespace Dalamud.Interface.Internal.Windows
             {
                 ImGui.Columns(4);
 
-                ImGui.SetColumnWidth(0, ImGui.GetWindowContentRegionWidth() - 330);
+                ImGui.SetColumnWidth(0, ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X - 330);
                 ImGui.SetColumnWidth(1, 180f);
                 ImGui.SetColumnWidth(2, 100f);
                 ImGui.SetColumnWidth(3, 100f);

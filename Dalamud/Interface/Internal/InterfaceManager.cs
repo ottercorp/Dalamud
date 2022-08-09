@@ -7,7 +7,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-
 using Dalamud.Configuration.Internal;
 using Dalamud.Game;
 using Dalamud.Game.ClientState.GamePad;
@@ -15,14 +14,13 @@ using Dalamud.Game.ClientState.Keys;
 using Dalamud.Game.Gui.Internal;
 using Dalamud.Game.Internal.DXGI;
 using Dalamud.Hooking;
-using Dalamud.Hooking.Internal;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.Internal.ManagedAsserts;
 using Dalamud.Interface.Internal.Notifications;
-using Dalamud.Interface.Internal.Windows.StyleEditor;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
+using Dalamud.Utility.Timing;
 using ImGuiNET;
 using ImGuiScene;
 using PInvoke;
@@ -30,6 +28,7 @@ using Serilog;
 using SharpDX.Direct3D11;
 
 // general dev notes, here because it's easiest
+
 /*
  * - Hooking ResizeBuffers seemed to be unnecessary, though I'm not sure why.  Left out for now since it seems to work without it.
  * - We may want to build our ImGui command list in a thread to keep it divorced from present.  We'd still have to block in present to
@@ -45,76 +44,45 @@ namespace Dalamud.Interface.Internal
     /// <summary>
     /// This class manages interaction with the ImGui interface.
     /// </summary>
-    internal class InterfaceManager : IDisposable
+    [ServiceManager.BlockingEarlyLoadedService]
+    internal class InterfaceManager : IDisposable, IServiceType
     {
         private const float DefaultFontSizePt = 12.0f;
         private const float DefaultFontSizePx = DefaultFontSizePt * 4.0f / 3.0f;
         private const ushort Fallback1Codepoint = 0x3013; // Geta mark; FFXIV uses this to indicate that a glyph is missing.
         private const ushort Fallback2Codepoint = '-'; // FFXIV uses dash if Geta mark is unavailable.
 
-        private readonly string rtssPath;
-
         private readonly HashSet<SpecialGlyphRequest> glyphRequests = new();
+        private readonly Dictionary<ImFontPtr, TargetFontModification> loadedFontInfo = new();
 
-        private readonly Hook<PresentDelegate> presentHook;
-        private readonly Hook<ResizeBuffersDelegate> resizeBuffersHook;
-        private readonly Hook<SetCursorDelegate> setCursorHook;
+        [ServiceManager.ServiceDependency]
+        private readonly Framework framework = Service<Framework>.Get();
 
         private readonly ManualResetEvent fontBuildSignal;
         private readonly SwapChainVtableResolver address;
+        private readonly Hook<DispatchMessageWDelegate> dispatchMessageWHook;
+        private readonly Hook<SetCursorDelegate> setCursorHook;
         private RawDX11Scene? scene;
 
-        private GameFontHandle[] axisFontHandles;
-        private bool overwriteAllNotoGlyphsWithAxis;
+        private Hook<PresentDelegate>? presentHook;
+        private Hook<ResizeBuffersDelegate>? resizeBuffersHook;
 
         // can't access imgui IO before first present call
         private bool lastWantCapture = false;
         private bool isRebuildingFonts = false;
+        private bool isOverrideGameCursor = true;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="InterfaceManager"/> class.
-        /// </summary>
-        public InterfaceManager()
+        [ServiceManager.ServiceConstructor]
+        private InterfaceManager()
         {
-            Service<NotificationManager>.Set();
-
-            var scanner = Service<SigScanner>.Get();
+            this.dispatchMessageWHook = Hook<DispatchMessageWDelegate>.FromImport(
+                null, "user32.dll", "DispatchMessageW", 0, this.DispatchMessageWDetour);
+            this.setCursorHook = Hook<SetCursorDelegate>.FromImport(
+                null, "user32.dll", "SetCursor", 0, this.SetCursorDetour);
 
             this.fontBuildSignal = new ManualResetEvent(false);
 
             this.address = new SwapChainVtableResolver();
-            this.address.Setup(scanner);
-
-            try
-            {
-                var rtss = NativeFunctions.GetModuleHandleW("RTSSHooks64.dll");
-
-                if (rtss != IntPtr.Zero)
-                {
-                    var fileName = new StringBuilder(255);
-                    _ = NativeFunctions.GetModuleFileNameW(rtss, fileName, fileName.Capacity);
-                    this.rtssPath = fileName.ToString();
-                    Log.Verbose($"RTSS at {this.rtssPath}");
-
-                    if (!NativeFunctions.FreeLibrary(rtss))
-                        throw new Win32Exception();
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Error(e, "RTSS Free failed");
-            }
-
-            this.setCursorHook = Hook<SetCursorDelegate>.FromSymbol("user32.dll", "SetCursor", this.SetCursorDetour, true);
-            this.presentHook = new Hook<PresentDelegate>(this.address.Present, this.PresentDetour);
-            this.resizeBuffersHook = new Hook<ResizeBuffersDelegate>(this.address.ResizeBuffers, this.ResizeBuffersDetour);
-
-            var setCursorAddress = this.setCursorHook?.Address ?? IntPtr.Zero;
-
-            Log.Verbose("===== S W A P C H A I N =====");
-            Log.Verbose($"SetCursor address 0x{setCursorAddress.ToInt64():X}");
-            Log.Verbose($"Present address 0x{this.presentHook.Address.ToInt64():X}");
-            Log.Verbose($"ResizeBuffers address 0x{this.resizeBuffersHook.Address.ToInt64():X}");
         }
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
@@ -123,10 +91,11 @@ namespace Dalamud.Interface.Internal
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
         private delegate IntPtr ResizeBuffersDelegate(IntPtr swapChain, uint bufferCount, uint width, uint height, uint newFormat, uint swapChainFlags);
 
-        [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate IntPtr SetCursorDelegate(IntPtr hCursor);
 
-        private delegate void InstallRTSSHook();
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate IntPtr DispatchMessageWDelegate(ref User32.MSG msg);
 
         /// <summary>
         /// This event gets called each frame to facilitate ImGui drawing.
@@ -176,15 +145,20 @@ namespace Dalamud.Interface.Internal
         /// <summary>
         /// Gets the address handle to the main process window.
         /// </summary>
-        public IntPtr WindowHandlePtr => this.scene.WindowHandlePtr;
+        public IntPtr WindowHandlePtr => this.scene?.WindowHandlePtr ?? IntPtr.Zero;
 
         /// <summary>
         /// Gets or sets a value indicating whether or not the game's cursor should be overridden with the ImGui cursor.
         /// </summary>
         public bool OverrideGameCursor
         {
-            get => this.scene.UpdateCursor;
-            set => this.scene.UpdateCursor = value;
+            get => this.scene?.UpdateCursor ?? this.isOverrideGameCursor;
+            set
+            {
+                this.isOverrideGameCursor = value;
+                if (this.scene != null)
+                    this.scene.UpdateCursor = value;
+            }
         }
 
         /// <summary>
@@ -198,6 +172,21 @@ namespace Dalamud.Interface.Internal
         public bool IsReady => this.scene != null;
 
         /// <summary>
+        /// Gets or sets a value indicating whether or not Draw events should be dispatched.
+        /// </summary>
+        public bool IsDispatchingEvents { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to override configuration for UseAxis.
+        /// </summary>
+        public bool? UseAxisOverride { get; set; } = null;
+
+        /// <summary>
+        /// Gets a value indicating whether to use AXIS fonts.
+        /// </summary>
+        public bool UseAxis => this.UseAxisOverride ?? Service<DalamudConfiguration>.Get().UseAxisFontsFromGame;
+
+        /// <summary>
         /// Gets or sets the overrided font gamma value, instead of using the value from configuration.
         /// </summary>
         public float? FontGammaOverride { get; set; } = null;
@@ -205,54 +194,32 @@ namespace Dalamud.Interface.Internal
         /// <summary>
         /// Gets the font gamma value to use.
         /// </summary>
-        public float FontGamma => Math.Max(0.1f, this.FontGammaOverride.GetValueOrDefault(Service<DalamudConfiguration>.Get().FontGamma));
+        public float FontGamma => Math.Max(0.1f, this.FontGammaOverride.GetValueOrDefault(Service<DalamudConfiguration>.Get().FontGammaLevel));
 
         /// <summary>
-        /// Enable this module.
+        /// Gets a value indicating whether we're building fonts but haven't generated atlas yet.
         /// </summary>
-        public void Enable()
-        {
-            this.setCursorHook?.Enable();
-            this.presentHook.Enable();
-            this.resizeBuffersHook.Enable();
+        public bool IsBuildingFontsBeforeAtlasBuild => this.isRebuildingFonts && !this.fontBuildSignal.WaitOne(0);
 
-            try
-            {
-                if (!string.IsNullOrEmpty(this.rtssPath))
-                {
-                    NativeFunctions.LoadLibraryW(this.rtssPath);
-                    var rtssModule = NativeFunctions.GetModuleHandleW("RTSSHooks64.dll");
-                    var installAddr = NativeFunctions.GetProcAddress(rtssModule, "InstallRTSSHook");
-
-                    Log.Debug("Installing RTSS hook");
-                    Marshal.GetDelegateForFunctionPointer<InstallRTSSHook>(installAddr).Invoke();
-                    Log.Debug("RTSS hook OK!");
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Could not reload RTSS");
-            }
-        }
+        /// <summary>
+        /// Gets a value indicating the native handle of the game main window.
+        /// </summary>
+        public IntPtr GameWindowHandle { get; private set; }
 
         /// <summary>
         /// Dispose of managed and unmanaged resources.
         /// </summary>
         public void Dispose()
         {
-            // HACK: this is usually called on a separate thread from PresentDetour (likely on a dedicated render thread)
-            // and if we aren't already disabled, disposing of the scene and hook can frequently crash due to the hook
-            // being disposed of in this thread while it is actively in use in the render thread.
-            // This is a terrible way to prevent issues, but should basically always work to ensure that all outstanding
-            // calls to PresentDetour have finished (and Disable means no new ones will start), before we try to cleanup
-            // So... not great, but much better than constantly crashing on unload
-            this.Disable();
-            Thread.Sleep(500);
+            this.framework.RunOnFrameworkThread(() =>
+            {
+                this.setCursorHook.Dispose();
+                this.presentHook?.Dispose();
+                this.resizeBuffersHook?.Dispose();
+                this.dispatchMessageWHook.Dispose();
+            }).Wait();
 
             this.scene?.Dispose();
-            this.setCursorHook?.Dispose();
-            this.presentHook.Dispose();
-            this.resizeBuffersHook.Dispose();
         }
 
 #nullable enable
@@ -324,14 +291,18 @@ namespace Dalamud.Interface.Internal
         /// </summary>
         public void RebuildFonts()
         {
+            if (this.scene == null)
+            {
+                Log.Verbose("[FONT] RebuildFonts(): scene not ready, doing nothing");
+                return;
+            }
+
             Log.Verbose("[FONT] RebuildFonts() called");
 
             // don't invoke this multiple times per frame, in case multiple plugins call it
             if (!this.isRebuildingFonts)
             {
                 Log.Verbose("[FONT] RebuildFonts() trigger");
-                this.SetAxisFonts();
-
                 this.isRebuildingFonts = true;
                 this.scene.OnNewRenderFrame += this.RebuildFontsInternal;
             }
@@ -414,41 +385,18 @@ namespace Dalamud.Interface.Internal
             Util.Fatal($"One or more files required by XIVLauncher were not found.\nPlease restart and report this error if it occurs again.\n\n{path}", "Error");
         }
 
-        private void SetAxisFonts()
+        private void InitScene(IntPtr swapChain)
         {
-            var configuration = Service<DalamudConfiguration>.Get();
-            this.overwriteAllNotoGlyphsWithAxis = configuration.UseAxisFontsFromGame;
-
-            if (this.axisFontHandles == null)
-            {
-                this.axisFontHandles = new GameFontHandle[]
-                {
-                    Service<GameFontManager>.Get().NewFontRef(new(GameFontFamilyAndSize.Axis96)),
-                    Service<GameFontManager>.Get().NewFontRef(new(GameFontFamilyAndSize.Axis12)),
-                    Service<GameFontManager>.Get().NewFontRef(new(GameFontFamilyAndSize.Axis14)),
-                    Service<GameFontManager>.Get().NewFontRef(new(GameFontFamilyAndSize.Axis18)),
-                    Service<GameFontManager>.Get().NewFontRef(new(GameFontFamilyAndSize.Axis36)),
-                };
-            }
-        }
-
-        /*
-         * NOTE(goat): When hooking ReShade DXGISwapChain::runtime_present, this is missing the syncInterval arg.
-         *             Seems to work fine regardless, I guess, so whatever.
-         */
-        private IntPtr PresentDetour(IntPtr swapChain, uint syncInterval, uint presentFlags)
-        {
-            if (this.scene != null && swapChain != this.scene.SwapChain.NativePointer)
-                return this.presentHook.Original(swapChain, syncInterval, presentFlags);
-
-            if (this.scene == null)
+            RawDX11Scene newScene;
+            using (Timings.Start("IM Scene Init"))
             {
                 try
                 {
-                    this.scene = new RawDX11Scene(swapChain);
+                    newScene = new RawDX11Scene(swapChain);
                 }
                 catch (DllNotFoundException ex)
                 {
+                    Service<InterfaceManagerWithScene>.ProvideException(ex);
                     Log.Error(ex, "Could not load ImGui dependencies.");
 
                     var res = PInvoke.User32.MessageBox(
@@ -468,6 +416,9 @@ namespace Dalamud.Interface.Internal
                     }
 
                     Environment.Exit(-1);
+
+                    // Doesn't reach here, but to make the compiler not complain
+                    return;
                 }
 
                 var startInfo = Service<DalamudStartInfo>.Get();
@@ -489,13 +440,10 @@ namespace Dalamud.Interface.Internal
                     Log.Error(ex, "Could not delete dalamudUI.ini");
                 }
 
-                this.scene.ImGuiIniPath = iniFileInfo.FullName;
-                this.scene.OnBuildUI += this.Display;
-                this.scene.OnNewInputFrame += this.OnNewInputFrame;
-
-                this.SetAxisFonts();
-
-                this.SetupFonts();
+                newScene.UpdateCursor = this.isOverrideGameCursor;
+                newScene.ImGuiIniPath = iniFileInfo.FullName;
+                newScene.OnBuildUI += this.Display;
+                newScene.OnNewInputFrame += this.OnNewInputFrame;
 
                 StyleModel.TransferOldModels();
 
@@ -528,6 +476,8 @@ namespace Dalamud.Interface.Internal
 
                 ImGui.GetIO().FontGlobalScale = configuration.GlobalUiScale;
 
+                this.SetupFonts();
+
                 if (!configuration.IsDocking)
                 {
                     ImGui.GetIO().ConfigFlags &= ~ImGuiConfigFlags.DockingEnable;
@@ -555,9 +505,23 @@ namespace Dalamud.Interface.Internal
                 ImGuiHelpers.MainViewport = ImGui.GetMainViewport();
 
                 Log.Information("[IM] Scene & ImGui setup OK!");
-
-                Service<DalamudIME>.Get().Enable();
             }
+
+            this.scene = newScene;
+            Service<InterfaceManagerWithScene>.Provide(new(this));
+        }
+
+        /*
+         * NOTE(goat): When hooking ReShade DXGISwapChain::runtime_present, this is missing the syncInterval arg.
+         *             Seems to work fine regardless, I guess, so whatever.
+         */
+        private IntPtr PresentDetour(IntPtr swapChain, uint syncInterval, uint presentFlags)
+        {
+            if (this.scene != null && swapChain != this.scene.SwapChain.NativePointer)
+                return this.presentHook!.Original(swapChain, syncInterval, presentFlags);
+
+            if (this.scene == null)
+                this.InitScene(swapChain);
 
             if (this.address.IsReshade)
             {
@@ -598,44 +562,92 @@ namespace Dalamud.Interface.Internal
             ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.ViewportsEnable;
         }
 
+        /// <summary>
+        /// Loads font for use in ImGui text functions.
+        /// </summary>
         private unsafe void SetupFonts()
         {
+            using var setupFontsTimings = Timings.Start("IM SetupFonts");
+
+            var gameFontManager = Service<GameFontManager>.Get();
             var dalamud = Service<Dalamud>.Get();
             var io = ImGui.GetIO();
             var ioFonts = io.Fonts;
-            var fontScale = io.FontGlobalScale;
+
             var fontGamma = this.FontGamma;
-            List<ImFontPtr> fontsToUnscale = new();
 
             this.fontBuildSignal.Reset();
             ioFonts.Clear();
             ioFonts.TexDesiredWidth = 4096;
+
+            Log.Verbose("[FONT] SetupFonts - 1");
+
+            foreach (var v in this.loadedFontInfo)
+                v.Value.Dispose();
+
+            this.loadedFontInfo.Clear();
+
+            Log.Verbose("[FONT] SetupFonts - 2");
 
             ImFontConfigPtr fontConfig = null;
             List<GCHandle> garbageList = new();
 
             try
             {
+                var dummyRangeHandle = GCHandle.Alloc(new ushort[] { '0', '0', 0 }, GCHandleType.Pinned);
+                garbageList.Add(dummyRangeHandle);
+
                 fontConfig = ImGuiNative.ImFontConfig_ImFontConfig();
                 fontConfig.OversampleH = 1;
                 fontConfig.OversampleV = 1;
-                fontConfig.PixelSnapH = true;
 
-            var fontPathSc = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "NotoSansCJKsc-Medium.otf");
+                var fontPathSc = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "NotoSansCJKsc-Regular.otf");
+                if (!File.Exists(fontPathSc))
+                    fontPathSc = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "NotoSansCJKsc-Medium.otf");
+                if (!File.Exists(fontPathSc))
+                    ShowFontError(fontPathSc);
+                Log.Verbose("[FONT] fontPathSc = {0}", fontPathSc);
 
-            if (!File.Exists(fontPathSc))
-                ShowFontError(fontPathSc);
+                var fontPathKr = null;
 
                 // Default font
+                Log.Verbose("[FONT] SetupFonts - Default font");
+                var fontInfo = new TargetFontModification(
+                    "Default",
+                    this.UseAxis ? TargetFontModification.AxisMode.Overwrite : TargetFontModification.AxisMode.GameGlyphsOnly,
+                    this.UseAxis ? DefaultFontSizePx : DefaultFontSizePx + 1,
+                    io.FontGlobalScale);
+                Log.Verbose("[FONT] SetupFonts - Default corresponding AXIS size: {0}pt ({1}px)", fontInfo.SourceAxis.Style.BaseSizePt, fontInfo.SourceAxis.Style.BaseSizePx);
+                fontConfig.SizePixels = fontInfo.TargetSizePx * io.FontGlobalScale;
+                if (this.UseAxis)
                 {
-                    var chineseRangeHandle = GCHandle.Alloc(GlyphRangesChinese.GlyphRanges, GCHandleType.Pinned);
-                    garbageList.Add(chineseRangeHandle);
+                    fontConfig.GlyphRanges = dummyRangeHandle.AddrOfPinnedObject();
+                    fontConfig.PixelSnapH = false;
+                    DefaultFont = ioFonts.AddFontDefault(fontConfig);
+                    this.loadedFontInfo[DefaultFont] = fontInfo;
+                }
+                else
+                {
+                    var japaneseRangeHandle = GCHandle.Alloc(GlyphRangesJapanese.GlyphRanges, GCHandleType.Pinned);
+                    garbageList.Add(japaneseRangeHandle);
 
-                    DefaultFont = ioFonts.AddFontFromFileTTF(fontPathSc, (DefaultFontSizePx + 1) * fontScale, fontConfig, chineseRangeHandle.AddrOfPinnedObject());
-                    fontsToUnscale.Add(DefaultFont);
+                    fontConfig.GlyphRanges = japaneseRangeHandle.AddrOfPinnedObject();
+                    fontConfig.PixelSnapH = true;
+                    DefaultFont = ioFonts.AddFontFromFileTTF(fontPathJp, fontConfig.SizePixels, fontConfig);
+                    this.loadedFontInfo[DefaultFont] = fontInfo;
+                }
+
+                if (fontPathKr != null && Service<DalamudConfiguration>.Get().EffectiveLanguage == "ko")
+                {
+                    fontConfig.MergeMode = true;
+                    fontConfig.GlyphRanges = ioFonts.GetGlyphRangesKorean();
+                    fontConfig.PixelSnapH = true;
+                    ioFonts.AddFontFromFileTTF(fontPathKr, fontConfig.SizePixels, fontConfig);
+                    fontConfig.MergeMode = false;
                 }
 
                 // FontAwesome icon font
+                Log.Verbose("[FONT] SetupFonts - FontAwesome icon font");
                 {
                     var fontPathIcon = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "FontAwesome5FreeSolid.otf");
                     if (!File.Exists(fontPathIcon))
@@ -644,20 +656,27 @@ namespace Dalamud.Interface.Internal
                     var iconRangeHandle = GCHandle.Alloc(new ushort[] { 0xE000, 0xF8FF, 0, }, GCHandleType.Pinned);
                     garbageList.Add(iconRangeHandle);
 
-                    IconFont = ioFonts.AddFontFromFileTTF(fontPathIcon, DefaultFontSizePx * fontScale, fontConfig, iconRangeHandle.AddrOfPinnedObject());
-                    fontsToUnscale.Add(IconFont);
+                    fontConfig.GlyphRanges = iconRangeHandle.AddrOfPinnedObject();
+                    fontConfig.PixelSnapH = true;
+                    IconFont = ioFonts.AddFontFromFileTTF(fontPathIcon, DefaultFontSizePx * io.FontGlobalScale, fontConfig);
+                    this.loadedFontInfo[IconFont] = new("Icon", TargetFontModification.AxisMode.GameGlyphsOnly, DefaultFontSizePx, io.FontGlobalScale);
                 }
 
                 // Monospace font
+                Log.Verbose("[FONT] SetupFonts - Monospace font");
                 {
                     var fontPathMono = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "Inconsolata-Regular.ttf");
                     if (!File.Exists(fontPathMono))
                         ShowFontError(fontPathMono);
-                    MonoFont = ioFonts.AddFontFromFileTTF(fontPathMono, DefaultFontSizePx * fontScale, fontConfig);
-                    fontsToUnscale.Add(MonoFont);
+
+                    fontConfig.GlyphRanges = IntPtr.Zero;
+                    fontConfig.PixelSnapH = true;
+                    MonoFont = ioFonts.AddFontFromFileTTF(fontPathMono, DefaultFontSizePx * io.FontGlobalScale, fontConfig);
+                    this.loadedFontInfo[MonoFont] = new("Mono", TargetFontModification.AxisMode.GameGlyphsOnly, DefaultFontSizePx, io.FontGlobalScale);
                 }
 
                 // Default font but in requested size for requested glyphs
+                Log.Verbose("[FONT] SetupFonts - Default font but in requested size for requested glyphs");
                 {
                     Dictionary<float, List<SpecialGlyphRequest>> extraFontRequests = new();
                     foreach (var extraFontRequest in this.glyphRequests)
@@ -701,78 +720,144 @@ namespace Dalamud.Interface.Internal
 
                         flattenedRanges.Add(0);
 
-                        var rangeHandle = GCHandle.Alloc(flattenedRanges.ToArray(), GCHandleType.Pinned);
-                        garbageList.Add(rangeHandle);
+                        fontInfo = new(
+                            $"Requested({fontSize}px)",
+                            this.UseAxis ? TargetFontModification.AxisMode.Overwrite : TargetFontModification.AxisMode.GameGlyphsOnly,
+                            fontSize,
+                            io.FontGlobalScale);
+                        if (this.UseAxis)
+                        {
+                            fontConfig.GlyphRanges = dummyRangeHandle.AddrOfPinnedObject();
+                            fontConfig.SizePixels = fontInfo.SourceAxis.Style.BaseSizePx;
+                            fontConfig.PixelSnapH = false;
 
-                        var sizedFont = ioFonts.AddFontFromFileTTF(fontPathSc, fontSize * fontScale, fontConfig, rangeHandle.AddrOfPinnedObject());
-                        fontsToUnscale.Add(sizedFont);
+                            var sizedFont = ioFonts.AddFontDefault(fontConfig);
+                            this.loadedFontInfo[sizedFont] = fontInfo;
+                            foreach (var request in requests)
+                                request.FontInternal = sizedFont;
+                        }
+                        else
+                        {
+                            var rangeHandle = GCHandle.Alloc(flattenedRanges.ToArray(), GCHandleType.Pinned);
+                            garbageList.Add(rangeHandle);
+                            fontConfig.PixelSnapH = true;
 
-                        foreach (var request in requests)
-                            request.FontInternal = sizedFont;
+                            var sizedFont = ioFonts.AddFontFromFileTTF(fontPathJp, fontSize * io.FontGlobalScale, fontConfig, rangeHandle.AddrOfPinnedObject());
+                            this.loadedFontInfo[sizedFont] = fontInfo;
+                            foreach (var request in requests)
+                                request.FontInternal = sizedFont;
+                        }
                     }
                 }
 
-                var gameFontManager = Service<GameFontManager>.Get();
                 gameFontManager.BuildFonts();
+
+                var customFontFirstConfigIndex = ioFonts.ConfigData.Size;
 
                 Log.Verbose("[FONT] Invoke OnBuildFonts");
                 this.BuildFonts?.Invoke();
                 Log.Verbose("[FONT] OnBuildFonts OK!");
 
-                for (var i = 0; i < ImGui.GetIO().Fonts.Fonts.Size; i++)
+                for (int i = customFontFirstConfigIndex, i_ = ioFonts.ConfigData.Size; i < i_; i++)
                 {
-                    Log.Verbose("{0} - {1}", i, ImGui.GetIO().Fonts.Fonts[i].GetDebugName());
+                    var config = ioFonts.ConfigData[i];
+                    if (gameFontManager.OwnsFont(config.DstFont))
+                        continue;
+
+                    config.OversampleH = 1;
+                    config.OversampleV = 1;
+
+                    var name = Encoding.UTF8.GetString((byte*)config.Name.Data, config.Name.Count).TrimEnd('\0');
+                    if (name.IsNullOrEmpty())
+                        name = $"{config.SizePixels}px";
+
+                    // ImFont information is reflected only if corresponding ImFontConfig has MergeMode not set.
+                    if (config.MergeMode)
+                    {
+                        if (!this.loadedFontInfo.ContainsKey(config.DstFont.NativePtr))
+                        {
+                            Log.Warning("MergeMode specified for {0} but not found in loadedFontInfo. Skipping.", name);
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        if (this.loadedFontInfo.ContainsKey(config.DstFont.NativePtr))
+                        {
+                            Log.Warning("MergeMode not specified for {0} but found in loadedFontInfo. Skipping.", name);
+                            continue;
+                        }
+
+                        // While the font will be loaded in the scaled size after FontScale is applied, the font will be treated as having the requested size when used from plugins.
+                        this.loadedFontInfo[config.DstFont.NativePtr] = new($"PlReq({name})", config.SizePixels);
+                    }
+
+                    config.SizePixels = config.SizePixels * io.FontGlobalScale;
                 }
 
+                for (int i = 0, i_ = ioFonts.ConfigData.Size; i < i_; i++)
+                {
+                    var config = ioFonts.ConfigData[i];
+                    config.RasterizerGamma = config.RasterizerGamma * fontGamma;
+                }
+
+                Log.Verbose("[FONT] ImGui.IO.Build will be called.");
                 ioFonts.Build();
-
-                if (Math.Abs(fontGamma - 1.0f) >= 0.001)
-                {
-                    // Gamma correction (stbtt/FreeType would output in linear space whereas most real world usages will apply 1.4 or 1.8 gamma; Windows/XIV prebaked uses 1.4)
-                    ioFonts.GetTexDataAsRGBA32(out byte* texPixels, out var texWidth, out var texHeight);
-                    for (int i = 3, i_ = texWidth * texHeight * 4; i < i_; i += 4)
-                        texPixels[i] = (byte)(Math.Pow(texPixels[i] / 255.0f, 1.0f / fontGamma) * 255.0f);
-                }
-
-                foreach (var font in fontsToUnscale)
-                    GameFontManager.UnscaleFont(font, fontScale, false);
+                gameFontManager.AfterIoFontsBuild();
+                Log.Verbose("[FONT] ImGui.IO.Build OK!");
 
                 gameFontManager.AfterBuildFonts();
 
-                foreach (var font in fontsToUnscale)
+                foreach (var (font, mod) in this.loadedFontInfo)
                 {
-                    // Leave IconFont alone.
-                    if (font.NativePtr == IconFont.NativePtr)
-                        continue;
-
-                    // MonoFont will be filled later from DefaultFont.
-                    if (font.NativePtr == MonoFont.NativePtr)
-                        continue;
-
-                    var axisFont = this.axisFontHandles[^1];
-                    for (var i = this.axisFontHandles.Length - 2; i >= 0; i--)
+                    // I have no idea what's causing NPE, so just to be safe
+                    try
                     {
-                        if (this.axisFontHandles[i].Style.Size >= (font.FontSize - 1) * fontScale * 3 / 4)
-                            axisFont = this.axisFontHandles[i];
-                        else
-                            break;
+                        if (font.NativePtr != null && font.NativePtr->ConfigData != null)
+                        {
+                            var nameBytes = Encoding.UTF8.GetBytes($"{mod.Name}\0");
+                            Marshal.Copy(nameBytes, 0, (IntPtr)font.ConfigData.Name.Data, Math.Min(nameBytes.Length, font.ConfigData.Name.Count));
+                        }
+                    }
+                    catch (NullReferenceException)
+                    {
+                        // do nothing
                     }
 
-                    if (this.overwriteAllNotoGlyphsWithAxis)
-                        GameFontManager.CopyGlyphsAcrossFonts(axisFont.ImFont, font, false, false);
-                    else
-                        GameFontManager.CopyGlyphsAcrossFonts(axisFont.ImFont, font, false, false, 0xE020, 0xE0DB);
+                    Log.Verbose("[FONT] {0}: Unscale with scale value of {1}", mod.Name, mod.Scale);
+                    GameFontManager.UnscaleFont(font, mod.Scale, false);
 
-                    // Fill missing glyphs in DefaultFont from Axis
-                    if (font.NativePtr == DefaultFont.NativePtr)
-                        GameFontManager.CopyGlyphsAcrossFonts(axisFont.ImFont, DefaultFont, true, false);
+                    if (mod.Axis == TargetFontModification.AxisMode.Overwrite)
+                    {
+                        Log.Verbose("[FONT] {0}: Overwrite from AXIS of size {1}px (was {2}px)", mod.Name, mod.SourceAxis.ImFont.FontSize, font.FontSize);
+                        GameFontManager.UnscaleFont(font, font.FontSize / mod.SourceAxis.ImFont.FontSize, false);
+                        var ascentDiff = mod.SourceAxis.ImFont.Ascent - font.Ascent;
+                        font.Ascent += ascentDiff;
+                        font.Descent = ascentDiff;
+                        font.FallbackChar = mod.SourceAxis.ImFont.FallbackChar;
+                        font.EllipsisChar = mod.SourceAxis.ImFont.EllipsisChar;
+                        ImGuiHelpers.CopyGlyphsAcrossFonts(mod.SourceAxis.ImFont, font, false, false);
+                    }
+                    else if (mod.Axis == TargetFontModification.AxisMode.GameGlyphsOnly)
+                    {
+                        Log.Verbose("[FONT] {0}: Overwrite game specific glyphs from AXIS of size {1}px", mod.Name, mod.SourceAxis.ImFont.FontSize, font.FontSize);
+                        if (!this.UseAxis && font.NativePtr == DefaultFont.NativePtr)
+                            mod.SourceAxis.ImFont.FontSize -= 1;
+                        ImGuiHelpers.CopyGlyphsAcrossFonts(mod.SourceAxis.ImFont, font, true, false, 0xE020, 0xE0DB);
+                        if (!this.UseAxis && font.NativePtr == DefaultFont.NativePtr)
+                            mod.SourceAxis.ImFont.FontSize += 1;
+                    }
+
+                    Log.Verbose("[FONT] {0}: Resize from {1}px to {2}px", mod.Name, font.FontSize, mod.TargetSizePx);
+                    GameFontManager.UnscaleFont(font, font.FontSize / mod.TargetSizePx, false);
                 }
 
                 // Fill missing glyphs in MonoFont from DefaultFont
-                GameFontManager.CopyGlyphsAcrossFonts(DefaultFont, MonoFont, true, false);
+                ImGuiHelpers.CopyGlyphsAcrossFonts(DefaultFont, MonoFont, true, false);
 
-                foreach (var font in fontsToUnscale)
+                for (int i = 0, i_ = ioFonts.Fonts.Size; i < i_; i++)
                 {
+                    var font = ioFonts.Fonts[i];
                     font.FallbackChar = Fallback1Codepoint;
                     font.BuildLookupTable();
                 }
@@ -780,6 +865,9 @@ namespace Dalamud.Interface.Internal
                 Log.Verbose("[FONT] Invoke OnAfterBuildFonts");
                 this.AfterBuildFonts?.Invoke();
                 Log.Verbose("[FONT] OnAfterBuildFonts OK!");
+
+                if (ioFonts.Fonts[0].NativePtr != DefaultFont.NativePtr)
+                    Log.Warning("[FONT] First font is not DefaultFont");
 
                 Log.Verbose("[FONT] Fonts built!");
 
@@ -797,11 +885,32 @@ namespace Dalamud.Interface.Internal
             }
         }
 
-        private void Disable()
+        [ServiceManager.CallWhenServicesReady]
+        private void ContinueConstruction(SigScanner sigScanner, Framework framework)
         {
-            this.setCursorHook?.Disable();
-            this.presentHook.Disable();
-            this.resizeBuffersHook.Disable();
+            this.address.Setup(sigScanner);
+            framework.RunOnFrameworkThread(() =>
+            {
+                while ((this.GameWindowHandle = NativeFunctions.FindWindowEx(IntPtr.Zero, this.GameWindowHandle, "FFXIVGAME", IntPtr.Zero)) != IntPtr.Zero)
+                {
+                    _ = User32.GetWindowThreadProcessId(this.GameWindowHandle, out var pid);
+
+                    if (pid == Environment.ProcessId && User32.IsWindowVisible(this.GameWindowHandle))
+                        break;
+                }
+
+                this.presentHook = Hook<PresentDelegate>.FromAddress(this.address.Present, this.PresentDetour);
+                this.resizeBuffersHook = Hook<ResizeBuffersDelegate>.FromAddress(this.address.ResizeBuffers, this.ResizeBuffersDetour);
+
+                Log.Verbose("===== S W A P C H A I N =====");
+                Log.Verbose($"Present address 0x{this.presentHook!.Address.ToInt64():X}");
+                Log.Verbose($"ResizeBuffers address 0x{this.resizeBuffersHook!.Address.ToInt64():X}");
+
+                this.setCursorHook.Enable();
+                this.presentHook.Enable();
+                this.resizeBuffersHook.Enable();
+                this.dispatchMessageWHook.Enable();
+            });
         }
 
         // This is intended to only be called as a handler attached to scene.OnNewRenderFrame
@@ -811,12 +920,31 @@ namespace Dalamud.Interface.Internal
             this.SetupFonts();
 
             Log.Verbose("[FONT] RebuildFontsInternal() detaching");
-            this.scene.OnNewRenderFrame -= this.RebuildFontsInternal;
+            this.scene!.OnNewRenderFrame -= this.RebuildFontsInternal;
+
+            Log.Verbose("[FONT] Calling InvalidateFonts");
             this.scene.InvalidateFonts();
 
             Log.Verbose("[FONT] Font Rebuild OK!");
 
             this.isRebuildingFonts = false;
+        }
+
+        private unsafe IntPtr DispatchMessageWDetour(ref User32.MSG msg)
+        {
+            if (msg.hwnd == this.GameWindowHandle && this.scene != null)
+            {
+                var ime = Service<DalamudIME>.GetNullable();
+                var res = ime?.ProcessWndProcW(msg.hwnd, msg.message, (void*)msg.wParam, (void*)msg.lParam);
+                if (res != null)
+                    return res.Value;
+
+                res = this.scene.ProcessWndProcW(msg.hwnd, msg.message, (void*)msg.wParam, (void*)msg.lParam);
+                if (res != null)
+                    return res.Value;
+            }
+
+            return this.dispatchMessageWHook.IsDisposed ? User32.DispatchMessage(ref msg) : this.dispatchMessageWHook.Original(ref msg);
         }
 
         private IntPtr ResizeBuffersDetour(IntPtr swapChain, uint bufferCount, uint width, uint height, uint newFormat, uint swapChainFlags)
@@ -830,11 +958,11 @@ namespace Dalamud.Interface.Internal
             // We have to ensure we're working with the main swapchain,
             // as viewports might be resizing as well
             if (this.scene == null || swapChain != this.scene.SwapChain.NativePointer)
-                return this.resizeBuffersHook.Original(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
+                return this.resizeBuffersHook!.Original(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
 
             this.scene?.OnPreResize();
 
-            var ret = this.resizeBuffersHook.Original(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
+            var ret = this.resizeBuffersHook!.Original(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
             if (ret.ToInt64() == 0x887A0001)
             {
                 Log.Error("invalid call to resizeBuffers");
@@ -850,7 +978,7 @@ namespace Dalamud.Interface.Internal
             if (this.lastWantCapture == true && (!this.scene?.IsImGuiCursor(hCursor) ?? false) && this.OverrideGameCursor)
                 return IntPtr.Zero;
 
-            return this.setCursorHook.Original(hCursor);
+            return this.setCursorHook.IsDisposed ? User32.SetCursor(new User32.SafeCursorHandle(hCursor, false)).DangerousGetHandle() : this.setCursorHook.Original(hCursor);
         }
 
         private void OnNewInputFrame()
@@ -858,6 +986,9 @@ namespace Dalamud.Interface.Internal
             var dalamudInterface = Service<DalamudInterface>.GetNullable();
             var gamepadState = Service<GamepadState>.GetNullable();
             var keyState = Service<KeyState>.GetNullable();
+
+            if (dalamudInterface == null || gamepadState == null || keyState == null)
+                return;
 
             // fix for keys in game getting stuck, if you were holding a game key (like run)
             // and then clicked on an imgui textbox - imgui would swallow the keyup event,
@@ -885,22 +1016,43 @@ namespace Dalamud.Interface.Internal
 
             if (gamepadEnabled && (ImGui.GetIO().ConfigFlags & ImGuiConfigFlags.NavEnableGamepad) > 0)
             {
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.Activate] = gamepadState.Raw(GamepadButtons.South);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.Cancel] = gamepadState.Raw(GamepadButtons.East);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.Input] = gamepadState.Raw(GamepadButtons.North);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.Menu] = gamepadState.Raw(GamepadButtons.West);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.DpadLeft] = gamepadState.Raw(GamepadButtons.DpadLeft);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.DpadRight] = gamepadState.Raw(GamepadButtons.DpadRight);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.DpadUp] = gamepadState.Raw(GamepadButtons.DpadUp);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.DpadDown] = gamepadState.Raw(GamepadButtons.DpadDown);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.LStickLeft] = gamepadState.LeftStickLeft;
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.LStickRight] = gamepadState.LeftStickRight;
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.LStickUp] = gamepadState.LeftStickUp;
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.LStickDown] = gamepadState.LeftStickDown;
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.FocusPrev] = gamepadState.Raw(GamepadButtons.L1);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.FocusNext] = gamepadState.Raw(GamepadButtons.R1);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.TweakSlow] = gamepadState.Raw(GamepadButtons.L2);
-                ImGui.GetIO().NavInputs[(int)ImGuiNavInput.TweakFast] = gamepadState.Raw(GamepadButtons.R2);
+                var northButton = gamepadState.Raw(GamepadButtons.North) != 0;
+                var eastButton = gamepadState.Raw(GamepadButtons.East) != 0;
+                var southButton = gamepadState.Raw(GamepadButtons.South) != 0;
+                var westButton = gamepadState.Raw(GamepadButtons.West) != 0;
+                var dPadUp = gamepadState.Raw(GamepadButtons.DpadUp) != 0;
+                var dPadRight = gamepadState.Raw(GamepadButtons.DpadRight) != 0;
+                var dPadDown = gamepadState.Raw(GamepadButtons.DpadDown) != 0;
+                var dPadLeft = gamepadState.Raw(GamepadButtons.DpadLeft) != 0;
+                var leftStickUp = gamepadState.LeftStickUp;
+                var leftStickRight = gamepadState.LeftStickRight;
+                var leftStickDown = gamepadState.LeftStickDown;
+                var leftStickLeft = gamepadState.LeftStickLeft;
+                var l1Button = gamepadState.Raw(GamepadButtons.L1) != 0;
+                var l2Button = gamepadState.Raw(GamepadButtons.L2) != 0;
+                var r1Button = gamepadState.Raw(GamepadButtons.R1) != 0;
+                var r2Button = gamepadState.Raw(GamepadButtons.R2) != 0;
+
+                var io = ImGui.GetIO();
+                io.AddKeyEvent(ImGuiKey.GamepadFaceUp, northButton);
+                io.AddKeyEvent(ImGuiKey.GamepadFaceRight, eastButton);
+                io.AddKeyEvent(ImGuiKey.GamepadFaceDown, southButton);
+                io.AddKeyEvent(ImGuiKey.GamepadFaceLeft, westButton);
+
+                io.AddKeyEvent(ImGuiKey.GamepadDpadUp, dPadUp);
+                io.AddKeyEvent(ImGuiKey.GamepadDpadRight, dPadRight);
+                io.AddKeyEvent(ImGuiKey.GamepadDpadDown, dPadDown);
+                io.AddKeyEvent(ImGuiKey.GamepadDpadLeft, dPadLeft);
+
+                io.AddKeyAnalogEvent(ImGuiKey.GamepadLStickUp, leftStickUp != 0, leftStickUp);
+                io.AddKeyAnalogEvent(ImGuiKey.GamepadLStickRight, leftStickRight != 0, leftStickRight);
+                io.AddKeyAnalogEvent(ImGuiKey.GamepadLStickDown, leftStickDown != 0, leftStickDown);
+                io.AddKeyAnalogEvent(ImGuiKey.GamepadLStickLeft, leftStickLeft != 0, leftStickLeft);
+
+                io.AddKeyEvent(ImGuiKey.GamepadL1, l1Button);
+                io.AddKeyEvent(ImGuiKey.GamepadL2, l2Button);
+                io.AddKeyEvent(ImGuiKey.GamepadR1, r1Button);
+                io.AddKeyEvent(ImGuiKey.GamepadR2, r2Button);
 
                 if (gamepadState.Pressed(GamepadButtons.R3) > 0)
                 {
@@ -926,10 +1078,33 @@ namespace Dalamud.Interface.Internal
             WindowSystem.FocusedWindowSystemNamespace = string.Empty;
 
             var snap = ImGuiManagedAsserts.GetSnapshot();
-            this.Draw?.Invoke();
+
+            if (this.IsDispatchingEvents)
+                this.Draw?.Invoke();
+
             ImGuiManagedAsserts.ReportProblems("Dalamud Core", snap);
 
             Service<NotificationManager>.Get().Draw();
+        }
+
+        /// <summary>
+        /// Represents an instance of InstanceManager with scene ready for use.
+        /// </summary>
+        public class InterfaceManagerWithScene : IServiceType
+        {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="InterfaceManagerWithScene"/> class.
+            /// </summary>
+            /// <param name="interfaceManager">An instance of <see cref="InterfaceManager"/>.</param>
+            internal InterfaceManagerWithScene(InterfaceManager interfaceManager)
+            {
+                this.Manager = interfaceManager;
+            }
+
+            /// <summary>
+            /// Associated InterfaceManager.
+            /// </summary>
+            public InterfaceManager Manager { get; init; }
         }
 
         /// <summary>
@@ -989,6 +1164,65 @@ namespace Dalamud.Interface.Internal
             public void Dispose()
             {
                 this.Manager.glyphRequests.Remove(this);
+            }
+        }
+
+        private unsafe class TargetFontModification : IDisposable
+        {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="TargetFontModification"/> class.
+            /// Constructs new target font modification information, assuming that AXIS fonts will not be applied.
+            /// </summary>
+            /// <param name="name">Name of the font to write to ImGui font information.</param>
+            /// <param name="sizePx">Target font size in pixels, which will not be considered for further scaling.</param>
+            internal TargetFontModification(string name, float sizePx)
+            {
+                this.Name = name;
+                this.Axis = AxisMode.Suppress;
+                this.TargetSizePx = sizePx;
+                this.Scale = 1;
+                this.SourceAxis = null;
+            }
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="TargetFontModification"/> class.
+            /// Constructs new target font modification information.
+            /// </summary>
+            /// <param name="name">Name of the font to write to ImGui font information.</param>
+            /// <param name="axis">Whether and how to use AXIS fonts.</param>
+            /// <param name="sizePx">Target font size in pixels, which will not be considered for further scaling.</param>
+            /// <param name="globalFontScale">Font scale to be referred for loading AXIS font of appropriate size.</param>
+            internal TargetFontModification(string name, AxisMode axis, float sizePx, float globalFontScale)
+            {
+                this.Name = name;
+                this.Axis = axis;
+                this.TargetSizePx = sizePx;
+                this.Scale = globalFontScale;
+                this.SourceAxis = Service<GameFontManager>.Get().NewFontRef(new(GameFontFamily.Axis, this.TargetSizePx * this.Scale));
+            }
+
+            internal enum AxisMode
+            {
+                Suppress,
+                GameGlyphsOnly,
+                Overwrite,
+            }
+
+            internal string Name { get; private init; }
+
+            internal AxisMode Axis { get; private init; }
+
+            internal float TargetSizePx { get; private init; }
+
+            internal float Scale { get; private init; }
+
+            internal GameFontHandle? SourceAxis { get; private init; }
+
+            internal bool SourceAxisAvailable => this.SourceAxis != null && this.SourceAxis.ImFont.NativePtr != null;
+
+            public void Dispose()
+            {
+                this.SourceAxis?.Dispose();
             }
         }
     }
