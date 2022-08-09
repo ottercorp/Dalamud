@@ -2,12 +2,6 @@ using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-using Dalamud.Configuration.Internal;
-using Dalamud.Game.Gui.ContextMenus;
-using Dalamud.Game.Gui.Dtr;
-using Dalamud.Game.Gui.FlyText;
-using Dalamud.Game.Gui.PartyFinder;
-using Dalamud.Game.Gui.Toast;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Hooking;
 using Dalamud.Interface;
@@ -15,6 +9,8 @@ using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.System.String;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using ImGuiNET;
 using Serilog;
 
@@ -25,13 +21,13 @@ namespace Dalamud.Game.Gui
     /// </summary>
     [PluginInterface]
     [InterfaceVersion("1.0")]
-    public sealed unsafe class GameGui : IDisposable
+    [ServiceManager.BlockingEarlyLoadedService]
+    public sealed unsafe class GameGui : IDisposable, IServiceType
     {
         private readonly GameGuiAddressResolver address;
 
         private readonly GetMatrixSingletonDelegate getMatrixSingleton;
         private readonly ScreenToWorldNativeDelegate screenToWorldNative;
-        private readonly GetAgentModuleDelegate getAgentModule;
 
         private readonly Hook<SetGlobalBgmDelegate> setGlobalBgmHook;
         private readonly Hook<HandleItemHoverDelegate> handleItemHoverHook;
@@ -45,14 +41,11 @@ namespace Dalamud.Game.Gui
         private GetUIMapObjectDelegate getUIMapObject;
         private OpenMapWithFlagDelegate openMapWithFlag;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GameGui"/> class.
-        /// This class is responsible for many aspects of interacting with the native game UI.
-        /// </summary>
-        internal GameGui()
+        [ServiceManager.ServiceConstructor]
+        private GameGui(SigScanner sigScanner)
         {
             this.address = new GameGuiAddressResolver();
-            this.address.Setup();
+            this.address.Setup(sigScanner);
 
             Log.Verbose("===== G A M E G U I =====");
             Log.Verbose($"GameGuiManager address 0x{this.address.BaseAddress.ToInt64():X}");
@@ -60,34 +53,24 @@ namespace Dalamud.Game.Gui
             Log.Verbose($"HandleItemHover address 0x{this.address.HandleItemHover.ToInt64():X}");
             Log.Verbose($"HandleItemOut address 0x{this.address.HandleItemOut.ToInt64():X}");
             Log.Verbose($"HandleImm address 0x{this.address.HandleImm.ToInt64():X}");
-            Log.Verbose($"GetAgentModule address 0x{this.address.GetAgentModule.ToInt64():X}");
 
-            Service<ChatGui>.Set(new ChatGui(this.address.ChatManager));
-            Service<PartyFinderGui>.Set();
-            Service<ToastGui>.Set();
-            Service<FlyTextGui>.Set();
-            Service<ContextMenu>.Set();
-            Service<DtrBar>.Set();
+            this.setGlobalBgmHook = Hook<SetGlobalBgmDelegate>.FromAddress(this.address.SetGlobalBgm, this.HandleSetGlobalBgmDetour);
 
-            this.setGlobalBgmHook = new Hook<SetGlobalBgmDelegate>(this.address.SetGlobalBgm, this.HandleSetGlobalBgmDetour);
+            this.handleItemHoverHook = Hook<HandleItemHoverDelegate>.FromAddress(this.address.HandleItemHover, this.HandleItemHoverDetour);
+            this.handleItemOutHook = Hook<HandleItemOutDelegate>.FromAddress(this.address.HandleItemOut, this.HandleItemOutDetour);
 
-            this.handleItemHoverHook = new Hook<HandleItemHoverDelegate>(this.address.HandleItemHover, this.HandleItemHoverDetour);
-            this.handleItemOutHook = new Hook<HandleItemOutDelegate>(this.address.HandleItemOut, this.HandleItemOutDetour);
+            this.handleActionHoverHook = Hook<HandleActionHoverDelegate>.FromAddress(this.address.HandleActionHover, this.HandleActionHoverDetour);
+            this.handleActionOutHook = Hook<HandleActionOutDelegate>.FromAddress(this.address.HandleActionOut, this.HandleActionOutDetour);
 
-            this.handleActionHoverHook = new Hook<HandleActionHoverDelegate>(this.address.HandleActionHover, this.HandleActionHoverDetour);
-            this.handleActionOutHook = new Hook<HandleActionOutDelegate>(this.address.HandleActionOut, this.HandleActionOutDetour);
-
-            this.handleImmHook = new Hook<HandleImmDelegate>(this.address.HandleImm, this.HandleImmDetour);
+            this.handleImmHook = Hook<HandleImmDelegate>.FromAddress(this.address.HandleImm, this.HandleImmDetour);
 
             this.getMatrixSingleton = Marshal.GetDelegateForFunctionPointer<GetMatrixSingletonDelegate>(this.address.GetMatrixSingleton);
 
             this.screenToWorldNative = Marshal.GetDelegateForFunctionPointer<ScreenToWorldNativeDelegate>(this.address.ScreenToWorld);
 
-            this.toggleUiHideHook = new Hook<ToggleUiHideDelegate>(this.address.ToggleUiHide, this.ToggleUiHideDetour);
+            this.toggleUiHideHook = Hook<ToggleUiHideDelegate>.FromAddress(this.address.ToggleUiHide, this.ToggleUiHideDetour);
 
-            this.getAgentModule = Marshal.GetDelegateForFunctionPointer<GetAgentModuleDelegate>(this.address.GetAgentModule);
-
-            this.utf8StringFromSequenceHook = new Hook<Utf8StringFromSequenceDelegate>(this.address.Utf8StringFromSequence, this.Utf8StringFromSequenceDetour);
+            this.utf8StringFromSequenceHook = Hook<Utf8StringFromSequenceDelegate>.FromAddress(this.address.Utf8StringFromSequence, this.Utf8StringFromSequenceDetour);
         }
 
         // Marshaled delegates
@@ -97,8 +80,6 @@ namespace Dalamud.Game.Gui
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
         private unsafe delegate bool ScreenToWorldNativeDelegate(float* camPos, float* clipPos, float rayDistance, float* worldPos, int* unknown);
-
-        private delegate IntPtr GetAgentModuleDelegate(IntPtr uiModule);
 
         // Hooked delegates
 
@@ -390,40 +371,36 @@ namespace Dalamud.Game.Gui
         /// <summary>
         /// Find the agent associated with an addon, if possible.
         /// </summary>
-        /// <param name="addon">The addon address.</param>
+        /// <param name="addonPtr">The addon address.</param>
         /// <returns>A pointer to the agent interface.</returns>
-        public unsafe IntPtr FindAgentInterface(IntPtr addon)
+        public unsafe IntPtr FindAgentInterface(IntPtr addonPtr)
         {
-            if (addon == IntPtr.Zero)
+            if (addonPtr == IntPtr.Zero)
                 return IntPtr.Zero;
 
-            var uiModule = Service<GameGui>.Get().GetUIModule();
-            if (uiModule == IntPtr.Zero)
+            var uiModule = (UIModule*)this.GetUIModule();
+            if (uiModule == null)
+                return IntPtr.Zero;
+
+            var agentModule = uiModule->GetAgentModule();
+            if (agentModule == null)
+                return IntPtr.Zero;
+
+            var addon = (AtkUnitBase*)addonPtr;
+            var addonId = addon->ParentID == 0 ? addon->ID : addon->ParentID;
+
+            if (addonId == 0)
+                return IntPtr.Zero;
+
+            var index = 0;
+            while (true)
             {
-                return IntPtr.Zero;
-            }
+                var agent = agentModule->GetAgentByInternalID((uint)index++);
+                if (agent == uiModule || agent == null)
+                    break;
 
-            var agentModule = this.getAgentModule(uiModule);
-            if (agentModule == IntPtr.Zero)
-            {
-                return IntPtr.Zero;
-            }
-
-            var unitBase = (FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase*)addon;
-            var id = unitBase->ParentID;
-            if (id == 0)
-                id = unitBase->IDu;
-
-            if (id == 0)
-                return IntPtr.Zero;
-
-            for (var i = 0; i < 380; i++)
-            {
-                var agent = Marshal.ReadIntPtr(agentModule, 0x20 + (i * 8));
-                if (agent == IntPtr.Zero)
-                    continue;
-                if (Marshal.ReadInt32(agent, 0x20) == id)
-                    return agent;
+                if (agent->AddonId == addonId)
+                    return new IntPtr(agent);
             }
 
             return IntPtr.Zero;
@@ -435,24 +412,9 @@ namespace Dalamud.Game.Gui
         /// <param name="bgmKey">The background music key.</param>
         public void SetBgm(ushort bgmKey) => this.setGlobalBgmHook.Original(bgmKey, 0, 0, 0, 0, 0);
 
-        /// <summary>
-        /// Enables the hooks and submodules of this module.
-        /// </summary>
-        public void Enable()
+        [ServiceManager.CallWhenServicesReady]
+        private void ContinueConstruction()
         {
-            Service<ChatGui>.Get().Enable();
-            Service<ToastGui>.Get().Enable();
-            Service<FlyTextGui>.Get().Enable();
-            Service<PartyFinderGui>.Get().Enable();
-
-            // TODO(goat): Remove when stable
-            var config = Service<DalamudConfiguration>.Get();
-            if (config.DalamudBetaKey == DalamudConfiguration.DalamudCurrentBetaKey)
-            {
-                Log.Warning("TAKE CARE!!! You are using Dalamud Testing, so the new context menu feature is enabled.\nThis may cause crashes with unupdated plugins.");
-                Service<ContextMenu>.Get().Enable();
-            }
-
             this.setGlobalBgmHook.Enable();
             this.handleItemHoverHook.Enable();
             this.handleItemOutHook.Enable();
@@ -468,12 +430,6 @@ namespace Dalamud.Game.Gui
         /// </summary>
         void IDisposable.Dispose()
         {
-            Service<ChatGui>.Get().ExplicitDispose();
-            Service<ToastGui>.Get().ExplicitDispose();
-            Service<FlyTextGui>.Get().ExplicitDispose();
-            Service<PartyFinderGui>.Get().ExplicitDispose();
-            Service<ContextMenu>.Get().ExplicitDispose();
-            Service<DtrBar>.Get().ExplicitDispose();
             this.setGlobalBgmHook.Dispose();
             this.handleItemHoverHook.Dispose();
             this.handleItemOutHook.Dispose();

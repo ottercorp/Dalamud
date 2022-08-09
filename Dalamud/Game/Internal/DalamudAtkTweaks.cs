@@ -22,7 +22,8 @@ namespace Dalamud.Game.Internal
     /// <summary>
     /// This class implements in-game Dalamud options in the in-game System menu.
     /// </summary>
-    internal sealed unsafe partial class DalamudAtkTweaks
+    [ServiceManager.EarlyLoadedService]
+    internal sealed unsafe partial class DalamudAtkTweaks : IServiceType
     {
         private readonly AtkValueChangeType atkValueChangeType;
         private readonly AtkValueSetString atkValueSetString;
@@ -33,19 +34,21 @@ namespace Dalamud.Game.Internal
 
         private readonly Hook<AtkUnitBaseReceiveGlobalEvent> hookAtkUnitBaseReceiveGlobalEvent;
 
+        [ServiceManager.ServiceDependency]
+        private readonly DalamudConfiguration configuration = Service<DalamudConfiguration>.Get();
+
+        [ServiceManager.ServiceDependency]
+        private readonly ContextMenu contextMenu = Service<ContextMenu>.Get();
+
         private readonly string locDalamudPlugins;
         private readonly string locDalamudSettings;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DalamudAtkTweaks"/> class.
-        /// </summary>
-        public DalamudAtkTweaks()
+        [ServiceManager.ServiceConstructor]
+        private DalamudAtkTweaks(SigScanner sigScanner)
         {
-            var sigScanner = Service<SigScanner>.Get();
-
             var openSystemMenuAddress = sigScanner.ScanText("E8 ?? ?? ?? ?? 32 C0 4C 8B AC 24 ?? ?? ?? ?? 48 8B 8D ?? ?? ?? ??");
 
-            this.hookAgentHudOpenSystemMenu = new Hook<AgentHudOpenSystemMenuPrototype>(openSystemMenuAddress, this.AgentHudOpenSystemMenuDetour);
+            this.hookAgentHudOpenSystemMenu = Hook<AgentHudOpenSystemMenuPrototype>.FromAddress(openSystemMenuAddress, this.AgentHudOpenSystemMenuDetour);
 
             var atkValueChangeTypeAddress = sigScanner.ScanText("E8 ?? ?? ?? ?? 45 84 F6 48 8D 4C 24 ??");
             this.atkValueChangeType = Marshal.GetDelegateForFunctionPointer<AtkValueChangeType>(atkValueChangeTypeAddress);
@@ -54,16 +57,15 @@ namespace Dalamud.Game.Internal
             this.atkValueSetString = Marshal.GetDelegateForFunctionPointer<AtkValueSetString>(atkValueSetStringAddress);
 
             var uiModuleRequestMainCommandAddress = sigScanner.ScanText("40 53 56 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 48 8B 01 8B DA 48 8B F1 FF 90 ?? ?? ?? ??");
-            this.hookUiModuleRequestMainCommand = new Hook<UiModuleRequestMainCommand>(uiModuleRequestMainCommandAddress, this.UiModuleRequestMainCommandDetour);
+            this.hookUiModuleRequestMainCommand = Hook<UiModuleRequestMainCommand>.FromAddress(uiModuleRequestMainCommandAddress, this.UiModuleRequestMainCommandDetour);
 
             var atkUnitBaseReceiveGlobalEventAddress = sigScanner.ScanText("48 89 5C 24 ?? 48 89 7C 24 ?? 55 41 56 41 57 48 8B EC 48 83 EC 50 44 0F B7 F2 ");
-            this.hookAtkUnitBaseReceiveGlobalEvent = new Hook<AtkUnitBaseReceiveGlobalEvent>(atkUnitBaseReceiveGlobalEventAddress, this.AtkUnitBaseReceiveGlobalEventDetour);
+            this.hookAtkUnitBaseReceiveGlobalEvent = Hook<AtkUnitBaseReceiveGlobalEvent>.FromAddress(atkUnitBaseReceiveGlobalEventAddress, this.AtkUnitBaseReceiveGlobalEventDetour);
 
             this.locDalamudPlugins = Loc.Localize("SystemMenuPlugins", "Dalamud Plugins");
             this.locDalamudSettings = Loc.Localize("SystemMenuSettings", "Dalamud Settings");
 
-            var contextMenu = Service<ContextMenu>.Get();
-            contextMenu.ContextMenuOpened += this.ContextMenuOnContextMenuOpened;
+            this.contextMenu.ContextMenuOpened += this.ContextMenuOnContextMenuOpened;
         }
 
         private delegate void AgentHudOpenSystemMenuPrototype(void* thisPtr, AtkValue* atkValueArgs, uint menuSize);
@@ -76,10 +78,8 @@ namespace Dalamud.Game.Internal
 
         private delegate IntPtr AtkUnitBaseReceiveGlobalEvent(AtkUnitBase* thisPtr, ushort cmd, uint a3, IntPtr a4, uint* a5);
 
-        /// <summary>
-        /// Enables the <see cref="DalamudAtkTweaks"/>.
-        /// </summary>
-        public void Enable()
+        [ServiceManager.CallWhenServicesReady]
+        private void ContinueConstruction(DalamudInterface dalamudInterface)
         {
             this.hookAgentHudOpenSystemMenu.Enable();
             this.hookUiModuleRequestMainCommand.Enable();
@@ -88,10 +88,13 @@ namespace Dalamud.Game.Internal
 
         private void ContextMenuOnContextMenuOpened(ContextMenuOpenedArgs args)
         {
-            var systemText = Service<DataManager>.Get().GetExcelSheet<Addon>()!.GetRow(1059)!.Text.RawString; // "System"
-            var configuration = Service<DalamudConfiguration>.Get();
+            var systemText = Service<DataManager>.GetNullable()?.GetExcelSheet<Addon>()?.GetRow(1059)?.Text?.RawString; // "System"
+            var interfaceManager = Service<InterfaceManager>.GetNullable();
 
-            if (args.Title == systemText && configuration.DoButtonsSystemMenu)
+            if (systemText == null || interfaceManager == null)
+                return;
+
+            if (args.Title == systemText && this.configuration.DoButtonsSystemMenu && interfaceManager.IsDispatchingEvents)
             {
                 var dalamudInterface = Service<DalamudInterface>.Get();
 
@@ -113,7 +116,7 @@ namespace Dalamud.Game.Internal
 
             // "SendHotkey"
             // 3 == Close
-            if (cmd == 12 && WindowSystem.HasAnyWindowSystemFocus && *arg == 3 && Service<DalamudConfiguration>.Get().IsFocusManagementEnabled)
+            if (cmd == 12 && WindowSystem.HasAnyWindowSystemFocus && *arg == 3 && this.configuration.IsFocusManagementEnabled)
             {
                 Log.Verbose($"Cancelling global event SendHotkey command due to WindowSystem {WindowSystem.FocusedWindowSystemNamespace}");
                 return IntPtr.Zero;
@@ -124,32 +127,37 @@ namespace Dalamud.Game.Internal
 
         private void AgentHudOpenSystemMenuDetour(void* thisPtr, AtkValue* atkValueArgs, uint menuSize)
         {
-            if (WindowSystem.HasAnyWindowSystemFocus && Service<DalamudConfiguration>.Get().IsFocusManagementEnabled)
+            if (WindowSystem.HasAnyWindowSystemFocus && this.configuration.IsFocusManagementEnabled)
             {
                 Log.Verbose($"Cancelling OpenSystemMenu due to WindowSystem {WindowSystem.FocusedWindowSystemNamespace}");
                 return;
             }
 
-            var configuration = Service<DalamudConfiguration>.Get();
-
-            if (!configuration.DoButtonsSystemMenu)
+            var interfaceManager = Service<InterfaceManager>.GetNullable();
+            if (interfaceManager == null)
             {
                 this.hookAgentHudOpenSystemMenu.Original(thisPtr, atkValueArgs, menuSize);
                 return;
             }
 
-            // the max size (hardcoded) is 0xE/15, but the system menu currently uses 0xC/12
+            if (!configuration.DoButtonsSystemMenu || !interfaceManager.IsDispatchingEvents)
+            {
+                this.hookAgentHudOpenSystemMenu.Original(thisPtr, atkValueArgs, menuSize);
+                return;
+            }
+
+            // the max size (hardcoded) is 0x11/17, but the system menu currently uses 0xC/12
             // this is a just in case that doesnt really matter
             // see if we can add 2 entries
-            if (menuSize >= 0xD)
+            if (menuSize >= 0x11)
             {
                 this.hookAgentHudOpenSystemMenu.Original(thisPtr, atkValueArgs, menuSize);
                 return;
             }
 
             // atkValueArgs is actually an array of AtkValues used as args. all their UI code works like this.
-            // in this case, menu size is stored in atkValueArgs[4], and the next 15 slots are the MainCommand
-            // the 15 slots after that, if they exist, are the entry names, but they are otherwise pulled from MainCommand EXD
+            // in this case, menu size is stored in atkValueArgs[4], and the next 17 slots are the MainCommand
+            // the 17 slots after that, if they exist, are the entry names, but they are otherwise pulled from MainCommand EXD
             // reference the original function for more details :)
 
             // step 1) move all the current menu items down so we can put Dalamud at the top like it deserves
@@ -173,9 +181,9 @@ namespace Dalamud.Game.Internal
             // step 3) create strings for them
             // since the game first checks for strings in the AtkValue argument before pulling them from the exd, if we create strings we dont have to worry
             // about hooking the exd reader, thank god
-            var firstStringEntry = &atkValueArgs[5 + 15];
+            var firstStringEntry = &atkValueArgs[5 + 17];
             this.atkValueChangeType(firstStringEntry, ValueType.String);
-            var secondStringEntry = &atkValueArgs[6 + 15];
+            var secondStringEntry = &atkValueArgs[6 + 17];
             this.atkValueChangeType(secondStringEntry, ValueType.String);
 
             const int color = 539;
@@ -210,15 +218,15 @@ namespace Dalamud.Game.Internal
 
         private void UiModuleRequestMainCommandDetour(void* thisPtr, int commandId)
         {
-            var dalamudInterface = Service<DalamudInterface>.Get();
+            var dalamudInterface = Service<DalamudInterface>.GetNullable();
 
             switch (commandId)
             {
                 case 69420:
-                    dalamudInterface.TogglePluginInstallerWindow();
+                    dalamudInterface?.TogglePluginInstallerWindow();
                     break;
                 case 69421:
-                    dalamudInterface.ToggleSettingsWindow();
+                    dalamudInterface?.ToggleSettingsWindow();
                     break;
                 default:
                     this.hookUiModuleRequestMainCommand.Original(thisPtr, commandId);
@@ -262,7 +270,7 @@ namespace Dalamud.Game.Internal
                 this.hookUiModuleRequestMainCommand.Dispose();
                 this.hookAtkUnitBaseReceiveGlobalEvent.Dispose();
 
-                Service<ContextMenu>.Get().ContextMenuOpened -= this.ContextMenuOnContextMenuOpened;
+                this.contextMenu.ContextMenuOpened -= this.ContextMenuOnContextMenuOpened;
             }
 
             this.disposed = true;

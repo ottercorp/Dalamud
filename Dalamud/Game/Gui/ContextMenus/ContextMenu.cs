@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
-
+using Dalamud.Configuration.Internal;
+using Dalamud.Game.Gui.ContextMenus.OldStructs;
 using Dalamud.Hooking;
 using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Logging;
 using Dalamud.Memory;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -22,7 +24,8 @@ namespace Dalamud.Game.Gui.ContextMenus
     /// </summary>
     [PluginInterface]
     [InterfaceVersion("1.0")]
-    public sealed class ContextMenu : IDisposable
+    [ServiceManager.BlockingEarlyLoadedService]
+    public sealed class ContextMenu : IDisposable, IServiceType
     {
         private const int MaxContextMenuItemsPerContextMenu = 32;
 
@@ -38,44 +41,42 @@ namespace Dalamud.Game.Gui.ContextMenus
 
         #endregion
 
-        private unsafe AgentContextInterface* currentAgentContextInterface;
+        private unsafe OldAgentContextInterface* currentAgentContextInterface;
 
         private IntPtr currentSubContextMenuTitle;
 
         private OpenSubContextMenuItem? selectedOpenSubContextMenuItem;
         private ContextMenuOpenedArgs? currentContextMenuOpenedArgs;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ContextMenu"/> class.
-        /// </summary>
-        public ContextMenu()
+        [ServiceManager.ServiceConstructor]
+        private ContextMenu(SigScanner sigScanner)
         {
             this.Address = new ContextMenuAddressResolver();
-            this.Address.Setup();
+            this.Address.Setup(sigScanner);
 
             unsafe
             {
                 this.openSubContextMenu = Marshal.GetDelegateForFunctionPointer<OpenSubContextMenuDelegate>(this.Address.OpenSubContextMenuPtr);
 
-                this.contextMenuOpeningHook = new Hook<ContextMenuOpeningDelegate>(this.Address.ContextMenuOpeningPtr, this.ContextMenuOpeningDetour);
-                this.contextMenuOpenedHook = new Hook<ContextMenuOpenedDelegate>(this.Address.ContextMenuOpenedPtr, this.ContextMenuOpenedDetour);
-                this.contextMenuItemSelectedHook = new Hook<ContextMenuItemSelectedDelegate>(this.Address.ContextMenuItemSelectedPtr, this.ContextMenuItemSelectedDetour);
-                this.subContextMenuOpeningHook = new Hook<SubContextMenuOpeningDelegate>(this.Address.SubContextMenuOpeningPtr, this.SubContextMenuOpeningDetour);
-                this.subContextMenuOpenedHook = new Hook<ContextMenuOpenedDelegate>(this.Address.SubContextMenuOpenedPtr, this.SubContextMenuOpenedDetour);
+                this.contextMenuOpeningHook = Hook<ContextMenuOpeningDelegate>.FromAddress(this.Address.ContextMenuOpeningPtr, this.ContextMenuOpeningDetour);
+                this.contextMenuOpenedHook = Hook<ContextMenuOpenedDelegate>.FromAddress(this.Address.ContextMenuOpenedPtr, this.ContextMenuOpenedDetour);
+                this.contextMenuItemSelectedHook = Hook<ContextMenuItemSelectedDelegate>.FromAddress(this.Address.ContextMenuItemSelectedPtr, this.ContextMenuItemSelectedDetour);
+                this.subContextMenuOpeningHook = Hook<SubContextMenuOpeningDelegate>.FromAddress(this.Address.SubContextMenuOpeningPtr, this.SubContextMenuOpeningDetour);
+                this.subContextMenuOpenedHook = Hook<ContextMenuOpenedDelegate>.FromAddress(this.Address.SubContextMenuOpenedPtr, this.SubContextMenuOpenedDetour);
             }
         }
 
         #region Delegates
 
-        private unsafe delegate bool OpenSubContextMenuDelegate(AgentContext* agentContext);
+        private unsafe delegate bool OpenSubContextMenuDelegate(OldAgentContext* agentContext);
 
-        private unsafe delegate IntPtr ContextMenuOpeningDelegate(IntPtr a1, IntPtr a2, IntPtr a3, uint a4, IntPtr a5, AgentContextInterface* agentContextInterface, IntPtr a7, ushort a8);
+        private unsafe delegate IntPtr ContextMenuOpeningDelegate(IntPtr a1, IntPtr a2, IntPtr a3, uint a4, IntPtr a5, OldAgentContextInterface* agentContextInterface, IntPtr a7, ushort a8);
 
         private unsafe delegate bool ContextMenuOpenedDelegate(AddonContextMenu* addonContextMenu, int menuSize, AtkValue* atkValueArgs);
 
         private unsafe delegate bool ContextMenuItemSelectedDelegate(AddonContextMenu* addonContextMenu, int selectedIndex, byte a3);
 
-        private unsafe delegate bool SubContextMenuOpeningDelegate(AgentContext* agentContext);
+        private unsafe delegate bool SubContextMenuOpeningDelegate(OldAgentContext* agentContext);
 
         #endregion
 
@@ -96,19 +97,7 @@ namespace Dalamud.Game.Gui.ContextMenus
             this.contextMenuOpeningHook.Disable();
         }
 
-        /// <summary>
-        /// Enable this subsystem.
-        /// </summary>
-        internal void Enable()
-        {
-            this.contextMenuOpeningHook.Enable();
-            this.contextMenuOpenedHook.Enable();
-            this.contextMenuItemSelectedHook.Enable();
-            this.subContextMenuOpeningHook.Enable();
-            this.subContextMenuOpenedHook.Enable();
-        }
-
-        private static unsafe bool IsInventoryContext(AgentContextInterface* agentContextInterface)
+        private static unsafe bool IsInventoryContext(OldAgentContextInterface* agentContextInterface)
         {
             return agentContextInterface == AgentInventoryContext.Instance();
         }
@@ -121,7 +110,20 @@ namespace Dalamud.Game.Gui.ContextMenus
             }
         }
 
-        private unsafe IntPtr ContextMenuOpeningDetour(IntPtr a1, IntPtr a2, IntPtr a3, uint a4, IntPtr a5, AgentContextInterface* agentContextInterface, IntPtr a7, ushort a8)
+        [ServiceManager.CallWhenServicesReady]
+        private void ContinueConstruction(GameGui gameGui)
+        {
+            if (!EnvironmentConfiguration.DalamudDoContextMenu)
+                return;
+
+            this.contextMenuOpeningHook.Enable();
+            this.contextMenuOpenedHook.Enable();
+            this.contextMenuItemSelectedHook.Enable();
+            this.subContextMenuOpeningHook.Enable();
+            this.subContextMenuOpenedHook.Enable();
+        }
+
+        private unsafe IntPtr ContextMenuOpeningDetour(IntPtr a1, IntPtr a2, IntPtr a3, uint a4, IntPtr a5, OldAgentContextInterface* agentContextInterface, IntPtr a7, ushort a8)
         {
             this.currentAgentContextInterface = agentContextInterface;
             return this.contextMenuOpeningHook!.Original(a1, a2, a3, a4, a5, agentContextInterface, a7, a8);
@@ -182,6 +184,9 @@ namespace Dalamud.Game.Gui.ContextMenus
             // TODO: For inventory sub context menus, we take only the last item -- the return item.
             // This is because we're doing a hack to spawn a Second Tier sub context menu and then appropriating it.
             var contextMenuItems = contextMenuReaderWriter.Read();
+            if (contextMenuItems == null)
+                return;
+
             if (IsInventoryContext(this.currentAgentContextInterface) && this.selectedOpenSubContextMenuItem != null)
             {
                 contextMenuItems = contextMenuItems.TakeLast(1).ToArray();
@@ -212,12 +217,12 @@ namespace Dalamud.Game.Gui.ContextMenus
             }
         }
 
-        private unsafe bool SubContextMenuOpeningDetour(AgentContext* agentContext)
+        private unsafe bool SubContextMenuOpeningDetour(OldAgentContext* agentContext)
         {
             return this.SubContextMenuOpeningImplementation(agentContext) || this.subContextMenuOpeningHook.Original(agentContext);
         }
 
-        private unsafe bool SubContextMenuOpeningImplementation(AgentContext* agentContext)
+        private unsafe bool SubContextMenuOpeningImplementation(OldAgentContext* agentContext)
         {
             if (this.openSubContextMenu == null || this.selectedOpenSubContextMenuItem == null)
             {
@@ -274,7 +279,7 @@ namespace Dalamud.Game.Gui.ContextMenus
             this.ContextMenuOpenedImplementation(addonContextMenu, ref atkValueCount, ref atkValues);
         }
 
-        private unsafe ContextMenuOpenedArgs? NotifyContextMenuOpened(AddonContextMenu* addonContextMenu, AgentContextInterface* agentContextInterface, string? title, ContextMenus.ContextMenuOpenedDelegate contextMenuOpenedDelegate, IEnumerable<ContextMenuItem> initialContextMenuItems)
+        private unsafe ContextMenuOpenedArgs? NotifyContextMenuOpened(AddonContextMenu* addonContextMenu, OldAgentContextInterface* agentContextInterface, string? title, ContextMenus.ContextMenuOpenedDelegate contextMenuOpenedDelegate, IEnumerable<ContextMenuItem> initialContextMenuItems)
         {
             var parentAddonName = this.GetParentAddonName(&addonContextMenu->AtkUnitBase);
 
@@ -285,11 +290,11 @@ namespace Dalamud.Game.Gui.ContextMenus
             if (IsInventoryContext(agentContextInterface))
             {
                 var agentInventoryContext = (AgentInventoryContext*)agentContextInterface;
-                inventoryItemContext = new InventoryItemContext(agentInventoryContext->InventoryItemId, agentInventoryContext->InventoryItemCount, agentInventoryContext->InventoryItemIsHighQuality);
+                inventoryItemContext = new InventoryItemContext(agentInventoryContext->TargetDummyItem.ItemID, agentInventoryContext->TargetDummyItem.Quantity, agentInventoryContext->TargetDummyItem.Flags.HasFlag(InventoryItem.ItemFlags.HQ));
             }
             else
             {
-                var agentContext = (AgentContext*)agentContextInterface;
+                var agentContext = (OldAgentContext*)agentContextInterface;
 
                 uint? id = agentContext->GameObjectId;
                 if (id == 0)
@@ -399,6 +404,9 @@ namespace Dalamud.Game.Gui.ContextMenus
             // Read the selected item directly from the game
             ContextMenuReaderWriter contextMenuReaderWriter = new ContextMenuReaderWriter(this.currentAgentContextInterface, addonContextMenu->AtkValuesCount, addonContextMenu->AtkValues);
             var gameContextMenuItems = contextMenuReaderWriter.Read();
+            if (gameContextMenuItems == null)
+                return;
+
             var gameSelectedItem = gameContextMenuItems.ElementAtOrDefault(selectedIndex);
 
             // This should be impossible

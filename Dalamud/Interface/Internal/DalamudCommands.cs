@@ -18,22 +18,12 @@ namespace Dalamud.Interface.Internal
     /// <summary>
     /// Class handling Dalamud core commands.
     /// </summary>
-    internal class DalamudCommands
+    [ServiceManager.EarlyLoadedService]
+    internal class DalamudCommands : IServiceType
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DalamudCommands"/> class.
-        /// </summary>
-        public DalamudCommands()
+        [ServiceManager.ServiceConstructor]
+        private DalamudCommands(CommandManager commandManager)
         {
-        }
-
-        /// <summary>
-        /// Register all command handlers with the Dalamud instance.
-        /// </summary>
-        public void SetupCommands()
-        {
-            var commandManager = Service<CommandManager>.Get();
-
             commandManager.AddHandler("/xldclose", new CommandInfo(this.OnUnloadCommand)
             {
                 HelpMessage = Loc.Localize("DalamudUnloadHelp", "Unloads XIVLauncher in-game addon."),
@@ -79,6 +69,18 @@ namespace Dalamud.Interface.Internal
             commandManager.AddHandler("/xldev", new CommandInfo(this.OnDebugDrawDevMenu)
             {
                 HelpMessage = Loc.Localize("DalamudDevMenuHelp", "Draw dev menu DEBUG"),
+                ShowInHelp = false,
+            });
+
+            commandManager.AddHandler("/xlstats", new CommandInfo(this.OnTogglePluginStats)
+            {
+                HelpMessage = Loc.Localize("DalamudPluginStats", "Draw plugin statistics window"),
+                ShowInHelp = false,
+            });
+
+            commandManager.AddHandler("/xlbranch", new CommandInfo(this.OnToggleBranchSwitcher)
+            {
+                HelpMessage = Loc.Localize("DalamudBranchSwitcher", "Draw branch switcher"),
                 ShowInHelp = false,
             });
 
@@ -131,6 +133,13 @@ namespace Dalamud.Interface.Internal
                 HelpMessage = "Dalamud version info",
             });
 
+            commandManager.AddHandler("/xlui", new CommandInfo(this.OnUiCommand)
+            {
+                HelpMessage = Loc.Localize(
+                    "DalamudUiModeHelp",
+                    "Toggle Dalamud UI display modes. Native UI modifications may also be affected by this, but that depends on the plugin."),
+            });
+
             commandManager.AddHandler("/imdebug", new CommandInfo(this.OnDebugImInfoCommand)
             {
                 HelpMessage = "ImGui DEBUG",
@@ -169,7 +178,7 @@ namespace Dalamud.Interface.Internal
 
             try
             {
-                Service<PluginManager>.Get().ReloadAllPlugins();
+                Service<PluginManager>.Get().ReloadAllPluginsAsync().Wait();
                 chatGui.Print("OK");
             }
             catch (Exception ex)
@@ -270,6 +279,16 @@ namespace Dalamud.Interface.Internal
             Service<DalamudInterface>.Get().ToggleDevMenu();
         }
 
+        private void OnTogglePluginStats(string command, string arguments)
+        {
+            Service<DalamudInterface>.Get().TogglePluginStatsWindow();
+        }
+
+        private void OnToggleBranchSwitcher(string command, string arguments)
+        {
+            Service<DalamudInterface>.Get().ToggleBranchSwitcher();
+        }
+
         private void OnDebugDrawDataMenu(string command, string arguments)
         {
             var dalamudInterface = Service<DalamudInterface>.Get();
@@ -282,7 +301,7 @@ namespace Dalamud.Interface.Internal
 
         private void OnDebugDrawIMEPanel(string command, string arguments)
         {
-            Service<DalamudInterface>.Get().OpenIMEWindow();
+            Service<DalamudInterface>.Get().OpenImeWindow();
         }
 
         private void OnOpenLog(string command, string arguments)
@@ -365,6 +384,32 @@ namespace Dalamud.Interface.Internal
         private void OnOpenSettingsCommand(string command, string arguments)
         {
             Service<DalamudInterface>.Get().ToggleSettingsWindow();
+        }
+
+        private void OnUiCommand(string command, string arguments)
+        {
+            var im = Service<InterfaceManager>.Get();
+
+            im.IsDispatchingEvents = arguments switch
+            {
+                "show" => true,
+                "hide" => false,
+                _ => !im.IsDispatchingEvents,
+            };
+
+            var pm = Service<PluginManager>.Get();
+
+            foreach (var plugin in pm.InstalledPlugins)
+            {
+                if (im.IsDispatchingEvents)
+                {
+                    plugin.DalamudInterface?.UiBuilder.NotifyShowUi();
+                }
+                else
+                {
+                    plugin.DalamudInterface?.UiBuilder.NotifyHideUi();
+                }
+            }
         }
     }
 }

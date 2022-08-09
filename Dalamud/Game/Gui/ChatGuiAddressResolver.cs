@@ -1,7 +1,5 @@
 using System;
 
-using Dalamud.Game.Internal;
-
 namespace Dalamud.Game.Gui
 {
     /// <summary>
@@ -9,20 +7,6 @@ namespace Dalamud.Game.Gui
     /// </summary>
     public sealed class ChatGuiAddressResolver : BaseAddressResolver
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ChatGuiAddressResolver"/> class.
-        /// </summary>
-        /// <param name="baseAddress">The base address of the native ChatManager class.</param>
-        public ChatGuiAddressResolver(IntPtr baseAddress)
-        {
-            this.BaseAddress = baseAddress;
-        }
-
-        /// <summary>
-        /// Gets the base address of the native ChatManager class.
-        /// </summary>
-        public IntPtr BaseAddress { get; }
-
         /// <summary>
         /// Gets the address of the native PrintMessage method.
         /// </summary>

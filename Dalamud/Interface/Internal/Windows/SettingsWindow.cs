@@ -12,7 +12,6 @@ using Dalamud.Game.Gui.Dtr;
 using Dalamud.Game.Text;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
-using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Internal;
 using Dalamud.Utility;
@@ -25,17 +24,17 @@ namespace Dalamud.Interface.Internal.Windows
     /// </summary>
     internal class SettingsWindow : Window
     {
-        private const float MinScale = 0.3f;
-        private const float MaxScale = 3.0f;
-
         private readonly string[] languages;
         private readonly string[] locLanguages;
+
         private int langIndex;
 
         private XivChatType dalamudMessagesChatType;
 
+        private bool doWaitForPluginsOnStartup;
         private bool doCfTaskBarFlash;
         private bool doCfChatMessage;
+        private bool doMbCollect;
 
         private float globalUiScale;
         private bool doUseAxisFontsFromGame;
@@ -59,6 +58,8 @@ namespace Dalamud.Interface.Internal.Windows
         private string fuckGFWTempUrlRegex = string.Empty;
         private string fuckGFWTempReplaceTo = string.Empty;
         private string fuckGFWAddError = string.Empty;
+
+        private int? pluginWaitBeforeFree;
 
         private List<ThirdPartyRepoSettings> thirdRepoList;
         private bool thirdRepoListChanged;
@@ -98,11 +99,13 @@ namespace Dalamud.Interface.Internal.Windows
 
             this.dalamudMessagesChatType = configuration.GeneralChatType;
 
+            this.doWaitForPluginsOnStartup = configuration.IsResumeGameAfterPluginLoad;
             this.doCfTaskBarFlash = configuration.DutyFinderTaskbarFlash;
             this.doCfChatMessage = configuration.DutyFinderChatMessage;
+            this.doMbCollect = configuration.IsMbCollect;
 
             this.globalUiScale = configuration.GlobalUiScale;
-            this.fontGamma = configuration.FontGamma;
+            this.fontGamma = configuration.FontGammaLevel;
             this.doUseAxisFontsFromGame = configuration.UseAxisFontsFromGame;
             this.doToggleUiHide = configuration.ToggleUiHide;
             this.doToggleUiHideDuringCutscenes = configuration.ToggleUiHideDuringCutscenes;
@@ -116,6 +119,8 @@ namespace Dalamud.Interface.Internal.Windows
 
             this.dtrSpacing = configuration.DtrSpacing;
             this.dtrSwapDirection = configuration.DtrSwapDirection;
+
+            this.pluginWaitBeforeFree = configuration.PluginWaitBeforeFree;
 
             this.doPluginTest = configuration.DoPluginTest;
             this.fuckGFWList = configuration.FuckGFWList.Select(x => x.Clone()).ToList();
@@ -132,26 +137,9 @@ namespace Dalamud.Interface.Internal.Windows
             this.proxyPort = configuration.ProxyPort;
 
             this.languages = Localization.ApplicableLangCodes.Prepend("en").ToArray();
-            try
-            {
-                if (string.IsNullOrEmpty(configuration.LanguageOverride))
-                {
-                    var currentUiLang = CultureInfo.CurrentUICulture;
-
-                    if (Localization.ApplicableLangCodes.Any(x => currentUiLang.TwoLetterISOLanguageName == x))
-                        this.langIndex = Array.IndexOf(this.languages, currentUiLang.TwoLetterISOLanguageName);
-                    else
-                        this.langIndex = 0;
-                }
-                else
-                {
-                    this.langIndex = Array.IndexOf(this.languages, configuration.LanguageOverride);
-                }
-            }
-            catch (Exception)
-            {
+            this.langIndex = Array.IndexOf(this.languages, configuration.EffectiveLanguage);
+            if (this.langIndex == -1)
                 this.langIndex = 0;
-            }
 
             try
             {
@@ -196,10 +184,13 @@ namespace Dalamud.Interface.Internal.Windows
             var configuration = Service<DalamudConfiguration>.Get();
             var interfaceManager = Service<InterfaceManager>.Get();
 
-            var rebuildFont = interfaceManager.FontGamma != configuration.FontGamma;
+            var rebuildFont = ImGui.GetIO().FontGlobalScale != configuration.GlobalUiScale
+                || interfaceManager.FontGamma != configuration.FontGammaLevel
+                || interfaceManager.UseAxis != configuration.UseAxisFontsFromGame;
 
             ImGui.GetIO().FontGlobalScale = configuration.GlobalUiScale;
             interfaceManager.FontGammaOverride = null;
+            interfaceManager.UseAxisOverride = null;
             this.thirdRepoList = configuration.ThirdRepoList.Select(x => x.Clone()).ToList();
             this.fuckGFWList = configuration.FuckGFWList.Select(x => x.Clone()).ToList();
             this.devPluginLocations = configuration.DevPluginLoadLocations.Select(x => x.Clone()).ToList();
@@ -215,7 +206,7 @@ namespace Dalamud.Interface.Internal.Windows
         public override void Draw()
         {
             var windowSize = ImGui.GetWindowSize();
-            ImGui.BeginChild("scrolling", new Vector2(windowSize.X - 5 - (5 * ImGuiHelpers.GlobalScale), windowSize.Y - 35 - (35 * ImGuiHelpers.GlobalScale)), false, ImGuiWindowFlags.HorizontalScrollbar);
+            ImGui.BeginChild("scrolling", new Vector2(windowSize.X - 5 - (5 * ImGuiHelpers.GlobalScale), windowSize.Y - 35 - (35 * ImGuiHelpers.GlobalScale)), false);
 
             if (ImGui.BeginTabBar("SetTabBar"))
             {
@@ -277,6 +268,9 @@ namespace Dalamud.Interface.Internal.Windows
 
             ImGuiHelpers.ScaledDummy(5);
 
+            ImGui.Checkbox(Loc.Localize("DalamudSettingsWaitForPluginsOnStartup", "Wait for plugins before game loads"), ref this.doWaitForPluginsOnStartup);
+            ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsWaitForPluginsOnStartupHint", "Do not let the game load, until plugins are loaded."));
+
             ImGui.Checkbox(Loc.Localize("DalamudSettingsFlash", "Flash FFXIV window on duty pop"), ref this.doCfTaskBarFlash);
             ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsFlashHint", "Flash the FFXIV window in your task bar when a duty is ready."));
 
@@ -293,7 +287,15 @@ namespace Dalamud.Interface.Internal.Windows
             ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsSystemMenuMsgHint", "Add buttons for Dalamud plugins and settings to the system menu."));
 
             ImGui.Checkbox(Loc.Localize("DalamudSettingsDisableRmtFiltering", "Disable RMT Filtering"), ref this.disableRmtFiltering);
-            ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsDisableRmtFilteringMsgHint", "Disable dalamud's built-in RMT ad filtering."));
+            ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsDisableRmtFilteringMsgHint", "Disable Dalamud's built-in RMT ad filtering."));
+
+            ImGuiHelpers.ScaledDummy(5);
+
+            ImGui.Checkbox(Loc.Localize("DalamudSettingDoMbCollect", "Anonymously upload market board data"), ref this.doMbCollect);
+
+            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudGrey);
+            ImGui.TextWrapped(Loc.Localize("DalamudSettingDoMbCollectHint", "Anonymously provide data about in-game economics to Universalis when browsing the market board. This data can't be tied to you in any way and everyone benefits!"));
+            ImGui.PopStyleColor();
         }
 
         private void DrawLookAndFeelTab()
@@ -301,23 +303,57 @@ namespace Dalamud.Interface.Internal.Windows
             var interfaceManager = Service<InterfaceManager>.Get();
 
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 3);
-            ImGui.Text(Loc.Localize("DalamudSettingsGlobalUiScale", "Global UI Scale"));
+            ImGui.Text(Loc.Localize("DalamudSettingsGlobalUiScale", "Global Font Scale"));
             ImGui.SameLine();
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - 3);
-            if (ImGui.Button(Loc.Localize("DalamudSettingsIndividualConfigResetToDefaultValue", "Reset") + "##DalamudSettingsGlobalUiScaleReset"))
+            if (ImGui.Button("9.6pt##DalamudSettingsGlobalUiScaleReset96"))
+            {
+                this.globalUiScale = 9.6f / 12.0f;
+                ImGui.GetIO().FontGlobalScale = this.globalUiScale;
+                interfaceManager.RebuildFonts();
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button("12pt##DalamudSettingsGlobalUiScaleReset12"))
             {
                 this.globalUiScale = 1.0f;
                 ImGui.GetIO().FontGlobalScale = this.globalUiScale;
                 interfaceManager.RebuildFonts();
             }
 
-            if (ImGui.DragFloat("##DalamudSettingsGlobalUiScaleDrag", ref this.globalUiScale, 0.005f, MinScale, MaxScale, "%.2f"))
+            ImGui.SameLine();
+            if (ImGui.Button("14pt##DalamudSettingsGlobalUiScaleReset14"))
             {
+                this.globalUiScale = 14.0f / 12.0f;
                 ImGui.GetIO().FontGlobalScale = this.globalUiScale;
                 interfaceManager.RebuildFonts();
             }
 
-            ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsGlobalUiScaleHint", "Scale all XIVLauncher UI elements - useful for 4K displays."));
+            ImGui.SameLine();
+            if (ImGui.Button("18pt##DalamudSettingsGlobalUiScaleReset18"))
+            {
+                this.globalUiScale = 18.0f / 12.0f;
+                ImGui.GetIO().FontGlobalScale = this.globalUiScale;
+                interfaceManager.RebuildFonts();
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button("36pt##DalamudSettingsGlobalUiScaleReset36"))
+            {
+                this.globalUiScale = 36.0f / 12.0f;
+                ImGui.GetIO().FontGlobalScale = this.globalUiScale;
+                interfaceManager.RebuildFonts();
+            }
+
+            var globalUiScaleInPt = 12f * this.globalUiScale;
+            if (ImGui.DragFloat("##DalamudSettingsGlobalUiScaleDrag", ref globalUiScaleInPt, 0.1f, 9.6f, 36f, "%.1fpt", ImGuiSliderFlags.AlwaysClamp))
+            {
+                this.globalUiScale = globalUiScaleInPt / 12f;
+                ImGui.GetIO().FontGlobalScale = this.globalUiScale;
+                interfaceManager.RebuildFonts();
+            }
+
+            ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsGlobalUiScaleHint", "Scale text in all XIVLauncher UI elements - this is useful for 4K displays."));
 
             ImGuiHelpers.ScaledDummy(10, 16);
 
@@ -328,12 +364,21 @@ namespace Dalamud.Interface.Internal.Windows
 
             ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsStyleEditorHint", "Modify the look & feel of Dalamud windows."));
 
-            ImGuiHelpers.ScaledDummy(10, 16);
+            ImGuiHelpers.ScaledDummy(10);
+
+            if (ImGui.Checkbox(Loc.Localize("DalamudSettingToggleAxisFonts", "Use AXIS fonts as default Dalamud font"), ref this.doUseAxisFontsFromGame))
+            {
+                interfaceManager.UseAxisOverride = this.doUseAxisFontsFromGame;
+                interfaceManager.RebuildFonts();
+            }
+
+            ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingToggleUiAxisFontsHint", "Use AXIS fonts (the game's main UI fonts) as default Dalamud font."));
+
+            ImGuiHelpers.ScaledDummy(10);
 
             ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingToggleUiHideOptOutNote", "Plugins may independently opt out of the settings below."));
 
-            ImGui.Checkbox(Loc.Localize("DalamudSettingToggleAxisFonts", "Use AXIS fonts as default Dalamud font"), ref this.doUseAxisFontsFromGame);
-            ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingToggleUiAxisFontsHint", "Use AXIS fonts (the game's main UI fonts) as default Dalamud font."));
+            ImGuiHelpers.ScaledDummy(3);
 
             ImGui.Checkbox(Loc.Localize("DalamudSettingToggleUiHide", "Hide plugin UI when the game UI is toggled off"), ref this.doToggleUiHide);
             ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingToggleUiHideHint", "Hide any open windows by plugins when toggling the game overlay."));
@@ -373,7 +418,7 @@ namespace Dalamud.Interface.Internal.Windows
                 interfaceManager.RebuildFonts();
             }
 
-            if (ImGui.DragFloat("##DalamudSettingsFontGammaDrag", ref this.fontGamma, 0.005f, MinScale, MaxScale, "%.2f"))
+            if (ImGui.DragFloat("##DalamudSettingsFontGammaDrag", ref this.fontGamma, 0.005f, 0.3f, 3f, "%.2f", ImGuiSliderFlags.AlwaysClamp))
             {
                 interfaceManager.FontGammaOverride = this.fontGamma;
                 interfaceManager.RebuildFonts();
@@ -489,6 +534,34 @@ namespace Dalamud.Interface.Internal.Windows
             var configuration = Service<DalamudConfiguration>.Get();
             var pluginManager = Service<PluginManager>.Get();
 
+            var useCustomPluginWaitBeforeFree = this.pluginWaitBeforeFree.HasValue;
+            if (ImGui.Checkbox(
+                    Loc.Localize("DalamudSettingsPluginCustomizeWaitTime", "Customize wait time for plugin unload"),
+                    ref useCustomPluginWaitBeforeFree))
+            {
+                if (!useCustomPluginWaitBeforeFree)
+                    this.pluginWaitBeforeFree = null;
+                else
+                    this.pluginWaitBeforeFree = PluginManager.PluginWaitBeforeFreeDefault;
+            }
+
+            if (useCustomPluginWaitBeforeFree)
+            {
+                var waitTime = this.pluginWaitBeforeFree ?? PluginManager.PluginWaitBeforeFreeDefault;
+                if (ImGui.SliderInt(
+                        "Wait time###DalamudSettingsPluginCustomizeWaitTimeSlider",
+                        ref waitTime,
+                        0,
+                        5000))
+                {
+                    this.pluginWaitBeforeFree = waitTime;
+                }
+            }
+
+            ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsPluginCustomizeWaitTimeHint", "Configure the wait time between stopping plugin and completely unloading plugin. If you are experiencing crashes when exiting the game, try increasing this value."));
+
+            ImGuiHelpers.ScaledDummy(12);
+
             #region Plugin testing
 
             ImGui.Checkbox(Loc.Localize("DalamudSettingsPluginTest", "Get plugin testing builds"), ref this.doPluginTest);
@@ -599,7 +672,7 @@ namespace Dalamud.Interface.Internal.Windows
 
             ImGui.Columns(5);
             ImGui.SetColumnWidth(0, 18 + (5 * ImGuiHelpers.GlobalScale));
-            var totalTextWidth = ImGui.GetWindowContentRegionWidth() - (18 + 16 + 14) - ((5 + 45 + 26) * ImGuiHelpers.GlobalScale);
+            var totalTextWidth = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X) - (18 + 16 + 14) - ((5 + 45 + 26) * ImGuiHelpers.GlobalScale);
             ImGui.SetColumnWidth(1, totalTextWidth / 2);
             ImGui.SetColumnWidth(2, totalTextWidth / 2);
             ImGui.SetColumnWidth(3, 16 + (45 * ImGuiHelpers.GlobalScale));
@@ -753,13 +826,15 @@ namespace Dalamud.Interface.Internal.Windows
             }
 
             ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingCustomRepoHint", "Add custom plugin repositories."));
-            ImGui.TextColored(ImGuiColors.DalamudRed, Loc.Localize("DalamudSettingCustomRepoWarning", "We cannot take any responsibility for third-party plugins and repositories.\nTake care when installing third-party plugins from untrusted sources."));
+            ImGui.TextColored(ImGuiColors.DalamudRed, Loc.Localize("DalamudSettingCustomRepoWarning", "We cannot take any responsibility for third-party plugins and repositories."));
+            ImGui.TextColored(ImGuiColors.DalamudRed, Loc.Localize("DalamudSettingCustomRepoWarning2", "Plugins have full control over your PC, like any other program, and may cause harm or crashes."));
+            ImGui.TextColored(ImGuiColors.DalamudRed, Loc.Localize("DalamudSettingCustomRepoWarning3", "Please make absolutely sure that you only install third-party plugins from developers you trust."));
 
             ImGuiHelpers.ScaledDummy(5);
 
             ImGui.Columns(4);
             ImGui.SetColumnWidth(0, 18 + (5 * ImGuiHelpers.GlobalScale));
-            ImGui.SetColumnWidth(1, ImGui.GetWindowContentRegionWidth() - (18 + 16 + 14) - ((5 + 45 + 26) * ImGuiHelpers.GlobalScale));
+            ImGui.SetColumnWidth(1, ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X - (18 + 16 + 14) - ((5 + 45 + 26) * ImGuiHelpers.GlobalScale));
             ImGui.SetColumnWidth(2, 16 + (45 * ImGuiHelpers.GlobalScale));
             ImGui.SetColumnWidth(3, 14 + (26 * ImGuiHelpers.GlobalScale));
 
@@ -907,7 +982,7 @@ namespace Dalamud.Interface.Internal.Windows
 
             ImGui.Columns(4);
             ImGui.SetColumnWidth(0, 18 + (5 * ImGuiHelpers.GlobalScale));
-            ImGui.SetColumnWidth(1, ImGui.GetWindowContentRegionWidth() - (18 + 16 + 14) - ((5 + 45 + 26) * ImGuiHelpers.GlobalScale));
+            ImGui.SetColumnWidth(1, ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X - (18 + 16 + 14) - ((5 + 45 + 26) * ImGuiHelpers.GlobalScale));
             ImGui.SetColumnWidth(2, 16 + (45 * ImGuiHelpers.GlobalScale));
             ImGui.SetColumnWidth(3, 14 + (26 * ImGuiHelpers.GlobalScale));
 
@@ -1079,8 +1154,10 @@ namespace Dalamud.Interface.Internal.Windows
 
             configuration.GeneralChatType = this.dalamudMessagesChatType;
 
+            configuration.IsResumeGameAfterPluginLoad = this.doWaitForPluginsOnStartup;
             configuration.DutyFinderTaskbarFlash = this.doCfTaskBarFlash;
             configuration.DutyFinderChatMessage = this.doCfChatMessage;
+            configuration.IsMbCollect = this.doMbCollect;
 
             configuration.GlobalUiScale = this.globalUiScale;
             configuration.ToggleUiHide = this.doToggleUiHide;
@@ -1093,7 +1170,7 @@ namespace Dalamud.Interface.Internal.Windows
             configuration.ShowTsm = this.doTsm;
 
             configuration.UseAxisFontsFromGame = this.doUseAxisFontsFromGame;
-            configuration.FontGamma = this.fontGamma;
+            configuration.FontGammaLevel = this.fontGamma;
 
             // This is applied every frame in InterfaceManager::CheckViewportState()
             configuration.IsDisableViewport = !this.doViewport;
@@ -1113,6 +1190,9 @@ namespace Dalamud.Interface.Internal.Windows
             {
                 ImGui.GetIO().BackendFlags &= ~ImGuiBackendFlags.HasGamepad;
                 ImGui.GetIO().ConfigFlags &= ~ImGuiConfigFlags.NavEnableSetMousePos;
+
+                var di = Service<DalamudInterface>.Get();
+                di.CloseGamepadModeNotifierWindow();
             }
             else
             {
@@ -1125,6 +1205,8 @@ namespace Dalamud.Interface.Internal.Windows
 
             configuration.DtrSpacing = this.dtrSpacing;
             configuration.DtrSwapDirection = this.dtrSwapDirection;
+
+            configuration.PluginWaitBeforeFree = this.pluginWaitBeforeFree;
 
             configuration.DoPluginTest = this.doPluginTest;
             configuration.ThirdRepoList = this.thirdRepoList.Select(x => x.Clone()).ToList();
