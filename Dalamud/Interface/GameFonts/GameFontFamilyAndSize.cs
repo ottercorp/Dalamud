@@ -46,6 +46,27 @@ namespace Dalamud.Interface.GameFonts
         Axis36,
 
         /// <summary>
+        /// CHNAXIS (120pt)
+        ///
+        /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
+        /// </summary>
+        ChnAxis120,
+
+        /// <summary>
+        /// CHNAXIS (140pt)
+        ///
+        /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
+        /// </summary>
+        ChnAxis140,
+
+        /// <summary>
+        /// CHNAXIS (180pt)
+        ///
+        /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
+        /// </summary>
+        ChnAxis180,
+
+        /// <summary>
         /// Jupiter (16pt)
         ///
         /// Serif font. Contains mostly ASCII range. Used in game for job names.

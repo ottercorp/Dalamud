@@ -26,6 +26,7 @@ namespace Dalamud.Interface.GameFonts
         {
             null,
             "AXIS_96", "AXIS_12", "AXIS_14", "AXIS_18", "AXIS_36",
+            "chnaxis_120", "chnaxis_140", "chnaxis_180",
             "Jupiter_16", "Jupiter_20", "Jupiter_23", "Jupiter_45", "Jupiter_46", "Jupiter_90",
             "Meidinger_16", "Meidinger_20", "Meidinger_40",
             "MiedingerMid_10", "MiedingerMid_12", "MiedingerMid_14", "MiedingerMid_18", "MiedingerMid_36",
@@ -57,7 +58,7 @@ namespace Dalamud.Interface.GameFonts
                                                  .Where(x => x != null)
                                                  .Select(x => x.Glyphs.Select(y => y.TextureFileIndex).Max())
                                                  .Max())
-                               .Select(x => dataManager.GetFile<TexFile>($"common/font/font{x}.tex")!)
+                               .Select(x => dataManager.GetFile<TexFile>($"common/font/font_chn_{x}.tex")!)
                                .Select(x => new Task<byte[]>(Timings.AttachTimingHandle(() => x.ImageData!)))
                                .ToArray();
                 foreach (var task in texTasks)
@@ -81,6 +82,9 @@ namespace Dalamud.Interface.GameFonts
                 GameFontFamilyAndSize.Axis14 => "AXIS (14pt)",
                 GameFontFamilyAndSize.Axis18 => "AXIS (18pt)",
                 GameFontFamilyAndSize.Axis36 => "AXIS (36pt)",
+                GameFontFamilyAndSize.ChnAxis120 => "CHNAXIS (120pt)",
+                GameFontFamilyAndSize.ChnAxis140 => "CHNAXIS (140pt)",
+                GameFontFamilyAndSize.ChnAxis180 => "CHNAXIS (180pt)",
                 GameFontFamilyAndSize.Jupiter16 => "Jupiter (16pt)",
                 GameFontFamilyAndSize.Jupiter20 => "Jupiter (20pt)",
                 GameFontFamilyAndSize.Jupiter23 => "Jupiter (23pt)",
@@ -117,6 +121,9 @@ namespace Dalamud.Interface.GameFonts
                 GameFontFamilyAndSize.Axis14 => true,
                 GameFontFamilyAndSize.Axis18 => true,
                 GameFontFamilyAndSize.Axis36 => true,
+                GameFontFamilyAndSize.ChnAxis120 => true,
+                GameFontFamilyAndSize.ChnAxis140 => true,
+                GameFontFamilyAndSize.ChnAxis180 => true,
                 _ => false,
             };
         }
