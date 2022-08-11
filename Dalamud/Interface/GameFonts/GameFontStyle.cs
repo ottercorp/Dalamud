@@ -90,6 +90,9 @@ namespace Dalamud.Interface.GameFonts
             GameFontFamilyAndSize.Axis14 => GameFontFamily.Axis,
             GameFontFamilyAndSize.Axis18 => GameFontFamily.Axis,
             GameFontFamilyAndSize.Axis36 => GameFontFamily.Axis,
+            GameFontFamilyAndSize.ChnAxis120 => GameFontFamily.Axis,
+            GameFontFamilyAndSize.ChnAxis140 => GameFontFamily.Axis,
+            GameFontFamilyAndSize.ChnAxis180 => GameFontFamily.Axis,
             GameFontFamilyAndSize.Jupiter16 => GameFontFamily.Jupiter,
             GameFontFamilyAndSize.Jupiter20 => GameFontFamily.Jupiter,
             GameFontFamilyAndSize.Jupiter23 => GameFontFamily.Jupiter,
@@ -116,7 +119,7 @@ namespace Dalamud.Interface.GameFonts
         /// </summary>
         public GameFontFamilyAndSize FamilyWithMinimumSize => this.Family switch
         {
-            GameFontFamily.Axis => GameFontFamilyAndSize.Axis96,
+            GameFontFamily.Axis => GameFontFamilyAndSize.ChnAxis120,
             GameFontFamily.Jupiter => GameFontFamilyAndSize.Jupiter16,
             GameFontFamily.JupiterNumeric => GameFontFamilyAndSize.Jupiter45,
             GameFontFamily.Meidinger => GameFontFamilyAndSize.Meidinger16,
@@ -136,6 +139,9 @@ namespace Dalamud.Interface.GameFonts
             GameFontFamilyAndSize.Axis14 => 14,
             GameFontFamilyAndSize.Axis18 => 18,
             GameFontFamilyAndSize.Axis36 => 36,
+            GameFontFamilyAndSize.ChnAxis120 => 12,
+            GameFontFamilyAndSize.ChnAxis140 => 14,
+            GameFontFamilyAndSize.ChnAxis180 => 18,
             GameFontFamilyAndSize.Jupiter16 => 16,
             GameFontFamilyAndSize.Jupiter20 => 20,
             GameFontFamilyAndSize.Jupiter23 => 23,
@@ -197,16 +203,12 @@ namespace Dalamud.Interface.GameFonts
                     return GameFontFamilyAndSize.Undefined;
 
                 case GameFontFamily.Axis:
-                    if (size <= 9.601)
-                        return GameFontFamilyAndSize.Axis96;
-                    else if (size <= 12.001)
-                        return GameFontFamilyAndSize.Axis12;
+                    if (size <= 12.001)
+                        return GameFontFamilyAndSize.ChnAxis120;
                     else if (size <= 14.001)
-                        return GameFontFamilyAndSize.Axis14;
-                    else if (size <= 18.001)
-                        return GameFontFamilyAndSize.Axis18;
+                        return GameFontFamilyAndSize.ChnAxis140;
                     else
-                        return GameFontFamilyAndSize.Axis36;
+                        return GameFontFamilyAndSize.ChnAxis180;
 
                 case GameFontFamily.Jupiter:
                     if (size <= 16.001)
