@@ -515,7 +515,7 @@ int main() {
 
             submitThread = std::thread([url = std::move(url)] {
                 const auto hInternet = WinHttpOpen(L"DALAMUDCRASHHANDLER", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, nullptr, nullptr, WINHTTP_FLAG_SECURE_DEFAULTS);
-                const auto hConnect = !hInternet ? nullptr : WinHttpConnect(hInternet, L"kamori.goats.dev", INTERNET_DEFAULT_HTTPS_PORT, 0);
+                const auto hConnect = !hInternet ? nullptr : WinHttpConnect(hInternet, L"aonyx.ffxiv.wang", INTERNET_DEFAULT_HTTPS_PORT, 0);
                 const auto hRequest = !hConnect ? nullptr : WinHttpOpenRequest(hConnect, L"GET", url.c_str(), nullptr, nullptr, nullptr, 0);
                 const auto bSent = !hRequest ? false : WinHttpSendRequest(hRequest,
                     WINHTTP_NO_ADDITIONAL_HEADERS,
@@ -533,35 +533,38 @@ int main() {
 
         TASKDIALOGCONFIG config = { 0 };
 
+        /*
         const TASKDIALOG_BUTTON radios[]{
             {IdRadioRestartNormal, L"Restart"},
             {IdRadioRestartWithout3pPlugins, L"Restart without 3rd party plugins"},
             {IdRadioRestartWithoutPlugins, L"Restart without any plugins"},
             {IdRadioRestartWithoutDalamud, L"Restart without Dalamud"},
         };
+        */
 
         const TASKDIALOG_BUTTON buttons[]{
-            {IdButtonRestart, L"Restart\nRestart the game, optionally without plugins or Dalamud."},
-            {IdButtonExit, L"Exit\nExit the game."},
+            /*
+            {IdButtonRestart, L"Restart\nRestart the game, optionally without plugins or Dalamud."},*/
+            {IdButtonExit, L"\x9000\x51FA\n\x9000\x51FA\x6E38\x620F\x3002"},
         };
 
         config.cbSize = sizeof(config);
         config.hInstance = GetModuleHandleW(nullptr);
         config.dwFlags = TDF_ENABLE_HYPERLINKS | TDF_CAN_BE_MINIMIZED | TDF_ALLOW_DIALOG_CANCELLATION | TDF_USE_COMMAND_LINKS;
         config.pszMainIcon = MAKEINTRESOURCE(IDI_ICON1);
-        config.pszMainInstruction = L"An error occurred";
+        config.pszMainInstruction = L"\x51FA\x73B0\x81F4\x547D\x9519\x8BEF";
         config.pszContent = (L""
-            R"aa(This may be caused by a faulty plugin, a broken TexTools modification, any other third-party tool, or simply a bug in the game.)aa" "\n"
+            L"\x53D1\x751F\x7684\x539F\x56E0\x53EF\x80FD\x662F\x4E00\x4E2A\x51FA\x9519\x7684\x63D2\x4EF6\x3001\x635F\x574F\x7684 TexTools Mod\x3001\x5176\x4ED6\x7684\x7B2C\x4E09\x65B9\x5DE5\x5177\xFF0C\x6216\x4EC5\x4EC5\x662F\x6E38\x620F\x672C\x8EAB\x7684 Bug\x3002" "\n"
             "\n"
-            R"aa(Try running integrity check in the XIVLauncher settings, and disabling plugins you don't need.)aa"
+            L"\x8BF7\x5C1D\x8BD5\x4F7F\x7528 XIVLauncher \x8BBE\x7F6E\x4E2D\x7684\x6E38\x620F\x5B8C\x6574\x6027\x68C0\x67E5\x68C0\x6D4B\x6E38\x620F\x6587\x4EF6\x5B8C\x6574\x6027\xFF0C\x5E76\x4E14\x505C\x7528\x4F60\x4E0D\x9700\x8981\x7684\x63D2\x4EF6"
         );
         config.pButtons = buttons;
         config.cButtons = ARRAYSIZE(buttons);
         config.nDefaultButton = IdButtonRestart;
         config.pszExpandedInformation = window_log_str.c_str();
         config.pszWindowTitle = L"Dalamud Error";
-        config.pRadioButtons = radios;
-        config.cRadioButtons = ARRAYSIZE(radios);
+        // config.pRadioButtons = radios;
+        // config.cRadioButtons = ARRAYSIZE(radios);
         config.nDefaultRadioButton = IdRadioRestartNormal;
         config.cxWidth = 300;
         config.pszFooter = (L""
@@ -583,7 +586,7 @@ int main() {
                 {
                     const auto link = std::wstring_view(reinterpret_cast<const wchar_t*>(lParam));
                     if (link == L"help") {
-                        ShellExecuteW(hwnd, nullptr, L"https://goatcorp.github.io/faq?utm_source=vectored", nullptr, nullptr, SW_SHOW);
+                        ShellExecuteW(hwnd, nullptr, L"https://ottercorp.github.io/faq?utm_source=vectored", nullptr, nullptr, SW_SHOW);
                     } else if (link == L"logdir") {
                         ShellExecuteW(hwnd, nullptr, L"explorer.exe", escape_shell_arg(std::format(L"/select,{}", logPath.wstring())).c_str(), nullptr, SW_SHOW);
                     } else if (link == L"logfile") {
