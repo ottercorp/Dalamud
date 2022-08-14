@@ -923,12 +923,14 @@ namespace Dalamud.Interface.Internal
         {
             if (msg.hwnd == this.GameWindowHandle && this.scene != null)
             {
+                /*
                 var ime = Service<DalamudIME>.GetNullable();
                 var res = ime?.ProcessWndProcW(msg.hwnd, msg.message, (void*)msg.wParam, (void*)msg.lParam);
                 if (res != null)
                     return res.Value;
+                */
 
-                res = this.scene.ProcessWndProcW(msg.hwnd, msg.message, (void*)msg.wParam, (void*)msg.lParam);
+                var res = this.scene.ProcessWndProcW(msg.hwnd, msg.message, (void*)msg.wParam, (void*)msg.lParam);
                 if (res != null)
                     return res.Value;
             }
