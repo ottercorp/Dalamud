@@ -238,7 +238,8 @@ namespace Dalamud.Interface.Internal.Windows
                 }
                 catch (Exception ex)
                 {
-                    Log.Error(ex, $"An unexpected error occurred with the icon for {manifest.InternalName}");
+                    // Keep silent
+                    // Log.Error(ex, $"An unexpected error occurred with the icon for {manifest.InternalName}");
                 }
             });
 
@@ -276,7 +277,8 @@ namespace Dalamud.Interface.Internal.Windows
                 }
                 catch (Exception ex)
                 {
-                    Log.Error(ex, $"An unexpected error occurred with the images for {manifest.InternalName}");
+                    // Keep silent
+                    // Log.Error(ex, $"An unexpected error occurred with the images for {manifest.InternalName}");
                 }
             });
 
