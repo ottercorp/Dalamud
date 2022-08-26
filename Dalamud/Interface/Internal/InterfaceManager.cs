@@ -62,6 +62,7 @@ namespace Dalamud.Interface.Internal
         private readonly SwapChainVtableResolver address;
         private readonly Hook<DispatchMessageWDelegate> dispatchMessageWHook;
         private readonly Hook<SetCursorDelegate> setCursorHook;
+        private Hook<ProcessMessageDelegate> processMessageHook;
         private RawDX11Scene? scene;
 
         private Hook<PresentDelegate>? presentHook;
@@ -96,6 +97,9 @@ namespace Dalamud.Interface.Internal
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate IntPtr DispatchMessageWDelegate(ref User32.MSG msg);
+
+        [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
+        private delegate IntPtr ProcessMessageDelegate(IntPtr hWnd, uint msg, ulong wParam, ulong lParam, IntPtr handeled);
 
         /// <summary>
         /// This event gets called each frame to facilitate ImGui drawing.
@@ -217,6 +221,7 @@ namespace Dalamud.Interface.Internal
                 this.presentHook?.Dispose();
                 this.resizeBuffersHook?.Dispose();
                 this.dispatchMessageWHook.Dispose();
+                this.processMessageHook?.Dispose();
             }).Wait();
 
             this.scene?.Dispose();
@@ -895,10 +900,15 @@ namespace Dalamud.Interface.Internal
                 Log.Verbose($"Present address 0x{this.presentHook!.Address.ToInt64():X}");
                 Log.Verbose($"ResizeBuffers address 0x{this.resizeBuffersHook!.Address.ToInt64():X}");
 
+                var wndProcAddress = sigScanner.ScanText("E8 ?? ?? ?? ?? 80 7C 24 ?? ?? 74 ?? B8");
+                Log.Verbose($"WndProc address 0x{wndProcAddress.ToInt64():X}");
+                this.processMessageHook = Hook<ProcessMessageDelegate>.FromAddress(wndProcAddress, this.ProcessMessageDetour);
+
                 this.setCursorHook.Enable();
                 this.presentHook.Enable();
                 this.resizeBuffersHook.Enable();
                 this.dispatchMessageWHook.Enable();
+                this.processMessageHook.Enable();
             });
         }
 
@@ -919,17 +929,17 @@ namespace Dalamud.Interface.Internal
             this.isRebuildingFonts = false;
         }
 
+        private unsafe IntPtr ProcessMessageDetour(IntPtr hWnd, uint msg, ulong wParam, ulong lParam, IntPtr handeled)
+        {
+            var ime = Service<DalamudIME>.GetNullable();
+            var res = ime?.ProcessWndProcW(hWnd, (User32.WindowMessage)msg, (void*)wParam, (void*)lParam);
+            return this.processMessageHook.Original(hWnd, msg, wParam, lParam, handeled);
+        }
+
         private unsafe IntPtr DispatchMessageWDetour(ref User32.MSG msg)
         {
             if (msg.hwnd == this.GameWindowHandle && this.scene != null)
             {
-                /*
-                var ime = Service<DalamudIME>.GetNullable();
-                var res = ime?.ProcessWndProcW(msg.hwnd, msg.message, (void*)msg.wParam, (void*)msg.lParam);
-                if (res != null)
-                    return res.Value;
-                */
-
                 var res = this.scene.ProcessWndProcW(msg.hwnd, msg.message, (void*)msg.wParam, (void*)msg.lParam);
                 if (res != null)
                     return res.Value;
