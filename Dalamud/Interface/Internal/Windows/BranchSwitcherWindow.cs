@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -20,7 +20,7 @@ namespace Dalamud.Interface.Internal.Windows;
 /// </summary>
 public class BranchSwitcherWindow : Window
 {
-    private const string BranchInfoUrl = "https://kamori.goats.dev/Dalamud/Release/Meta";
+    private const string BranchInfoUrl = "https://aonyx.ffxiv.wang/Dalamud/Release/Meta";
 
     private Dictionary<string, VersionEntry>? branches;
     private int selectedBranchIndex;
@@ -74,8 +74,7 @@ public class BranchSwitcherWindow : Window
 
         if (pickedBranch.Value.SupportedGameVer != si.GameVersion)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-            ImGui.TextWrapped("Can't pick this branch. GameVer != SupportedGameVer.");
+            ImGui.TextColored(ImGuiColors.DalamudRed,"Can't pick this branch. GameVer != SupportedGameVer.");
         }
         else
         {
