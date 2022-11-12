@@ -3,7 +3,7 @@ namespace Dalamud.Configuration
     /// <summary>
     /// Third party repository for dalamud plugins.
     /// </summary>
-    internal sealed class FuckGFWSettings
+    public sealed class FuckGFWSettings
     {
         /// <summary>
         /// Gets or sets the fuck GFW url.

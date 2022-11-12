@@ -623,6 +623,15 @@ internal class InterfaceManager : IDisposable, IServiceType
                 ShowFontError(fontPathSc);
             Log.Verbose("[FONT] fontPathSc = {0}", fontPathSc);
 
+            /*
+            var fontPathKr = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "NotoSansCJKkr-Regular.otf");
+            if (!File.Exists(fontPathKr))
+                fontPathKr = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "NotoSansKR-Regular.otf");
+            if (!File.Exists(fontPathKr))
+                fontPathKr = null;
+            Log.Verbose("[FONT] fontPathKr = {0}", fontPathKr);
+            */
+
             // Default font
             Log.Verbose("[FONT] SetupFonts - Default font");
             var fontInfo = new TargetFontModification(
@@ -641,30 +650,32 @@ internal class InterfaceManager : IDisposable, IServiceType
             }
             else
             {
-                var japaneseRangeHandle = GCHandle.Alloc(GlyphRangesJapanese.GlyphRanges, GCHandleType.Pinned);
-                garbageList.Add(japaneseRangeHandle);
+                var chineseRangeHandle = GCHandle.Alloc(GlyphRangesChinese.GlyphRanges, GCHandleType.Pinned);
+                garbageList.Add(chineseRangeHandle);
 
-                    fontConfig.GlyphRanges = japaneseRangeHandle.AddrOfPinnedObject();
-                    fontConfig.PixelSnapH = true;
-                    DefaultFont = ioFonts.AddFontFromFileTTF(fontPathJp, fontConfig.SizePixels, fontConfig);
-                    this.loadedFontInfo[DefaultFont] = fontInfo;
-                }
+                fontConfig.GlyphRanges = chineseRangeHandle.AddrOfPinnedObject();
+                fontConfig.PixelSnapH = true;
+                DefaultFont = ioFonts.AddFontFromFileTTF(fontPathSc, fontConfig.SizePixels, fontConfig);
+                this.loadedFontInfo[DefaultFont] = fontInfo;
+            }
 
-                if (fontPathKr != null && Service<DalamudConfiguration>.Get().EffectiveLanguage == "ko")
-                {
-                    fontConfig.MergeMode = true;
-                    fontConfig.GlyphRanges = ioFonts.GetGlyphRangesKorean();
-                    fontConfig.PixelSnapH = true;
-                    ioFonts.AddFontFromFileTTF(fontPathKr, fontConfig.SizePixels, fontConfig);
-                    fontConfig.MergeMode = false;
-                }
+            /*
+            if (fontPathKr != null && Service<DalamudConfiguration>.Get().EffectiveLanguage == "ko")
+            {
+                fontConfig.MergeMode = true;
+                fontConfig.GlyphRanges = ioFonts.GetGlyphRangesKorean();
+                fontConfig.PixelSnapH = true;
+                ioFonts.AddFontFromFileTTF(fontPathKr, fontConfig.SizePixels, fontConfig);
+                fontConfig.MergeMode = false;
+            }
+            */
 
-                // FontAwesome icon font
-                Log.Verbose("[FONT] SetupFonts - FontAwesome icon font");
-                {
-                    var fontPathIcon = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "FontAwesome5FreeSolid.otf");
-                    if (!File.Exists(fontPathIcon))
-                        ShowFontError(fontPathIcon);
+            // FontAwesome icon font
+            Log.Verbose("[FONT] SetupFonts - FontAwesome icon font");
+            {
+                var fontPathIcon = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "FontAwesome5FreeSolid.otf");
+                if (!File.Exists(fontPathIcon))
+                    ShowFontError(fontPathIcon);
 
                 var iconRangeHandle = GCHandle.Alloc(new ushort[] { 0xE000, 0xF8FF, 0, }, GCHandleType.Pinned);
                 garbageList.Add(iconRangeHandle);
@@ -755,13 +766,13 @@ internal class InterfaceManager : IDisposable, IServiceType
                         garbageList.Add(rangeHandle);
                         fontConfig.PixelSnapH = true;
 
-                            var sizedFont = ioFonts.AddFontFromFileTTF(fontPathJp, fontSize * io.FontGlobalScale, fontConfig, rangeHandle.AddrOfPinnedObject());
-                            this.loadedFontInfo[sizedFont] = fontInfo;
-                            foreach (var request in requests)
-                                request.FontInternal = sizedFont;
-                        }
+                        var sizedFont = ioFonts.AddFontFromFileTTF(fontPathSc, fontSize * io.FontGlobalScale, fontConfig, rangeHandle.AddrOfPinnedObject());
+                        this.loadedFontInfo[sizedFont] = fontInfo;
+                        foreach (var request in requests)
+                            request.FontInternal = sizedFont;
                     }
                 }
+            }
 
             gameFontManager.BuildFonts();
 
@@ -927,12 +938,17 @@ internal class InterfaceManager : IDisposable, IServiceType
             Log.Verbose($"Present address 0x{this.presentHook!.Address.ToInt64():X}");
             Log.Verbose($"ResizeBuffers address 0x{this.resizeBuffersHook!.Address.ToInt64():X}");
 
-                this.setCursorHook.Enable();
-                this.presentHook.Enable();
-                this.resizeBuffersHook.Enable();
-                this.dispatchMessageWHook.Enable();
-            });
-        }
+            var wndProcAddress = sigScanner.ScanText("E8 ?? ?? ?? ?? 80 7C 24 ?? ?? 74 ?? B8");
+            Log.Verbose($"WndProc address 0x{wndProcAddress.ToInt64():X}");
+            this.processMessageHook = Hook<ProcessMessageDelegate>.FromAddress(wndProcAddress, this.ProcessMessageDetour);
+
+            this.setCursorHook.Enable();
+            this.presentHook.Enable();
+            this.resizeBuffersHook.Enable();
+            this.dispatchMessageWHook.Enable();
+            this.processMessageHook.Enable();
+        });
+    }
 
     // This is intended to only be called as a handler attached to scene.OnNewRenderFrame
     private void RebuildFontsInternal()
@@ -951,11 +967,6 @@ internal class InterfaceManager : IDisposable, IServiceType
         this.isRebuildingFonts = false;
     }
 
-        private unsafe IntPtr DispatchMessageWDetour(ref User32.MSG msg)
-        {
-        this.isRebuildingFonts = false;
-    }
-
     private unsafe IntPtr ProcessMessageDetour(IntPtr hWnd, uint msg, ulong wParam, ulong lParam, IntPtr handeled)
     {
         var ime = Service<DalamudIME>.GetNullable();
@@ -964,11 +975,13 @@ internal class InterfaceManager : IDisposable, IServiceType
     }
 
     private unsafe IntPtr DispatchMessageWDetour(ref User32.MSG msg)
-
-                res = this.scene.ProcessWndProcW(msg.hwnd, msg.message, (void*)msg.wParam, (void*)msg.lParam);
-                if (res != null)
-                    return res.Value;
-            }
+    {
+        if (msg.hwnd == this.GameWindowHandle && this.scene != null)
+        {
+            var res = this.scene.ProcessWndProcW(msg.hwnd, msg.message, (void*)msg.wParam, (void*)msg.lParam);
+            if (res != null)
+                return res.Value;
+        }
 
         return this.dispatchMessageWHook.IsDisposed ? User32.DispatchMessage(ref msg) : this.dispatchMessageWHook.Original(ref msg);
     }
@@ -980,8 +993,6 @@ internal class InterfaceManager : IDisposable, IServiceType
 #endif
 
         this.ResizeBuffers?.InvokeSafely();
-
-        // We have to ensure we're working with the main swapchain,
 
         // We have to ensure we're working with the main swapchain,
         // as viewports might be resizing as well
