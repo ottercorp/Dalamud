@@ -86,13 +86,13 @@ jobs:
               $versionData | ConvertTo-Json -Compress | Out-File ".\${branchName}\version"
               
               # TEMP for net7
-              if ($branchName -eq "stg") {
-                Copy-Item -Force ".\canary.zip" ".\net7\latest.zip"
-                $versionData.RuntimeVersion = "7.0.0"
-                $versionData | ConvertTo-Json -Compress | Out-File ".\net7\version"
-              }
+              # if ($branchName -eq "stg") {
+              #   Copy-Item -Force ".\canary.zip" ".\net7\latest.zip"
+              #   $versionData.RuntimeVersion = "7.0.0"
+              #   $versionData | ConvertTo-Json -Compress | Out-File ".\net7\version"
+              # }
               
-              Remove-Item .\canary.zip
+              # Remove-Item .\canary.zip
             }
 
             echo "DVER=${newVersion}" >> $Env:GITHUB_ENV
