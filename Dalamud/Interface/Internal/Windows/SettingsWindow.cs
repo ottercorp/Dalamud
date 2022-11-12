@@ -54,13 +54,13 @@ internal class SettingsWindow : Window
     private int dtrSpacing;
     private bool dtrSwapDirection;
 
-        private List<FuckGFWSettings> fuckGFWList;
-        private bool fuckGFWListChanged;
-        private string fuckGFWTempUrlRegex = string.Empty;
-        private string fuckGFWTempReplaceTo = string.Empty;
-        private string fuckGFWAddError = string.Empty;
+    private List<FuckGFWSettings> fuckGFWList;
+    private bool fuckGFWListChanged;
+    private string fuckGFWTempUrlRegex = string.Empty;
+    private string fuckGFWTempReplaceTo = string.Empty;
+    private string fuckGFWAddError = string.Empty;
 
-        private int? pluginWaitBeforeFree;
+    private int? pluginWaitBeforeFree;
 
     private List<ThirdPartyRepoSettings> thirdRepoList;
     private bool thirdRepoListChanged;
@@ -77,9 +77,9 @@ internal class SettingsWindow : Window
     private bool doButtonsSystemMenu;
     private bool disableRmtFiltering;
 
-        private bool useSystemProxy;
-        private string proxyHost = string.Empty;
-        private int proxyPort;
+    private bool useSystemProxy;
+    private string proxyHost = string.Empty;
+    private int proxyPort;
 
         #region Experimental
 
@@ -123,24 +123,24 @@ internal class SettingsWindow : Window
 
         this.pluginWaitBeforeFree = configuration.PluginWaitBeforeFree;
 
-            this.doPluginTest = configuration.DoPluginTest;
-            this.fuckGFWList = configuration.FuckGFWList.Select(x => x.Clone()).ToList();
-            this.thirdRepoList = configuration.ThirdRepoList.Select(x => x.Clone()).ToList();
-            this.devPluginLocations = configuration.DevPluginLoadLocations.Select(x => x.Clone()).ToList();
+        this.doPluginTest = configuration.DoPluginTest;
+        this.fuckGFWList = configuration.FuckGFWList.Select(x => x.Clone()).ToList();
+        this.thirdRepoList = configuration.ThirdRepoList.Select(x => x.Clone()).ToList();
+        this.devPluginLocations = configuration.DevPluginLoadLocations.Select(x => x.Clone()).ToList();
 
         this.printPluginsWelcomeMsg = configuration.PrintPluginsWelcomeMsg;
         this.autoUpdatePlugins = configuration.AutoUpdatePlugins;
         this.doButtonsSystemMenu = configuration.DoButtonsSystemMenu;
         this.disableRmtFiltering = configuration.DisableRmtFiltering;
 
-            this.useSystemProxy = configuration.UseSystemProxy;
-            this.proxyHost = configuration.ProxyHost;
-            this.proxyPort = configuration.ProxyPort;
+        this.useSystemProxy = configuration.UseSystemProxy;
+        this.proxyHost = configuration.ProxyHost;
+        this.proxyPort = configuration.ProxyPort;
 
-            this.languages = Localization.ApplicableLangCodes.Prepend("en").ToArray();
-            this.langIndex = Array.IndexOf(this.languages, configuration.EffectiveLanguage);
-            if (this.langIndex == -1)
-                this.langIndex = 0;
+        this.languages = Localization.ApplicableLangCodes.Prepend("en").ToArray();
+        this.langIndex = Array.IndexOf(this.languages, configuration.EffectiveLanguage);
+        if (this.langIndex == -1)
+            this.langIndex = 0;
 
         try
         {

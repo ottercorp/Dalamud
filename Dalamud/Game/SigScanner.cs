@@ -546,70 +546,69 @@ public class SigScanner : IDisposable, IServiceType
             this.textCache = new ConcurrentDictionary<string, long>();
             Log.Error(ex, "Couldn't load cached sigs");
         }
+    }
 
-        public IntPtr ScanReversed(IntPtr baseAddress, int size, string signature)
+    public IntPtr ScanReversed(IntPtr baseAddress, int size, string signature)
+    {
+        var needle = this.SigToNeedle(signature);
+
+        unsafe
         {
-            var needle = SigToNeedle(signature);
-
-            unsafe
+            var pCursor = (byte*)baseAddress.ToPointer();
+            var pBottom = (byte*)(baseAddress - size + needle.Length);
+            while (pCursor > pBottom)
             {
-                var pCursor = (byte*)baseAddress.ToPointer();
-                var pBottom = (byte*)(baseAddress - size + needle.Length);
-                while (pCursor > pBottom)
-                {
-                    if (IsMatch(pCursor, needle)) return (IntPtr)pCursor;
-
-
-                    // Advance an offset
-                    pCursor -= 1;
-                }
+                if (this.IsMatch(pCursor, needle)) return (IntPtr)pCursor;
+                // Advance an offset
+                pCursor -= 1;
             }
-
-            throw new KeyNotFoundException($"Can't find a signature of {signature}");
         }
 
+        throw new KeyNotFoundException($"Can't find a signature of {signature}");
+    }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private unsafe bool IsMatch(byte* pCursor, byte?[] needle)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private unsafe bool IsMatch(byte* pCursor, byte?[] needle)
+    {
+        for (var i = 0; i < needle.Length; i++)
         {
-            for (var i = 0; i < needle.Length; i++)
-            {
-                var expected = needle[i];
-                if (expected == null) continue;
+            var expected = needle[i];
+            if (expected == null) continue;
 
-                var actual = *(pCursor + i);
-                if (expected != actual) return false;
-            }
-
-            return true;
+            var actual = *(pCursor + i);
+            if (expected != actual) return false;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private byte?[] SigToNeedle(string signature)
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private byte?[] SigToNeedle(string signature)
+    {
+        // Strip all whitespaces
+        signature = signature.Replace(" ", string.Empty);
+
+        if (signature.Length % 2 != 0)
         {
-            // Strip all whitespaces
-            signature = signature.Replace(" ", "");
+            throw new ArgumentException(
+                "Signature without whitespaces must be divisible by two.", nameof(signature));
+        }
 
-            if (signature.Length % 2 != 0)
-                throw new ArgumentException("Signature without whitespaces must be divisible by two.",
-                                            nameof(signature));
+        var needleLength = signature.Length / 2;
+        var needle = new byte?[needleLength];
 
-            var needleLength = signature.Length / 2;
-            var needle = new byte?[needleLength];
-
-            for (var i = 0; i < needleLength; i++)
+        for (var i = 0; i < needleLength; i++)
+        {
+            var hexString = signature.Substring(i * 2, 2);
+            if (hexString == "??" || hexString == "**")
             {
-                var hexString = signature.Substring(i * 2, 2);
-                if (hexString == "??" || hexString == "**")
-                {
-                    needle[i] = null;
-                    continue;
-                }
-
-                needle[i] = byte.Parse(hexString, NumberStyles.AllowHexSpecifier);
+                needle[i] = null;
+                continue;
             }
 
-            return needle;
+            needle[i] = byte.Parse(hexString, NumberStyles.AllowHexSpecifier);
         }
+
+        return needle;
     }
 }
