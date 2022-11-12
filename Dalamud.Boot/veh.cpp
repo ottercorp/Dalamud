@@ -24,8 +24,11 @@
 
 PVOID g_veh_handle = nullptr;
 bool g_veh_do_full_dump = false;
+
 HANDLE g_crashhandler_process = nullptr;
 HANDLE g_crashhandler_pipe_write = nullptr;
+
+std::recursive_mutex g_exception_handler_mutex;
 
 std::chrono::time_point<std::chrono::system_clock> g_time_start;
 
@@ -126,8 +129,6 @@ static void append_injector_launch_args(std::vector<std::wstring>& args)
 
 LONG exception_handler(EXCEPTION_POINTERS* ex)
 {
-    static std::recursive_mutex s_exception_handler_mutex;
-
     if (ex->ExceptionRecord->ExceptionCode == 0x12345678)
     {
         // pass
@@ -143,7 +144,7 @@ LONG exception_handler(EXCEPTION_POINTERS* ex)
     }
 
     // block any other exceptions hitting the veh while the messagebox is open
-    const auto lock = std::lock_guard(s_exception_handler_mutex);
+    const auto lock = std::lock_guard(g_exception_handler_mutex);
 
     exception_info exinfo{};
     exinfo.pExceptionPointers = ex;
@@ -174,10 +175,14 @@ LONG exception_handler(EXCEPTION_POINTERS* ex)
     }
     
     exinfo.dwStackTraceLength = static_cast<DWORD>(stackTrace.size());
+    exinfo.dwTroubleshootingPackDataLength = static_cast<DWORD>(g_startInfo.TroubleshootingPackData.size());
     if (DWORD written; !WriteFile(g_crashhandler_pipe_write, &exinfo, static_cast<DWORD>(sizeof exinfo), &written, nullptr) || sizeof exinfo != written)
         return EXCEPTION_CONTINUE_SEARCH;
 
     if (DWORD written; !WriteFile(g_crashhandler_pipe_write, &stackTrace[0], static_cast<DWORD>(std::span(stackTrace).size_bytes()), &written, nullptr) || std::span(stackTrace).size_bytes() != written)
+        return EXCEPTION_CONTINUE_SEARCH;
+
+    if (DWORD written; !WriteFile(g_crashhandler_pipe_write, &g_startInfo.TroubleshootingPackData[0], static_cast<DWORD>(std::span(g_startInfo.TroubleshootingPackData).size_bytes()), &written, nullptr) || std::span(g_startInfo.TroubleshootingPackData).size_bytes() != written)
         return EXCEPTION_CONTINUE_SEARCH;
 
     SuspendThread(GetCurrentThread());
@@ -223,11 +228,7 @@ bool veh::add_handler(bool doFullDump, const std::string& workingDirectory)
     
     siex.StartupInfo.cb = sizeof siex;
     siex.StartupInfo.dwFlags = STARTF_USESHOWWINDOW;
-#ifdef NDEBUG
-    siex.StartupInfo.wShowWindow = SW_HIDE;
-#else
-    siex.StartupInfo.wShowWindow = SW_SHOW;
-#endif
+    siex.StartupInfo.wShowWindow = g_startInfo.CrashHandlerShow ? SW_SHOW : SW_HIDE;
 
     // set up list of handles to inherit to child process
     std::vector<char> attributeListBuf;
@@ -267,7 +268,7 @@ bool veh::add_handler(bool doFullDump, const std::string& workingDirectory)
 
     std::vector<std::wstring> args;
     std::wstring argstr;
-    args.emplace_back((std::filesystem::path(workingDirectory) / "DalamudCrashHandler.exe").wstring());
+    args.emplace_back((std::filesystem::path(unicode::convert<std::wstring>(workingDirectory)) / L"DalamudCrashHandler.exe").wstring());
     args.emplace_back(std::format(L"--process-handle={}", reinterpret_cast<size_t>(hInheritableCurrentProcess)));
     args.emplace_back(std::format(L"--exception-info-pipe-read-handle={}", reinterpret_cast<size_t>(hReadPipeInheritable->get())));
     args.emplace_back(std::format(L"--asset-directory={}", unicode::convert<std::wstring>(g_startInfo.AssetDirectory)));
@@ -308,7 +309,7 @@ bool veh::add_handler(bool doFullDump, const std::string& workingDirectory)
     }
 
     CloseHandle(pi.hThread);
-
+    
     g_crashhandler_process = pi.hProcess;
     g_crashhandler_pipe_write = hWritePipe->release();
     logging::I("Launched DalamudCrashHandler.exe: PID {}", pi.dwProcessId);

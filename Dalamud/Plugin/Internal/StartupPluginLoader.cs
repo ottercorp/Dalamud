@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+
 using Dalamud.Logging.Internal;
 using Dalamud.Support;
 using Dalamud.Utility.Timing;
@@ -35,7 +36,7 @@ public class StartupPluginLoader : IServiceType
 
             using (Timings.Start("PM Load Sync Plugins"))
             {
-                pluginManager.LoadAllPlugins();
+                pluginManager.LoadAllPlugins().Wait();
                 Log.Information("[T3] PML OK!");
             }
 

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+
 using Dalamud.Configuration.Internal;
 using Dalamud.Game;
 using Dalamud.Game.Gui.Dtr;
@@ -182,7 +183,7 @@ internal class LocalPlugin : IDisposable
     /// <summary>
     /// Gets the plugin name, directly from the plugin or if it is not loaded from the manifest.
     /// </summary>
-    public string Name => this.instance?.Name ?? this.Manifest.Name;
+    public string Name => this.Manifest.Name;
 
     /// <summary>
     /// Gets an optional reason, if the plugin is banned.
@@ -217,8 +218,10 @@ internal class LocalPlugin : IDisposable
     /// <summary>
     /// Gets a value indicating whether or not this plugin is orphaned(belongs to a repo) or not.
     /// </summary>
-    public bool IsOrphaned => !this.IsDev && !this.Manifest.InstalledFromUrl.IsNullOrEmpty() &&
-                              Service<PluginManager>.Get().Repos.All(x => x.PluginMasterUrl != this.Manifest.InstalledFromUrl);
+    public bool IsOrphaned => !this.IsDev &&
+                              !this.Manifest.InstalledFromUrl.IsNullOrEmpty() && // TODO(api8): Remove this, all plugins will have a proper flag
+                              Service<PluginManager>.Get().Repos.All(x => x.PluginMasterUrl != this.Manifest.InstalledFromUrl) &&
+                              this.Manifest.InstalledFromUrl != LocalPluginManifest.FlagMainRepo;
 
     /// <summary>
     /// Gets a value indicating whether this plugin has been banned.
@@ -283,6 +286,12 @@ internal class LocalPlugin : IDisposable
         await this.pluginLoadStateLock.WaitAsync();
         try
         {
+            if (reloading && this.IsDev)
+            {
+                // Reload the manifest in-case there were changes here too.
+                this.ReloadManifest();
+            }
+
             switch (this.State)
             {
                 case PluginState.Loaded:
@@ -357,16 +366,6 @@ internal class LocalPlugin : IDisposable
                 }
 
                 this.loader.Reload();
-
-                if (this.IsDev)
-                {
-                    // Reload the manifest in-case there were changes here too.
-                    var manifestDevFile = LocalPluginManifest.GetManifestFile(this.DllFile);
-                    if (manifestDevFile.Exists)
-                    {
-                        this.Manifest = LocalPluginManifest.Load(manifestDevFile);
-                    }
-                }
             }
 
             // Load the assembly
@@ -402,7 +401,7 @@ internal class LocalPlugin : IDisposable
                 new PluginPatchData(this.DllFile);
 
             this.DalamudInterface =
-                new DalamudPluginInterface(this.pluginAssembly.GetName().Name!, this.DllFile, reason, this.IsDev);
+                new DalamudPluginInterface(this.pluginAssembly.GetName().Name!, this.DllFile, reason, this.IsDev, this.Manifest.InstalledFromUrl);
 
             if (this.Manifest.LoadSync && this.Manifest.LoadRequiredState is 0 or 1)
             {
@@ -424,10 +423,8 @@ internal class LocalPlugin : IDisposable
                 return;
             }
 
-            SignatureHelper.Initialise(this.instance);
-
             // In-case the manifest name was a placeholder. Can occur when no manifest was included.
-            if (this.instance.Name != this.Manifest.Name)
+            if (this.Manifest.Name.IsNullOrEmpty())
             {
                 this.Manifest.Name = this.instance.Name;
                 this.Manifest.Save(this.manifestFile);
@@ -623,6 +620,22 @@ internal class LocalPlugin : IDisposable
     {
         this.Manifest.ScheduledForDeletion = status;
         this.SaveManifest();
+    }
+
+    /// <summary>
+    /// Reload the manifest if it exists, preserve the internal Disabled state.
+    /// </summary>
+    public void ReloadManifest()
+    {
+        var manifest = LocalPluginManifest.GetManifestFile(this.DllFile);
+        if (manifest.Exists)
+        {
+            var isDisabled = this.IsDisabled; // saving the internal state because it could have been deleted
+            this.Manifest = LocalPluginManifest.Load(manifest);
+            this.Manifest.Disabled = isDisabled;
+
+            this.SaveManifest();
+        }
     }
 
     private static void SetupLoaderConfig(LoaderConfig config)

@@ -58,9 +58,15 @@ namespace utils {
         void* get_imported_function_pointer(const char* pcszDllName, const char* pcszFunctionName, uint32_t hintOrOrdinal) const;
         template<typename TFn> TFn** get_imported_function_pointer(const char* pcszDllName, const char* pcszFunctionName, uint32_t hintOrOrdinal) { return reinterpret_cast<TFn**>(get_imported_function_pointer(pcszDllName, pcszFunctionName, hintOrOrdinal)); }
 
+        [[nodiscard]] std::unique_ptr<std::remove_pointer_t<HGLOBAL>, decltype(&FreeResource)> get_resource(LPCWSTR lpName, LPCWSTR lpType) const;
+        [[nodiscard]] std::wstring get_description() const;
+        [[nodiscard]] VS_FIXEDFILEINFO get_file_version() const;
+
         static loaded_module current_process();
         static std::vector<loaded_module> all_modules();
     };
+
+    std::wstring format_file_version(const VS_FIXEDFILEINFO& v);
 
     class signature_finder {
         std::vector<std::span<const char>> m_ranges;
@@ -90,11 +96,18 @@ namespace utils {
             size_t PatternIndex;
             size_t MatchIndex;
             size_t CaptureIndex;
+
+            const char* resolve_jump_target(size_t instructionOffset = 0) const;
+
+            template<typename T>
+            T resolve_jump_target(size_t instructionOffset = 0) const {
+                return reinterpret_cast<T>(const_cast<char*>(resolve_jump_target(instructionOffset)));
+            }
         };
 
         std::vector<result> find(size_t minCount, size_t maxCount, bool bErrorOnMoreThanMaximum) const;
 
-        std::span<const char> find_one() const;
+        result find_one() const;
     };
 
     class memory_tenderizer {

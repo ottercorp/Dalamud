@@ -1,3 +1,5 @@
+#include <array>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -14,22 +16,158 @@
 #define NOMINMAX
 #include <Windows.h>
 
+#include <comdef.h>
 #include <CommCtrl.h>
 #include <DbgHelp.h>
 #include <minidumpapiset.h>
 #include <PathCch.h>
 #include <Psapi.h>
 #include <shellapi.h>
+#include <ShlGuid.h>
+#include <ShObjIdl.h>
 #include <winhttp.h>
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(linker, "/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
+_COM_SMARTPTR_TYPEDEF(IFileOperation, __uuidof(IFileOperation));
+_COM_SMARTPTR_TYPEDEF(IFileSaveDialog, __uuidof(IFileSaveDialog));
+_COM_SMARTPTR_TYPEDEF(IShellItem, __uuidof(IShellItem));
+_COM_SMARTPTR_TYPEDEF(IBindCtx, __uuidof(IBindCtx));
+_COM_SMARTPTR_TYPEDEF(IStream, __uuidof(IStream));
+
+static constexpr GUID Guid_IFileDialog_Tspack{ 0xfc057318, 0xad35, 0x4599, {0xa7, 0x68, 0xdd, 0xaf, 0x70, 0xbe, 0x98, 0x75} };
+
 #include "resource.h"
 #include "../Dalamud.Boot/crashhandler_shared.h"
+#include "miniz.h"
 
 HANDLE g_hProcess = nullptr;
 bool g_bSymbolsAvailable = false;
+
+std::string ws_to_u8(const std::wstring& ws) {
+    std::string s(WideCharToMultiByte(CP_UTF8, 0, ws.data(), static_cast<int>(ws.size()), nullptr, 0, nullptr, nullptr), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, ws.data(), static_cast<int>(ws.size()), s.data(), static_cast<int>(s.size()), nullptr, nullptr);
+    return s;
+}
+
+std::wstring u8_to_ws(const std::string& s) {
+    std::wstring ws(MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0), '\0');
+    MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), ws.data(), static_cast<int>(ws.size()));
+    return ws;
+}
+
+std::wstring get_window_string(HWND hWnd) {
+    std::wstring buf(GetWindowTextLengthW(hWnd), L'\0');
+    GetWindowTextW(hWnd, &buf[0], static_cast<int>(buf.size()));
+    return buf;
+}
+
+[[noreturn]]
+void throw_hresult(HRESULT hr, const std::string& clue = {}) {
+    wchar_t* pwszMsg = nullptr;
+    FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        nullptr,
+        hr,
+        MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
+        reinterpret_cast<LPWSTR>(&pwszMsg),
+        0,
+        nullptr);
+    if (!pwszMsg) {
+        if (clue.empty())
+            throw std::runtime_error(std::format("Error (HRESULT=0x{:08X})", static_cast<uint32_t>(hr)));
+        else
+            throw std::runtime_error(std::format("Error at {} (HRESULT=0x{:08X})", clue, static_cast<uint32_t>(hr)));
+    }
+
+    std::unique_ptr<wchar_t, decltype(LocalFree)*> pszMsgFree(pwszMsg, LocalFree);
+    if (clue.empty())
+        throw std::runtime_error(std::format("Error (HRESULT=0x{:08X}): {}", static_cast<uint32_t>(hr), ws_to_u8(pwszMsg)));
+    else
+        throw std::runtime_error(std::format("Error at {} (HRESULT=0x{:08X}): {}", clue, static_cast<uint32_t>(hr), ws_to_u8(pwszMsg)));
+}
+
+[[noreturn]]
+void throw_last_error(const std::string& clue = {}) {
+    throw_hresult(HRESULT_FROM_WIN32(GetLastError()), clue);
+}
+
+HRESULT throw_if_failed(HRESULT hr, std::initializer_list<HRESULT> acceptables = {}, const std::string& clue = {}) {
+    if (SUCCEEDED(hr))
+        return hr;
+
+    for (const auto& h : acceptables) {
+        if (h == hr)
+            return hr;
+    }
+
+    throw_hresult(hr, clue);
+}
+
+std::wstring describe_module(const std::filesystem::path& path) {
+    DWORD verHandle = 0;
+    std::vector<uint8_t> block;
+    block.resize(GetFileVersionInfoSizeW(path.c_str(), &verHandle));
+    if (block.empty()) {
+        if (GetLastError() == ERROR_RESOURCE_TYPE_NOT_FOUND)
+            return L"<no information available>";
+        return std::format(L"<error: GetFileVersionInfoSizeW#1 returned {}>", GetLastError());
+    }
+    if (!GetFileVersionInfoW(path.c_str(), 0, static_cast<DWORD>(block.size()), block.data()))
+        return std::format(L"<error: GetFileVersionInfoSizeW#2 returned {}>", GetLastError());
+
+    UINT size = 0;
+    
+    std::wstring version = L"v?.?.?.?";
+    if (LPVOID lpBuffer; VerQueryValueW(block.data(), L"\\", &lpBuffer, &size)) {
+        const auto& v = *static_cast<const VS_FIXEDFILEINFO*>(lpBuffer);
+        if (v.dwSignature != 0xfeef04bd || sizeof v > size) {
+            version = L"<invalid version information>";
+        } else {
+            if (v.dwFileVersionMS == v.dwProductVersionMS && v.dwFileVersionLS == v.dwProductVersionLS) {
+                version = std::format(L"v{}.{}.{}.{}",
+                    (v.dwProductVersionMS >> 16) & 0xFFFF,
+                    (v.dwProductVersionMS >> 0) & 0xFFFF,
+                    (v.dwProductVersionLS >> 16) & 0xFFFF,
+                    (v.dwProductVersionLS >> 0) & 0xFFFF);
+            } else {
+                version = std::format(L"file=v{}.{}.{}.{} prod=v{}.{}.{}.{}",
+                    (v.dwFileVersionMS >> 16) & 0xFFFF,
+                    (v.dwFileVersionMS >> 0) & 0xFFFF,
+                    (v.dwFileVersionLS >> 16) & 0xFFFF,
+                    (v.dwFileVersionLS >> 0) & 0xFFFF,
+                    (v.dwProductVersionMS >> 16) & 0xFFFF,
+                    (v.dwProductVersionMS >> 0) & 0xFFFF,
+                    (v.dwProductVersionLS >> 16) & 0xFFFF,
+                    (v.dwProductVersionLS >> 0) & 0xFFFF);
+            }
+        }
+    }
+
+    std::wstring description = L"<no description>";
+    if (LPVOID lpBuffer; VerQueryValueW(block.data(), L"\\VarFileInfo\\Translation", &lpBuffer, &size)) {
+        struct LANGANDCODEPAGE {
+            WORD wLanguage;
+            WORD wCodePage;
+        };
+        const auto langs = std::span(reinterpret_cast<const LANGANDCODEPAGE*>(lpBuffer), size / sizeof(LANGANDCODEPAGE));
+        for (const auto& lang : langs) {
+            if (!VerQueryValueW(block.data(), std::format(L"\\StringFileInfo\\{:04x}{:04x}\\FileDescription", lang.wLanguage, lang.wCodePage).c_str(), &lpBuffer, &size))
+                continue;
+            auto currName = std::wstring_view(static_cast<wchar_t*>(lpBuffer), size);
+            while (!currName.empty() && currName.back() == L'\0')
+                currName = currName.substr(0, currName.size() - 1);
+            if (currName.empty())
+                continue;
+            description = currName;
+            break;
+        }
+    }
+
+    return std::format(L"{} {}", description, version);
+}
 
 const std::map<HMODULE, size_t>& get_remote_modules() {
     static const auto data = [] {
@@ -265,7 +403,7 @@ void print_exception_info_extended(const EXCEPTION_POINTERS& ex, const CONTEXT& 
     log << L"\nModules\n{";
 
     for (const auto& [hModule, path] : get_remote_module_paths())
-        log << std::format(L"\n  {:08X}\t{}", reinterpret_cast<DWORD64>(hModule), path.wstring());
+        log << std::format(L"\n  {:08X}\t{}\t{}", reinterpret_cast<DWORD64>(hModule), path.wstring(), describe_module(path));
 
     log << L"\n}\n";
 }
@@ -301,6 +439,160 @@ std::wstring escape_shell_arg(const std::wstring& arg) {
         res.push_back(L'"');
     }
     return res;
+}
+
+void export_tspack(HWND hWndParent, const std::filesystem::path& logDir, const std::string& crashLog, const std::string& troubleshootingPackData) {
+    static const char* SourceLogFiles[] = {
+        "output.log",
+        "patcher.log",
+        "dalamud.log",
+        "dalamud.injector.log",
+        "dalamud.boot.log",
+        "aria.log",
+    };
+    static constexpr auto MaxSizePerLog = 1 * 1024 * 1024;
+    static constexpr std::array<COMDLG_FILTERSPEC, 2> OutputFileTypeFilterSpec{{
+        { L"Dalamud Troubleshooting Pack File (*.tspack)", L"*.tspack" },
+        { L"All files (*.*)", L"*" },
+    }};
+
+    IShellItemPtr pItem;
+    try {
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        IFileSaveDialogPtr pDialog;
+        throw_if_failed(pDialog.CreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_INPROC_SERVER), {}, "pDialog.CreateInstance");
+        throw_if_failed(pDialog->SetClientGuid(Guid_IFileDialog_Tspack), {}, "pDialog->SetClientGuid");
+        throw_if_failed(pDialog->SetFileTypes(static_cast<UINT>(OutputFileTypeFilterSpec.size()), OutputFileTypeFilterSpec.data()), {}, "pDialog->SetFileTypes");
+        throw_if_failed(pDialog->SetFileTypeIndex(0), {}, "pDialog->SetFileTypeIndex");
+        throw_if_failed(pDialog->SetTitle(L"Export Dalamud Troubleshooting Pack"), {}, "pDialog->SetTitle");
+        throw_if_failed(pDialog->SetFileName(std::format(L"crash-{:04}{:02}{:02}{:02}{:02}{:02}.tspack", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond).c_str()), {}, "pDialog->SetFileName");
+        throw_if_failed(pDialog->SetDefaultExtension(L"tspack"), {}, "pDialog->SetDefaultExtension");
+        switch (throw_if_failed(pDialog->Show(hWndParent), { HRESULT_FROM_WIN32(ERROR_CANCELLED) }, "pDialog->Show")) {
+            case HRESULT_FROM_WIN32(ERROR_CANCELLED):
+                return;
+        }
+
+        throw_if_failed(pDialog->GetResult(&pItem), {}, "pDialog->GetResult");
+        
+        IBindCtxPtr pBindCtx;
+        throw_if_failed(CreateBindCtx(0, &pBindCtx), {}, "CreateBindCtx");
+
+        auto options = BIND_OPTS{.cbStruct = sizeof(BIND_OPTS), .grfMode = STGM_READWRITE | STGM_SHARE_EXCLUSIVE | STGM_CREATE};
+        throw_if_failed(pBindCtx->SetBindOptions(&options), {}, "pBindCtx->SetBindOptions");
+
+        IStreamPtr pStream;
+        throw_if_failed(pItem->BindToHandler(pBindCtx, BHID_Stream, IID_PPV_ARGS(&pStream)), {}, "pItem->BindToHandler");
+
+        throw_if_failed(pStream->SetSize({}), {}, "pStream->SetSize");
+        
+        mz_zip_archive zipa{};
+        zipa.m_pIO_opaque = &*pStream;
+        zipa.m_pRead = [](void* pOpaque, mz_uint64 file_ofs, void* pBuf, size_t n) -> size_t {
+            const auto pStream = static_cast<IStream*>(pOpaque);
+            throw_if_failed(pStream->Seek({ .QuadPart = static_cast<int64_t>(file_ofs) }, STREAM_SEEK_SET, nullptr), {}, "pStream->Seek");
+            ULONG read;
+            throw_if_failed(pStream->Read(pBuf, static_cast<ULONG>(n), &read), {}, "pStream->Read");
+            return read;
+        };
+        zipa.m_pWrite = [](void* pOpaque, mz_uint64 file_ofs, const void* pBuf, size_t n) -> size_t {
+            const auto pStream = static_cast<IStream*>(pOpaque);
+            throw_if_failed(pStream->Seek({ .QuadPart = static_cast<int64_t>(file_ofs) }, STREAM_SEEK_SET, nullptr), {}, "pStream->Seek");
+            ULONG written;
+            throw_if_failed(pStream->Write(pBuf, static_cast<ULONG>(n), &written), {}, "pStream->Write");
+            return written;
+        };
+        const auto mz_throw_if_failed = [&zipa](mz_bool res, const std::string& clue) {
+            if (!res)
+                throw std::runtime_error(std::format("Failed to save file at {}: mz_error={} description={}", clue, static_cast<int>(mz_zip_get_last_error(&zipa)), mz_zip_get_error_string(mz_zip_get_last_error(&zipa))));
+        };
+
+        mz_throw_if_failed(mz_zip_writer_init_v2(&zipa, 0, 0), "mz_zip_writer_init_v2");
+        mz_throw_if_failed(mz_zip_writer_add_mem(&zipa, "trouble.json", troubleshootingPackData.data(), troubleshootingPackData.size(), MZ_ZIP_FLAG_WRITE_HEADER_SET_SIZE | MZ_BEST_COMPRESSION), "mz_zip_writer_add_mem: trouble.json");
+        mz_throw_if_failed(mz_zip_writer_add_mem(&zipa, "crash.log", crashLog.data(), crashLog.size(), MZ_ZIP_FLAG_WRITE_HEADER_SET_SIZE | MZ_BEST_COMPRESSION), "mz_zip_writer_add_mem: crash.log");
+
+        struct HandleAndBaseOffset {
+            HANDLE h;
+            int64_t off;
+        };
+        const auto fnHandleReader = [](void* pOpaque, mz_uint64 file_ofs, void* pBuf, size_t n) -> size_t {
+            const auto& info = *reinterpret_cast<const HandleAndBaseOffset*>(pOpaque);
+            if (!SetFilePointerEx(info.h, { .QuadPart = static_cast<int64_t>(info.off + file_ofs) }, nullptr, SEEK_SET))
+                throw_last_error("fnHandleReader: SetFilePointerEx");
+            if (DWORD read; !ReadFile(info.h, pBuf, static_cast<DWORD>(n), &read, nullptr))
+                throw_last_error("fnHandleReader: ReadFile");
+            else
+                return read;
+        };
+        for (const auto& pcszLogFileName : SourceLogFiles) {
+            const auto logFilePath = logDir / pcszLogFileName;
+            if (!exists(logFilePath))
+                continue;
+
+            const auto hLogFile = CreateFileW(logFilePath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+            if (hLogFile == INVALID_HANDLE_VALUE)
+                throw_last_error(std::format("indiv. log file: CreateFileW({})", ws_to_u8(logFilePath.wstring())));
+            
+            std::unique_ptr<void, decltype(&CloseHandle)> hLogFileClose(hLogFile, &CloseHandle);
+
+            LARGE_INTEGER size, baseOffset{};
+            if (!SetFilePointerEx(hLogFile, {}, &size, SEEK_END))
+                throw_last_error(std::format("indiv. log file: SetFilePointerEx({})", ws_to_u8(logFilePath.wstring())));
+
+            if (size.QuadPart > MaxSizePerLog) {
+                if (!SetFilePointerEx(hLogFile, {.QuadPart = -MaxSizePerLog}, &baseOffset, SEEK_END))
+                    throw_last_error(std::format("indiv. log file: SetFilePointerEx#2({})", ws_to_u8(logFilePath.wstring())));
+            }
+
+            auto handleInfo = HandleAndBaseOffset{.h = hLogFile, .off = baseOffset.QuadPart};
+            const auto modt = std::chrono::system_clock::to_time_t(std::chrono::clock_cast<std::chrono::system_clock>(last_write_time(logFilePath))); 
+            mz_throw_if_failed(mz_zip_writer_add_read_buf_callback(
+                &zipa,
+                pcszLogFileName,
+                fnHandleReader, &handleInfo,  // callback info
+                size.QuadPart - baseOffset.QuadPart,
+                &modt,
+                nullptr, 0,  // comments
+                MZ_ZIP_FLAG_WRITE_HEADER_SET_SIZE | MZ_BEST_COMPRESSION,  // flags and compression ratio
+                nullptr, 0,  // user extra data (local)
+                nullptr, 0   // user extra data (central)
+                ), std::format("mz_zip_writer_add_read_buf_callback({})", ws_to_u8(logFilePath.wstring())));
+        }
+
+        mz_throw_if_failed(mz_zip_writer_finalize_archive(&zipa), "mz_zip_writer_finalize_archive");
+        mz_throw_if_failed(mz_zip_writer_end(&zipa), "mz_zip_writer_end");
+
+    } catch (const std::exception& e) {
+        MessageBoxW(hWndParent, std::format(L"Failed to save file: {}", u8_to_ws(e.what())).c_str(), get_window_string(hWndParent).c_str(), MB_OK | MB_ICONERROR);
+
+        if (pItem) {
+            try {
+                IFileOperationPtr pFileOps;
+                throw_if_failed(pFileOps.CreateInstance(__uuidof(FileOperation), nullptr, CLSCTX_ALL));
+                throw_if_failed(pFileOps->SetOperationFlags(FOF_NO_UI));
+                throw_if_failed(pFileOps->DeleteItem(pItem, nullptr));
+                throw_if_failed(pFileOps->PerformOperations());
+            } catch (const std::exception& e2) {
+                std::wcerr << std::format(L"Failed to remove temporary file: {}", u8_to_ws(e2.what())) << std::endl;
+            }
+            pItem.Release();
+        }
+    }
+
+    if (pItem) {
+        PWSTR pwszFileName;
+        if (FAILED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pwszFileName))) {
+            if (FAILED(pItem->GetDisplayName(SIGDN_DESKTOPABSOLUTEEDITING, &pwszFileName))) {
+                MessageBoxW(hWndParent, L"The file has been saved to the specified path.", get_window_string(hWndParent).c_str(), MB_OK | MB_ICONINFORMATION);
+            } else {
+                std::unique_ptr<std::remove_pointer<PWSTR>::type, decltype(CoTaskMemFree)*> pszFileNamePtr(pwszFileName, CoTaskMemFree);
+                MessageBoxW(hWndParent, std::format(L"The file has been saved to: {}", pwszFileName).c_str(), get_window_string(hWndParent).c_str(), MB_OK | MB_ICONINFORMATION);
+            }
+        } else {
+            std::unique_ptr<std::remove_pointer<PWSTR>::type, decltype(CoTaskMemFree)*> pszFileNamePtr(pwszFileName, CoTaskMemFree);
+            ShellExecuteW(hWndParent, nullptr, L"explorer.exe", escape_shell_arg(std::format(L"/select,{}", pwszFileName)).c_str(), nullptr, SW_SHOW);
+        }
+    }
 }
 
 enum {
@@ -362,6 +654,7 @@ void restart_game_using_injector(int nRadioButton, const std::vector<std::wstrin
 
 int main() {
     enum crash_handler_special_exit_codes {
+        UnknownError = -99,
         InvalidParameter = -101,
         ProcessExitedUnknownExitCode = -102,
     };
@@ -369,6 +662,7 @@ int main() {
     HANDLE hPipeRead = nullptr;
     std::filesystem::path assetDir, logDir;
     std::optional<std::vector<std::wstring>> launcherArgs;
+    auto fullDump = false;
     
     std::vector<std::wstring> args;
     if (int argc = 0; const auto argv = CommandLineToArgvW(GetCommandLineW(), &argc)) {
@@ -380,6 +674,9 @@ int main() {
         const auto arg = std::wstring_view(args[i]);
         if (launcherArgs) {
             launcherArgs->emplace_back(arg);
+            if (arg == L"--veh-full") {
+                fullDump = true;
+            }
         } else if (constexpr wchar_t pwszArgPrefix[] = L"--process-handle="; arg.starts_with(pwszArgPrefix)) {
             g_hProcess = reinterpret_cast<HANDLE>(std::wcstoull(&arg[ARRAYSIZE(pwszArgPrefix) - 1], nullptr, 0));
         } else if (constexpr wchar_t pwszArgPrefix[] = L"--exception-info-pipe-read-handle="; arg.starts_with(pwszArgPrefix)) {
@@ -460,10 +757,19 @@ int main() {
             }
         }
 
+        std::string troubleshootingPackData(exinfo.dwTroubleshootingPackDataLength, '\0');
+        if (exinfo.dwTroubleshootingPackDataLength) {
+            if (DWORD read; !ReadFile(hPipeRead, &troubleshootingPackData[0], exinfo.dwTroubleshootingPackDataLength, &read, nullptr)) {
+                std::cout << std::format("Failed to read troubleshooting pack data: error 0x{:x}", GetLastError()) << std::endl;
+            }
+        }
+
         SYSTEMTIME st;
         GetLocalTime(&st);
-        const auto dumpPath = logDir.empty() ? std::filesystem::path() : logDir / std::format("dalamud_appcrash_{:04}{:02}{:02}_{:02}{:02}{:02}_{:03}_{}.dmp", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, dwProcessId);
-        const auto logPath = logDir.empty() ? std::filesystem::path() : logDir / std::format("dalamud_appcrash_{:04}{:02}{:02}_{:02}{:02}{:02}_{:03}_{}.log", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, dwProcessId);
+        const auto dalamudLogPath = logDir.empty() ? std::filesystem::path() : logDir / L"Dalamud.log";
+        const auto dalamudBootLogPath = logDir.empty() ? std::filesystem::path() : logDir / L"Dalamud.boot.log";
+        const auto dumpPath = logDir.empty() ? std::filesystem::path() : logDir / std::format(L"dalamud_appcrash_{:04}{:02}{:02}_{:02}{:02}{:02}_{:03}_{}.dmp", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, dwProcessId);
+        const auto logPath = logDir.empty() ? std::filesystem::path() : logDir / std::format(L"dalamud_appcrash_{:04}{:02}{:02}_{:02}{:02}{:02}_{:03}_{}.log", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, dwProcessId);
         std::wstring dumpError;
         if (dumpPath.empty()) {
             std::cout << "Skipping dump path, as log directory has not been specified" << std::endl;
@@ -481,7 +787,7 @@ int main() {
                 }
 
                 std::unique_ptr<std::remove_pointer_t<HANDLE>, decltype(&CloseHandle)> hDumpFilePtr(hDumpFile, &CloseHandle);
-                if (!MiniDumpWriteDump(g_hProcess, dwProcessId, hDumpFile, static_cast<MINIDUMP_TYPE>(MiniDumpWithDataSegs | MiniDumpWithModuleHeaders), &mdmp_info, nullptr, nullptr)) {
+                if (!MiniDumpWriteDump(g_hProcess, dwProcessId, hDumpFile, fullDump ? MiniDumpWithFullMemory : static_cast<MINIDUMP_TYPE>(MiniDumpWithDataSegs | MiniDumpWithModuleHeaders), &mdmp_info, nullptr, nullptr)) {
                     std::wcerr << (dumpError = std::format(L"MiniDumpWriteDump(0x{:x}, {}, 0x{:x}({}), MiniDumpWithFullMemory, ..., nullptr, nullptr) error: 0x{:x}", reinterpret_cast<size_t>(g_hProcess), dwProcessId, reinterpret_cast<size_t>(hDumpFile), dumpPath.wstring(), GetLastError())) << std::endl;
                     break;
                 }
@@ -504,14 +810,13 @@ int main() {
 
         SymRefreshModuleList(GetCurrentProcess());
         print_exception_info(exinfo.hThreadHandle, exinfo.ExceptionPointers, exinfo.ContextRecord, log);
-        auto window_log_str = log.str();
+        const auto window_log_str = log.str();
         print_exception_info_extended(exinfo.ExceptionPointers, exinfo.ContextRecord, log);
-
         std::wofstream(logPath) << log.str();
 
         std::thread submitThread;
         if (!getenv("DALAMUD_NO_METRIC")) {
-            auto url = std::format(L"/Dalamud/Metric/ReportCrash/?lt={}&code={:x}", exinfo.nLifetime, exinfo.ExceptionRecord.ExceptionCode);
+            auto url = std::format(L"/Dalamud/Metric/ReportCrash?lt={}&code={:x}", exinfo.nLifetime, exinfo.ExceptionRecord.ExceptionCode);
 
             submitThread = std::thread([url = std::move(url)] {
                 const auto hInternet = WinHttpOpen(L"DALAMUDCRASHHANDLER", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, nullptr, nullptr, WINHTTP_FLAG_SECURE_DEFAULTS);
@@ -525,6 +830,20 @@ int main() {
                 if (!bSent)
                     std::cerr << std::format("Failed to send metric: 0x{:x}", GetLastError()) << std::endl;
 
+                if (WinHttpReceiveResponse(hRequest, nullptr))
+                {
+                    DWORD dwStatusCode = 0;
+                    DWORD dwStatusCodeSize = sizeof(DWORD);
+
+                    WinHttpQueryHeaders(hRequest,
+                                        WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                                        WINHTTP_HEADER_NAME_BY_INDEX,
+                                        &dwStatusCode, &dwStatusCodeSize, WINHTTP_NO_HEADER_INDEX);
+
+                    if (dwStatusCode != 200)
+                        std::cerr << std::format("Failed to send metric: {}", dwStatusCode) << std::endl;
+                }
+                
                 if (hRequest) WinHttpCloseHandle(hRequest);
                 if (hConnect) WinHttpCloseHandle(hConnect);
                 if (hInternet) WinHttpCloseHandle(hInternet);
@@ -561,16 +880,25 @@ int main() {
         config.pButtons = buttons;
         config.cButtons = ARRAYSIZE(buttons);
         config.nDefaultButton = IdButtonRestart;
+        config.pszExpandedControlText = L"Hide stack trace";
+        config.pszCollapsedControlText = L"Stack trace for plugin developers";
         config.pszExpandedInformation = window_log_str.c_str();
         config.pszWindowTitle = L"Dalamud Error";
         // config.pRadioButtons = radios;
         // config.cRadioButtons = ARRAYSIZE(radios);
         config.nDefaultRadioButton = IdRadioRestartNormal;
         config.cxWidth = 300;
+
+#if _DEBUG
         config.pszFooter = (L""
             R"aa(<a href="help">Help</a> | <a href="logdir">Open log directory</a> | <a href="logfile">Open log file</a> | <a href="resume">Attempt to resume</a>)aa"
         );
-
+#else
+        config.pszFooter = (L""
+            R"aa(<a href="help">Help</a> | <a href="logdir">Open log directory</a> | <a href="logfile">Open log file</a>)aa"
+        );
+#endif
+        
         // Can't do this, xiv stops pumping messages here
         //config.hwndParent = FindWindowA("FFXIVGAME", NULL);
 
@@ -591,6 +919,10 @@ int main() {
                         ShellExecuteW(hwnd, nullptr, L"explorer.exe", escape_shell_arg(std::format(L"/select,{}", logPath.wstring())).c_str(), nullptr, SW_SHOW);
                     } else if (link == L"logfile") {
                         ShellExecuteW(hwnd, nullptr, logPath.c_str(), nullptr, nullptr, SW_SHOW);
+                    } else if (link == L"exporttspack") {
+                        export_tspack(hwnd, logDir, ws_to_u8(log.str()), troubleshootingPackData);
+                    } else if (link == L"discord") {
+                        ShellExecuteW(hwnd, nullptr, L"https://goat.place", nullptr, nullptr, SW_SHOW);
                     } else if (link == L"resume") {
                         attemptResume = true;
                         DestroyWindow(hwnd);

@@ -26,7 +26,20 @@ void xivfixes::unhook_dll(bool bApply) {
         std::filesystem::path path;
         try {
             path = mod.path();
-            logging::I("{} [{}/{}] Module 0x{:X} ~ 0x{:X} (0x{:X}): \"{}\"", LogTagW, i + 1, mods.size(), mod.address_int(), mod.address_int() + mod.image_size(), mod.image_size(), path.wstring());
+            std::wstring version, description;
+            try {
+                version = utils::format_file_version(mod.get_file_version());
+            } catch (...) {
+                version = L"<unknown>";
+            }
+            
+            try {
+                description = mod.get_description();
+            } catch (...) {
+                description = L"<unknown>";
+            }
+            
+            logging::I(R"({} [{}/{}] Module 0x{:X} ~ 0x{:X} (0x{:X}): "{}" ("{}" ver {}))", LogTagW, i + 1, mods.size(), mod.address_int(), mod.address_int() + mod.image_size(), mod.image_size(), path.wstring(), description, version);
         } catch (const std::exception& e) {
             logging::W("{} [{}/{}] Module 0x{:X}: Failed to resolve path: {}", LogTag, i + 1, mods.size(), mod.address_int(), e.what());
             return;
@@ -156,26 +169,11 @@ static TFnGetInputDeviceManager* GetGetInputDeviceManager(HWND hwnd) {
     if (pCached)
         return pCached;
 
-    char szClassName[256];
-    GetClassNameA(hwnd, szClassName, static_cast<int>(sizeof szClassName));
-
-    WNDCLASSEXA wcx{};
-    GetClassInfoExA(g_hGameInstance, szClassName, &wcx);
-    const auto match = utils::signature_finder()
+    return pCached = utils::signature_finder()
         .look_in(utils::loaded_module(g_hGameInstance), ".text")
-        .look_for_hex("41 81 fe 19 02 00 00 0f 87 ?? ?? 00 00 0f 84 ?? ?? 00 00")
-        .find_one();
-
-    auto ptr = match.data() + match.size() + *reinterpret_cast<const int*>(match.data() + match.size() - 4);
-    ptr += 4;  // CMP RBX, 0x7
-    ptr += 2;  // JNZ <giveup>
-    ptr += 7;  // MOV RCX, <Framework::Instance>
-    ptr += 3;  // TEST RCX, RCX
-    ptr += 2;  // JZ <giveup>
-    ptr += 5;  // CALL <GetInputDeviceManagerInstance()>
-    ptr += *reinterpret_cast<const int*>(ptr - 4);
-
-    return pCached = reinterpret_cast<TFnGetInputDeviceManager*>(ptr);
+        .look_for_hex("e8 ?? ?? ?? ?? 48 8b 58 10 48 85 db")
+        .find_one()
+        .resolve_jump_target<TFnGetInputDeviceManager*>();
 }
 
 void xivfixes::prevent_devicechange_crashes(bool bApply) {
@@ -189,9 +187,13 @@ void xivfixes::prevent_devicechange_crashes(bool bApply) {
     static const auto s_pfnBinder = static_cast<WNDPROC>(VirtualAlloc(nullptr, 64, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE));
     static const auto s_pfnAlternativeWndProc = static_cast<WNDPROC>([](HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT {
         if (uMsg == WM_DEVICECHANGE && wParam == DBT_DEVNODES_CHANGED) {
-            if (!GetGetInputDeviceManager(hWnd)()) {
-                logging::I("{} WndProc(0x{:X}, WM_DEVICECHANGE, DBT_DEVNODES_CHANGED, {}) called but the game does not have InputDeviceManager initialized; doing nothing.", LogTag, reinterpret_cast<size_t>(hWnd), lParam);
-                return 0;
+            try {
+                if (!GetGetInputDeviceManager(hWnd)()) {
+                    logging::I("{} WndProc(0x{:X}, WM_DEVICECHANGE, DBT_DEVNODES_CHANGED, {}) called but the game does not have InputDeviceManager initialized; doing nothing.", LogTag, reinterpret_cast<size_t>(hWnd), lParam);
+                    return 0;
+                }
+            } catch (const std::exception& e) {
+                logging::W("{} WndProc(0x{:X}, WM_DEVICECHANGE, DBT_DEVNODES_CHANGED, {}) called, but failed to resolve address for GetInputDeviceManager: {}", LogTag, reinterpret_cast<size_t>(hWnd), lParam, e.what());
             }
         }
 
@@ -425,7 +427,8 @@ void xivfixes::backup_userdata_save(bool bApply) {
             LPSECURITY_ATTRIBUTES lpSecurityAttributes,
             DWORD dwCreationDisposition,
             DWORD dwFlagsAndAttributes,
-            HANDLE hTemplateFile)->HANDLE {
+            HANDLE hTemplateFile) noexcept {
+
             if (dwDesiredAccess != GENERIC_WRITE)
                 return s_hookCreateFileW->call_original(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 
@@ -434,9 +437,17 @@ void xivfixes::backup_userdata_save(bool bApply) {
             if (ext != ".dat" && ext != ".cfg")
                 return s_hookCreateFileW->call_original(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 
+            for (auto i = 0; i < 16; i++) {
+                std::error_code ec;
+                auto resolved = read_symlink(path, ec);
+                if (ec || resolved == path)
+                    break;
+                path = std::move(resolved);
+            }
+
             std::filesystem::path temporaryPath = path;
-            temporaryPath.replace_extension(path.extension().wstring() + L".new");
-            const auto handle = s_hookCreateFileW->call_original(temporaryPath.c_str(), GENERIC_READ | GENERIC_WRITE | DELETE, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+            temporaryPath.replace_extension(std::format(L"{}.new.{:X}.{:X}", path.extension().c_str(), std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count(), GetCurrentProcessId()));
+            const auto handle = s_hookCreateFileW->call_original(temporaryPath.c_str(), GENERIC_READ | GENERIC_WRITE | DELETE, dwShareMode, lpSecurityAttributes, CREATE_ALWAYS, dwFlagsAndAttributes, hTemplateFile);
             if (handle == INVALID_HANDLE_VALUE)
                 return handle;
 
@@ -446,7 +457,7 @@ void xivfixes::backup_userdata_save(bool bApply) {
             return handle;
         });
 
-        s_hookCloseHandle->set_detour([](HANDLE handle) {
+        s_hookCloseHandle->set_detour([](HANDLE handle) noexcept {
             const auto lock = std::lock_guard(s_mtx);
             if (const auto it = s_handles.find(handle); it != s_handles.end()) {
                 std::filesystem::path tempPath(std::move(it->second.first));

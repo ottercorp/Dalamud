@@ -13,6 +13,18 @@ namespace Dalamud.Plugin.Internal.Types;
 internal record LocalPluginManifest : PluginManifest
 {
     /// <summary>
+    /// Flag indicating that a plugin was installed from the official repo.
+    /// </summary>
+    [JsonIgnore]
+    public const string FlagMainRepo = "OFFICIAL";
+
+    /// <summary>
+    /// Flag indicating that a plugin is a dev plugin..
+    /// </summary>
+    [JsonIgnore]
+    public const string FlagDevPlugin = "DEVPLUGIN";
+
+    /// <summary>
     /// Gets or sets a value indicating whether the plugin is disabled and should not be loaded.
     /// This value supersedes the ".disabled" file functionality and should not be included in the plugin master.
     /// </summary>
@@ -40,12 +52,17 @@ internal record LocalPluginManifest : PluginManifest
     /// Gets a value indicating whether this manifest is associated with a plugin that was installed from a third party
     /// repo. Unless the manifest has been manually modified, this is determined by the InstalledFromUrl being null.
     /// </summary>
-    public bool IsThirdParty => !this.InstalledFromUrl.IsNullOrEmpty() && this.InstalledFromUrl != PluginRepository.MainRepoUrl;
+    public bool IsThirdParty => !this.InstalledFromUrl.IsNullOrEmpty() && this.InstalledFromUrl != FlagMainRepo;
 
     /// <summary>
     /// Gets the effective version of this plugin.
     /// </summary>
     public Version EffectiveVersion => this.Testing && this.TestingAssemblyVersion != null ? this.TestingAssemblyVersion : this.AssemblyVersion;
+
+    /// <summary>
+    /// Gets a value indicating whether this plugin is eligible for testing.
+    /// </summary>
+    public bool IsAvailableForTesting => this.TestingAssemblyVersion != null && this.TestingAssemblyVersion > this.AssemblyVersion;
 
     /// <summary>
     /// Save a plugin manifest to file.

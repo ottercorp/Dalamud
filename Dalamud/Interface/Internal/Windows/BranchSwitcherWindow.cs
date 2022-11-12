@@ -74,7 +74,7 @@ public class BranchSwitcherWindow : Window
 
         if (pickedBranch.Value.SupportedGameVer != si.GameVersion)
         {
-            ImGui.TextColored(ImGuiColors.DalamudRed,"Can't pick this branch. GameVer != SupportedGameVer.");
+            ImGui.TextColored(ImGuiColors.DalamudRed, "Can't pick this branch. GameVer != SupportedGameVer.");
         }
         else
         {
@@ -88,7 +88,7 @@ public class BranchSwitcherWindow : Window
                 var config = Service<DalamudConfiguration>.Get();
                 config.DalamudBetaKind = pickedBranch.Key;
                 config.DalamudBetaKey = pickedBranch.Value.Key;
-                config.Save();
+                config.QueueSave();
             }
 
             if (ImGui.Button("Pick"))
