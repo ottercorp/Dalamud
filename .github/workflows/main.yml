@@ -61,7 +61,7 @@ jobs:
       env:
         GH_BRANCH: ${{ steps.extract_branch.outputs.branch }}
       run: |
-        Compress-Archive .\scratch\* .\canary.zip  # Recreate the release zip
+        Compress-Archive -Force .\scratch\* .\canary.zip  # Recreate the release zip
         
         $branchName = $env:GH_BRANCH
         
