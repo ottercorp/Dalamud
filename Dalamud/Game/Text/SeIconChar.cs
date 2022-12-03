@@ -41,6 +41,11 @@ namespace Dalamud.Game.Text
         Clock = 0xE031,
 
         /// <summary>
+        /// The flag with 3 down-arrow icon unicode character.
+        /// </summary>
+        Flag = 0xE031,
+
+        /// <summary>
         /// The gil icon unicode character.
         /// </summary>
         Gil = 0xE049,
@@ -99,6 +104,11 @@ namespace Dalamud.Game.Text
         /// The mouse with a 5 icon unicode character.
         /// </summary>
         Mouse5 = 0xE059,
+
+        /// <summary>
+        /// The three-dots icon unicode character.
+        /// </summary>
+        ThreeDots = 0xE05A,
 
         /// <summary>
         /// The level English icon unicode character.
@@ -561,9 +571,19 @@ namespace Dalamud.Game.Text
         Prohibited = 0xE043,
 
         /// <summary>
+        /// The strange shazam icon unicode character.
+        /// </summary>
+        Shazam = 0xE044,
+
+        /// <summary>
         /// The dice icon unicode character.
         /// </summary>
         Dice = 0xE03E,
+
+        /// <summary>
+        /// The dot icon unicode character.
+        /// </summary>
+        DOT = 0xE03F,
 
         /// <summary>
         /// The debuff icon unicode character.
@@ -579,6 +599,26 @@ namespace Dalamud.Game.Text
         /// The cross-world icon unicode character.
         /// </summary>
         CrossWorld = 0xE05D,
+
+        /// <summary>
+        /// The playback(?) icon unicode character.
+        /// </summary>
+        PlayBack = 0xE05E,
+
+        /// <summary>
+        /// The false(?) icon unicode character.
+        /// </summary>
+        False = 0xE05F,
+
+        /// <summary>
+        /// The Globe(?) icon unicode character.
+        /// </summary>
+        Globe = 0xE038,
+
+        /// <summary>
+        /// The reversed Z(?) icon unicode character.
+        /// </summary>
+        ReversedZ = 0xE039,
 
         /// <summary>
         /// The Eureka level icon unicode character.
@@ -634,6 +674,46 @@ namespace Dalamud.Game.Text
         /// The IME alphanumeric half-width icon unicode character.
         /// </summary>
         ImeAlphanumericHalfWidth = 0xE024,
+
+        /// <summary>
+        /// The IME Korean character.
+        /// </summary>
+        ImeKorean = 0xE025,
+
+        /// <summary>
+        /// The IME Chinese character.
+        /// </summary>
+        ImeChinese = 0xE026,
+
+        /// <summary>
+        /// The IME English character in Chinese.
+        /// </summary>
+        ImeKorean = 0xE027,
+
+        /// <summary>
+        /// A small 'm' character (minute in english maybe?).
+        /// </summary>
+        MinuteEnglish = 0xE028,
+
+        /// <summary>
+        /// A small '分' character.
+        /// </summary>
+        MinuteEnglish = 0xE029,
+
+        /// <summary>
+        /// A '【' character.
+        /// </summary>
+        SquareracketsOpen = 0xE02A,
+
+        /// <summary>
+        /// A '】' character.
+        /// </summary>
+        SquareracketsClose = 0xE02B,
+
+        /// <summary>
+        /// The instance (E) icon unicode character.
+        /// </summary>
+        InstanceE = 0xE0B0,
 
         /// <summary>
         /// The instance (1) icon unicode character.
