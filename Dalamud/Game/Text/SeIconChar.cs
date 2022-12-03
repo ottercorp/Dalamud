@@ -688,7 +688,7 @@ namespace Dalamud.Game.Text
         /// <summary>
         /// The IME English character in Chinese.
         /// </summary>
-        ImeKorean = 0xE027,
+        ImeEnglishInCN = 0xE027,
 
         /// <summary>
         /// A small 'm' character (minute in english maybe?).
@@ -698,7 +698,7 @@ namespace Dalamud.Game.Text
         /// <summary>
         /// A small '分' character.
         /// </summary>
-        MinuteEnglish = 0xE029,
+        MinuteChinese = 0xE029,
 
         /// <summary>
         /// A '【' character.
