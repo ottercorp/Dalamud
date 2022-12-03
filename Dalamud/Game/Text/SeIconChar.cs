@@ -1,8 +1,8 @@
 namespace Dalamud.Game.Text;
 
-    /// <summary>
-    /// The sprout icon unicode character.
-    /// </summary>
+/// <summary>
+/// Special unicode characters with game-related symbols that work both in-game and in any dalamud window.
+/// </summary>
     public enum SeIconChar
     {
         /// <summary>
