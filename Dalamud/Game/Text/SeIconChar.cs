@@ -43,7 +43,7 @@ namespace Dalamud.Game.Text
         /// <summary>
         /// The flag with 3 down-arrow icon unicode character.
         /// </summary>
-        Flag = 0xE031,
+        Flag = 0xE032,
 
         /// <summary>
         /// The gil icon unicode character.
