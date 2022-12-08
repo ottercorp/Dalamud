@@ -8,6 +8,7 @@ using Dalamud.Interface;
 using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
 using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -184,6 +185,30 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
     /// <param name="worldPos">Coordinates in the world.</param>
     /// <param name="screenPos">Converted coordinates.</param>
     /// <returns>True if worldPos corresponds to a position in front of the camera.</returns>
+    /* TODO: Hold for 6.2 since FFXIVClientStruct not updated
+    public bool WorldToScreen(Vector3 worldPos, out Vector2 screenPos)
+    {
+        // Get base object with matrices
+        var matrixSingleton = this.getMatrixSingleton();
+
+        // Read current ViewProjectionMatrix plus game window size
+        var windowPos = ImGuiHelpers.MainViewport.Pos;
+        var viewProjectionMatrix = *(Matrix4x4*)(matrixSingleton + 0x1b4);
+        var device = Device.Instance();
+        float width = device->Width;
+        float height = device->Height;
+
+        var pCoords = Vector3.Transform(worldPos, viewProjectionMatrix);
+        screenPos = new Vector2(pCoords.X / MathF.Abs(pCoords.Z), pCoords.Y / MathF.Abs(pCoords.Z));
+
+        screenPos.X = (0.5f * width * (screenPos.X + 1f)) + windowPos.X;
+        screenPos.Y = (0.5f * height * (1f - screenPos.Y)) + windowPos.Y;
+
+        return pCoords.Z > 0 &&
+               screenPos.X > windowPos.X && screenPos.X < windowPos.X + width &&
+               screenPos.Y > windowPos.Y && screenPos.Y < windowPos.Y + height;
+    }
+    */
     public bool WorldToScreen(Vector3 worldPos, out Vector2 screenPos)
     {
         // Get base object with matrices
