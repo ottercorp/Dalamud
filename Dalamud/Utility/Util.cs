@@ -567,29 +567,34 @@ public static class Util
         return Check1() || Check2() || Check3();
     }
 
-        /// <summary>
-        /// Set the proxy.
-        /// </summary>
-        /// <param name="useSystemProxy">Use system proxy</param>
-        /// <param name="proxyHost">The proxy host.</param>
-        /// <param name="proxyPort">The proxy port.</param>
-        public static void SetProxy(bool useSystemProxy, string proxyHost = "", int proxyPort = 0) {
-            var proxy = useSystemProxy ? WebRequest.GetSystemWebProxy() : new WebProxy(proxyHost, proxyPort);
-            if (useSystemProxy) {
-                Log.Information($"Current proxy is default proxy of system.");
-            }
-            else {
-                Log.Information($"Current proxy is {proxyHost}:{proxyPort}.");
-            }
-            WebRequest.DefaultWebProxy = proxy;
-            HttpClient.DefaultProxy = proxy;
+    /// <summary>
+    /// Set the proxy.
+    /// </summary>
+    /// <param name="useSystemProxy">Use system proxy</param>
+    /// <param name="proxyHost">The proxy host.</param>
+    /// <param name="proxyPort">The proxy port.</param>
+    public static void SetProxy(bool useSystemProxy, string proxyHost = "", int proxyPort = 0)
+    {
+        var proxyAddress = $"{proxyHost}:{proxyPort}";
+        var proxy = useSystemProxy ? WebRequest.GetSystemWebProxy() : new WebProxy(proxyAddress, true);
+        if (useSystemProxy)
+        {
+            Log.Information($"Current proxy is default proxy of system.");
+        }
+        else
+        {
+            Log.Information($"Current proxy is {proxyAddress}.");
+        }
+
+        WebRequest.DefaultWebProxy = proxy;
+        HttpClient.DefaultProxy = proxy;
         }
 
         /// <summary>
         /// Open a link in the default browser.
         /// </summary>
         /// <param name="url">The link to open.</param>
-        public static void OpenLink(string url)
+    public static void OpenLink(string url)
         {
             var process = new ProcessStartInfo(url)
             {

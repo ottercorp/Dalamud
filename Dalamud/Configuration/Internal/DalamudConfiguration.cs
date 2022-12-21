@@ -279,7 +279,7 @@ internal sealed class DalamudConfiguration : IServiceType
     /// <summary>
     /// Gets or sets the proxy host address.
     /// </summary>
-    public string ProxyHost { get; set; } = "127.0.0.1";
+    public string ProxyHost { get; set; } = "http://127.0.0.1";
 
     /// <summary>
     /// Gets or sets the proxy port.

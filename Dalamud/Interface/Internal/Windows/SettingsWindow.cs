@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 
 using CheapLoc;
@@ -600,29 +603,70 @@ internal class SettingsWindow : Window
 
         ImGuiHelpers.ScaledDummy(12);
 
-            this.DrawFuckGFWSection();
+        this.DrawFuckGFWSection();
 
-            ImGuiHelpers.ScaledDummy(12);
+        ImGuiHelpers.ScaledDummy(12);
 
-            this.ProxySetting();
+        this.ProxySetting();
 
-            ImGuiHelpers.ScaledDummy(12);
+        ImGuiHelpers.ScaledDummy(12);
 
-            ImGui.TextColored(ImGuiColors.DalamudGrey, "Total memory used by Dalamud & Plugins: " + Util.FormatBytes(GC.GetTotalMemory(false)));
+        ImGui.TextColored(ImGuiColors.DalamudGrey, "Total memory used by Dalamud & Plugins: " + Util.FormatBytes(GC.GetTotalMemory(false)));
         }
 
-        private void ProxySetting() {
-                ImGui.Checkbox("Use System Proxy" , ref this.useSystemProxy);
-                if (!this.useSystemProxy)
+    private string proxyStatus = "Unknown";
+    private void ProxySetting()
+    {
+        ImGui.Checkbox("Use System Proxy" , ref this.useSystemProxy);
+        if (!this.useSystemProxy)
+        {
+            ImGui.Text("Proxy Host:");
+            ImGui.SameLine();
+            ImGui.InputText("##proxyHost", ref this.proxyHost, 65535);
+            ImGui.Text("Proxy Port:");
+            ImGui.SameLine();
+            ImGui.InputInt("##proxyPort", ref this.proxyPort);
+            ImGui.Text("Socks and Http proxy are supported now. Restart game to apply the proxy");
+        }
+
+        if (ImGui.Button("TestProxy"))
+        {
+            Task.Run(async () => {
+                try
                 {
-                    ImGui.Text("Proxy Host:");
-                    ImGui.SameLine();
-                    ImGui.InputText("##proxyHost", ref this.proxyHost, 65535);
-                    ImGui.Text("Proxy Port:");
-                    ImGui.SameLine();
-                    ImGui.InputInt("##proxyPort", ref this.proxyPort);
+                    var handler = new HttpClientHandler
+                    {
+                        Proxy = new WebProxy($"{this.proxyHost}:{this.proxyPort}", true),
+                    };
+                    var httpClient = new HttpClient(handler);
+                    httpClient.Timeout = TimeSpan.FromSeconds(3);
+                    _ = await httpClient.GetStringAsync("https://raw.githubusercontent.com/ottercorp/dalamud-distrib/main/version");
+                    this.proxyStatus = "Valid";
+                    }
+                catch (Exception)
+                {
+                    this.proxyStatus = "Invalid";
                 }
+            });
         }
+
+        var proxyStatusColor = ImGuiColors.DalamudWhite;
+        switch (this.proxyStatus)
+        {
+            case "Testing":
+                proxyStatusColor = ImGuiColors.DalamudYellow;
+                break;
+            case "Valid":
+                proxyStatusColor = ImGuiColors.ParsedGreen;
+                break;
+            case "Invalid":
+                proxyStatusColor = ImGuiColors.DalamudRed;
+                break;
+            default: break;
+        }
+
+        ImGui.TextColored(proxyStatusColor,$"The status of porxy: {this.proxyStatus}");
+    }
 
         private void FuckGFWAddDefault()
         {
