@@ -252,7 +252,8 @@ internal class PluginImageCache : IDisposable, IServiceType
             }
             catch (Exception ex)
             {
-                Log.Error(ex, $"An unexpected error occurred with the icon for {manifest.InternalName}");
+                // Log.Error(ex, $"An unexpected error occurred with the icon for {manifest.InternalName}");
+                Log.Verbose($"An unexpected error occurred with the icon for {manifest.InternalName}");
             }
         });
 
@@ -290,7 +291,8 @@ internal class PluginImageCache : IDisposable, IServiceType
             }
             catch (Exception ex)
             {
-                Log.Error(ex, $"An unexpected error occurred with the images for {manifest.InternalName}");
+                // Log.Error(ex, $"An unexpected error occurred with the images for {manifest.InternalName}");
+                Log.Verbose($"An unexpected error occurred with the images for {manifest.InternalName}");
             }
         });
 
