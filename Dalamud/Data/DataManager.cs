@@ -16,6 +16,8 @@ using Lumina;
 using Lumina.Data;
 using Lumina.Data.Files;
 using Lumina.Excel;
+using Lumina.Excel.GeneratedSheets;
+using Lumina.Text;
 using Newtonsoft.Json;
 using Serilog;
 
@@ -119,10 +121,37 @@ public sealed class DataManager : IDisposable, IServiceType
                 }
             });
             this.luminaResourceThread.Start();
+            ChangeWorldForCN();
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Could not download data.");
+        }
+    }
+
+    /// <summary>
+    /// 为国服服务器临时修正isPublic & DataCenter数据.
+    /// </summary>
+    private void ChangeWorldForCN()
+    {
+        var dcSheet = this.GameData.Excel.GetSheet<WorldDCGroupType>()!;
+        foreach (var (server,name) in CNWorld.ServerList)
+        {
+            var dc = dcSheet.GetRow(server);
+            dc.Name = new SeString(name);
+            if (dc.RowId == 201)
+            {
+                dc.RowId = 104;
+                dc.Region = 2;
+            }
+        }
+
+        var worldSheet = this.GameData.Excel.GetSheet<World>()!;
+        foreach (var (world,server) in CNWorld.WorldList)
+        {
+            var w = worldSheet.GetRow(world);
+            w.IsPublic = true;
+            w.DataCenter = new LazyRow<WorldDCGroupType>(this.GameData, server, Lumina.Data.Language.ChineseSimplified);
         }
     }
 
