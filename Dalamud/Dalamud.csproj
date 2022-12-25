@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <PropertyGroup Label="Feature">
-        <DalamudVersion>7.3.1.3</DalamudVersion>
+        <DalamudVersion>7.3.3.0</DalamudVersion>
         <Description>XIV Launcher addon framework</Description>
         <AssemblyVersion>$(DalamudVersion)</AssemblyVersion>
         <Version>$(DalamudVersion)</Version>
@@ -45,6 +45,11 @@
     <PropertyGroup Label="Configuration" Condition="'$(Configuration)'=='Debug'">
         <DefineConstants>DEBUG;TRACE</DefineConstants>
     </PropertyGroup>
+    <PropertyGroup Label="Configuration" Condition="'$(Configuration)'=='Release'">
+        <AppOutputBase>$(MSBuildProjectDirectory)\</AppOutputBase>
+        <PathMap>$(AppOutputBase)=C:\goatsoft\companysecrets\dalamud\</PathMap>
+    </PropertyGroup>
+
     <PropertyGroup Label="Warnings">
         <NoWarn>IDE0002;IDE0003;IDE1006;IDE0044;CA1822;CS1591;CS1701;CS1702</NoWarn>
         <!-- IDE1002 - Simplify member access -->
@@ -150,19 +155,4 @@
         <!-- writes the attribute to the customAssemblyInfo file -->
         <WriteCodeFragment Language="C#" OutputFile="$(CustomAssemblyInfoFile)" AssemblyAttributes="@(AssemblyAttributes)" />
     </Target>
-    <ItemGroup>
-      <None Remove="C:\Users\z_y_p\.nuget\packages\reloaded.assembler\1.0.10\build\FASMX64.DLL" />
-    </ItemGroup>
-    <ItemGroup>
-      <None Remove="C:\Users\z_y_p\.nuget\packages\reloaded.assembler\1.0.10\build\FASM-LICENSE.TXT" />
-    </ItemGroup>
-    <ItemGroup>
-      <None Remove="C:\Users\z_y_p\.nuget\packages\reloaded.assembler\1.0.10\build\FASM.DLL" />
-    </ItemGroup>
-    <ItemGroup>
-      <None Remove="C:\Users\z_y_p\.nuget\packages\reloaded.assembler\1.0.10\build\Reloaded.Assembler.targets" />
-    </ItemGroup>
-    <ItemGroup>
-      <None Remove="C:\Users\z_y_p\.nuget\packages\reloaded.assembler\1.0.10\build\Reloaded.Assembler.targets" />
-    </ItemGroup>
 </Project>
