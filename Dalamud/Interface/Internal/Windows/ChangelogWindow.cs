@@ -23,9 +23,9 @@ internal sealed class ChangelogWindow : Window, IDisposable
     public const string WarrantsChangelogForMajorMinor = "7.0.";
 
     private const string ChangeLog =
-        @"• 更新了 Dalamud 以与版本 6.2 兼容。
-• 让事情变得更快
-• 插件现在可以在保持安装状态时关闭，而不是完全删除
+        @"• 修复代理设置
+• 适配国服服务器、大区列表
+• 兼容ReShade5/GShade 4
 
 如果您发现任何问题或需要帮助，请查看常见问题解答，如果您需要帮助，请联系我们的 QQ频道
 谢谢，玩得开心！";
