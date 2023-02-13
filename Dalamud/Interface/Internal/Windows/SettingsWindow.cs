@@ -84,7 +84,7 @@ internal class SettingsWindow : Window
     private string proxyHost = string.Empty;
     private int proxyPort;
 
-        #region Experimental
+    #region Experimental
 
     private bool doPluginTest;
 
@@ -170,12 +170,12 @@ internal class SettingsWindow : Window
         }
     }
 
-        /// <inheritdoc/>
-        public override void OnOpen()
-        {
-            this.thirdRepoListChanged = false;
-            this.fuckGFWListChanged = false;
-            this.devPluginLocationsChanged = false;
+    /// <inheritdoc/>
+    public override void OnOpen()
+    {
+        this.thirdRepoListChanged = false;
+        this.fuckGFWListChanged = false;
+        this.devPluginLocationsChanged = false;
 
         var configuration = Service<DalamudConfiguration>.Get();
         this.dtrOrder = configuration.DtrOrder;
@@ -192,12 +192,12 @@ internal class SettingsWindow : Window
                           || interfaceManager.FontGamma != configuration.FontGammaLevel
                           || interfaceManager.UseAxis != configuration.UseAxisFontsFromGame;
 
-            ImGui.GetIO().FontGlobalScale = configuration.GlobalUiScale;
-            interfaceManager.FontGammaOverride = null;
-            interfaceManager.UseAxisOverride = null;
-            this.thirdRepoList = configuration.ThirdRepoList.Select(x => x.Clone()).ToList();
-            this.fuckGFWList = configuration.FuckGFWList.Select(x => x.Clone()).ToList();
-            this.devPluginLocations = configuration.DevPluginLoadLocations.Select(x => x.Clone()).ToList();
+        ImGui.GetIO().FontGlobalScale = configuration.GlobalUiScale;
+        interfaceManager.FontGammaOverride = null;
+        interfaceManager.UseAxisOverride = null;
+        this.thirdRepoList = configuration.ThirdRepoList.Select(x => x.Clone()).ToList();
+        this.fuckGFWList = configuration.FuckGFWList.Select(x => x.Clone()).ToList();
+        this.devPluginLocations = configuration.DevPluginLoadLocations.Select(x => x.Clone()).ToList();
 
         configuration.DtrOrder = this.dtrOrder;
         configuration.DtrIgnore = this.dtrIgnore;
@@ -612,12 +612,13 @@ internal class SettingsWindow : Window
         ImGuiHelpers.ScaledDummy(12);
 
         ImGui.TextColored(ImGuiColors.DalamudGrey, "Total memory used by Dalamud & Plugins: " + Util.FormatBytes(GC.GetTotalMemory(false)));
-        }
+    }
 
     private string proxyStatus = "Unknown";
+
     private void ProxySetting()
     {
-        ImGui.Checkbox("Use System Proxy" , ref this.useSystemProxy);
+        ImGui.Checkbox("Use System Proxy", ref this.useSystemProxy);
         if (!this.useSystemProxy)
         {
             ImGui.Text("Proxy Host:");
@@ -631,7 +632,8 @@ internal class SettingsWindow : Window
 
         if (ImGui.Button("TestProxy"))
         {
-            Task.Run(async () => {
+            Task.Run(async () =>
+            {
                 try
                 {
                     var handler = new HttpClientHandler
@@ -642,7 +644,7 @@ internal class SettingsWindow : Window
                     httpClient.Timeout = TimeSpan.FromSeconds(3);
                     _ = await httpClient.GetStringAsync("https://raw.githubusercontent.com/ottercorp/dalamud-distrib/main/version");
                     this.proxyStatus = "Valid";
-                    }
+                }
                 catch (Exception)
                 {
                     this.proxyStatus = "Invalid";
@@ -665,215 +667,215 @@ internal class SettingsWindow : Window
             default: break;
         }
 
-        ImGui.TextColored(proxyStatusColor,$"The status of porxy: {this.proxyStatus}");
+        ImGui.TextColored(proxyStatusColor, $"The status of porxy: {this.proxyStatus}");
     }
 
-        private void FuckGFWAddDefault()
+    private void FuckGFWAddDefault()
+    {
+        List<FuckGFWSettings> defaultFuckGFWSettings = new();
+        defaultFuckGFWSettings.Add(new FuckGFWSettings
         {
-            List<FuckGFWSettings> defaultFuckGFWSettings = new();
-            defaultFuckGFWSettings.Add(new FuckGFWSettings
-                {
-                    UrlRegex = @"https:\/\/raw\.githubusercontent\.com",
-                    ReplaceTo = "https://raw.fastgit.org/",
-                    IsEnabled = true,
-                });
-            defaultFuckGFWSettings.Add(new FuckGFWSettings
-                {
-                    UrlRegex = @"https:\/\/(?:gitee|github)\.com\/(.*)?\/(.*)?\/raw",
-                    ReplaceTo = "https://raw.fastgit.org/$1/$2",
-                    IsEnabled = true,
-                });
-            defaultFuckGFWSettings.Add(new FuckGFWSettings
-                {
-                    UrlRegex = @"https:\/\/github\.com\/(.*)?\/(.*)?\/releases\/download",
-                    ReplaceTo = "https://download.fastgit.org/$1/$2/releases/download",
-                    IsEnabled = true,
-                });
-            defaultFuckGFWSettings.ForEach(settings =>
-            {
-                if (!this.fuckGFWList.Any(fuckGFW => fuckGFW.UrlRegex.Equals(settings.UrlRegex)))
-                {
-                    this.fuckGFWList.Add(settings);
-                    this.fuckGFWListChanged = true;
-                }
-            });
-        }
-
-        private void DrawFuckGFWSection()
+            UrlRegex = @"https:\/\/raw\.githubusercontent\.com",
+            ReplaceTo = "https://raw.fastgit.org/",
+            IsEnabled = true,
+        });
+        defaultFuckGFWSettings.Add(new FuckGFWSettings
         {
-            ImGui.Text(Loc.Localize("DalamudSettingsFuckGFW", "Fuck GFW Replacements"));
-            if (this.fuckGFWListChanged)
+            UrlRegex = @"https:\/\/(?:gitee|github)\.com\/(.*)?\/(.*)?\/raw",
+            ReplaceTo = "https://raw.fastgit.org/$1/$2",
+            IsEnabled = true,
+        });
+        defaultFuckGFWSettings.Add(new FuckGFWSettings
+        {
+            UrlRegex = @"https:\/\/github\.com\/(.*)?\/(.*)?\/releases\/download",
+            ReplaceTo = "https://download.fastgit.org/$1/$2/releases/download",
+            IsEnabled = true,
+        });
+        defaultFuckGFWSettings.ForEach(settings =>
+        {
+            if (!this.fuckGFWList.Any(fuckGFW => fuckGFW.UrlRegex.Equals(settings.UrlRegex)))
             {
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.HealerGreen);
-                ImGui.SameLine();
-                ImGui.Text(Loc.Localize("DalamudSettingsChanged", "(Changed)"));
-                ImGui.PopStyleColor();
-            }
-
-            if (ImGui.Button(Loc.Localize("DalamudFuckGFWAddDefault", "Add Default")))
-            {
-                this.FuckGFWAddDefault();
-            }
-
-            ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingFuckGFWHint", "Add fuck GFW replacements."));
-            ImGui.TextColored(ImGuiColors.DalamudRed, Loc.Localize("DalamudSettingFuckGFWWarning", "We cannot take care of all of your network conditions.\nThink before adding new replacements."));
-
-            ImGuiHelpers.ScaledDummy(5);
-
-            ImGui.Columns(5);
-            ImGui.SetColumnWidth(0, 18 + (5 * ImGuiHelpers.GlobalScale));
-            var totalTextWidth = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X) - (18 + 16 + 14) - ((5 + 45 + 26) * ImGuiHelpers.GlobalScale);
-            ImGui.SetColumnWidth(1, totalTextWidth / 2);
-            ImGui.SetColumnWidth(2, totalTextWidth / 2);
-            ImGui.SetColumnWidth(3, 16 + (45 * ImGuiHelpers.GlobalScale));
-            ImGui.SetColumnWidth(4, 14 + (26 * ImGuiHelpers.GlobalScale));
-
-            ImGui.Separator();
-
-            ImGui.Text("#");
-            ImGui.NextColumn();
-            ImGui.Text("URL Regex");
-            ImGui.NextColumn();
-            ImGui.Text("Replace To");
-            ImGui.NextColumn();
-            ImGui.Text("Enabled");
-            ImGui.NextColumn();
-            ImGui.Text(string.Empty);
-            ImGui.NextColumn();
-
-            ImGui.Separator();
-
-            FuckGFWSettings fuckToRemove = null;
-
-            var fuckNumber = 0;
-            foreach (var fuckGFWSetting in this.fuckGFWList)
-            {
-                var isEnabled = fuckGFWSetting.IsEnabled;
-
-                ImGui.PushID($"thirdRepo_{fuckGFWSetting.UrlRegex}");
-
-                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (ImGui.GetColumnWidth() / 2) - 8 - (ImGui.CalcTextSize(fuckNumber.ToString()).X / 2));
-                ImGui.Text(fuckNumber.ToString());
-
-                ImGui.NextColumn();
-                ImGui.SetNextItemWidth(-1);
-                var urlRegex = fuckGFWSetting.UrlRegex;
-                if (ImGui.InputText($"##fuckGFWInput", ref urlRegex, 65535, ImGuiInputTextFlags.EnterReturnsTrue))
-                {
-                    var contains = this.fuckGFWList.Select(repo => repo.UrlRegex).Contains(urlRegex);
-                    if (fuckGFWSetting.UrlRegex == urlRegex)
-                    {
-                        // no change.
-                    }
-                    else if (contains && fuckGFWSetting.UrlRegex != urlRegex)
-                    {
-                        this.fuckGFWAddError = Loc.Localize("DalamudFuckGFWExists", "Fuck GFW exists.");
-                        Task.Delay(5000).ContinueWith(t => this.fuckGFWAddError = string.Empty);
-                    }
-                    else
-                    {
-                        fuckGFWSetting.UrlRegex = urlRegex;
-                        this.fuckGFWListChanged |= urlRegex != fuckGFWSetting.UrlRegex;
-                    }
-                }
-
-                ImGui.NextColumn();
-                ImGui.SetNextItemWidth(-1);
-                var replaceTo = fuckGFWSetting.ReplaceTo;
-                if (ImGui.InputText($"##fuckGFWReplaceInput", ref replaceTo, 65535, ImGuiInputTextFlags.EnterReturnsTrue))
-                {
-                    var contains = this.fuckGFWList.Select(repo => repo.UrlRegex).Contains(urlRegex);
-                    contains &= this.fuckGFWList.Select(repo => repo.ReplaceTo).Contains(replaceTo);
-                    if (fuckGFWSetting.ReplaceTo == replaceTo)
-                    {
-                        // no change.
-                    }
-                    else
-                    {
-                        fuckGFWSetting.ReplaceTo = replaceTo;
-                        this.fuckGFWListChanged |= replaceTo != fuckGFWSetting.ReplaceTo;
-                    }
-                }
-
-                ImGui.NextColumn();
-                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (ImGui.GetColumnWidth() / 2) - 7 - (12 * ImGuiHelpers.GlobalScale));
-                if (ImGui.Checkbox("##fuckGFWCheck", ref isEnabled))
-                {
-                    this.fuckGFWListChanged |= fuckGFWSetting.IsEnabled != isEnabled;
-                    fuckGFWSetting.IsEnabled = isEnabled;
-                }
-
-                ImGui.NextColumn();
-                if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
-                {
-                    fuckToRemove = fuckGFWSetting;
-                }
-
-                ImGui.PopID();
-
-                ImGui.NextColumn();
-                ImGui.Separator();
-
-                fuckNumber++;
-            }
-
-            if (fuckToRemove != null)
-            {
-                this.fuckGFWList.Remove(fuckToRemove);
+                this.fuckGFWList.Add(settings);
                 this.fuckGFWListChanged = true;
             }
+        });
+    }
+
+    private void DrawFuckGFWSection()
+    {
+        ImGui.Text(Loc.Localize("DalamudSettingsFuckGFW", "Fuck GFW Replacements"));
+        if (this.fuckGFWListChanged)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.HealerGreen);
+            ImGui.SameLine();
+            ImGui.Text(Loc.Localize("DalamudSettingsChanged", "(Changed)"));
+            ImGui.PopStyleColor();
+        }
+
+        if (ImGui.Button(Loc.Localize("DalamudFuckGFWAddDefault", "Add Default")))
+        {
+            this.FuckGFWAddDefault();
+        }
+
+        ImGui.TextColored(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingFuckGFWHint", "Add fuck GFW replacements."));
+        ImGui.TextColored(ImGuiColors.DalamudRed, Loc.Localize("DalamudSettingFuckGFWWarning", "We cannot take care of all of your network conditions.\nThink before adding new replacements."));
+
+        ImGuiHelpers.ScaledDummy(5);
+
+        ImGui.Columns(5);
+        ImGui.SetColumnWidth(0, 18 + (5 * ImGuiHelpers.GlobalScale));
+        var totalTextWidth = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X) - (18 + 16 + 14) - ((5 + 45 + 26) * ImGuiHelpers.GlobalScale);
+        ImGui.SetColumnWidth(1, totalTextWidth / 2);
+        ImGui.SetColumnWidth(2, totalTextWidth / 2);
+        ImGui.SetColumnWidth(3, 16 + (45 * ImGuiHelpers.GlobalScale));
+        ImGui.SetColumnWidth(4, 14 + (26 * ImGuiHelpers.GlobalScale));
+
+        ImGui.Separator();
+
+        ImGui.Text("#");
+        ImGui.NextColumn();
+        ImGui.Text("URL Regex");
+        ImGui.NextColumn();
+        ImGui.Text("Replace To");
+        ImGui.NextColumn();
+        ImGui.Text("Enabled");
+        ImGui.NextColumn();
+        ImGui.Text(string.Empty);
+        ImGui.NextColumn();
+
+        ImGui.Separator();
+
+        FuckGFWSettings fuckToRemove = null;
+
+        var fuckNumber = 0;
+        foreach (var fuckGFWSetting in this.fuckGFWList)
+        {
+            var isEnabled = fuckGFWSetting.IsEnabled;
+
+            ImGui.PushID($"thirdRepo_{fuckGFWSetting.UrlRegex}");
 
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (ImGui.GetColumnWidth() / 2) - 8 - (ImGui.CalcTextSize(fuckNumber.ToString()).X / 2));
             ImGui.Text(fuckNumber.ToString());
+
             ImGui.NextColumn();
             ImGui.SetNextItemWidth(-1);
-            ImGui.InputText("##fuckGFWUrlRegexInput", ref this.fuckGFWTempUrlRegex, 300);
-            ImGui.NextColumn();
-            ImGui.SetNextItemWidth(-1);
-            ImGui.InputText("##fuckGFWReplaceToInput", ref this.fuckGFWTempReplaceTo, 300);
-            ImGui.NextColumn();
-            // Enabled button
-            ImGui.NextColumn();
-            if (!string.IsNullOrEmpty(this.fuckGFWTempUrlRegex) && ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
+            var urlRegex = fuckGFWSetting.UrlRegex;
+            if (ImGui.InputText($"##fuckGFWInput", ref urlRegex, 65535, ImGuiInputTextFlags.EnterReturnsTrue))
             {
-                this.fuckGFWTempUrlRegex = this.fuckGFWTempUrlRegex.TrimEnd();
-                if (this.fuckGFWList.Any(r => string.Equals(r.UrlRegex, this.fuckGFWTempUrlRegex, StringComparison.InvariantCultureIgnoreCase)))
+                var contains = this.fuckGFWList.Select(repo => repo.UrlRegex).Contains(urlRegex);
+                if (fuckGFWSetting.UrlRegex == urlRegex)
                 {
-                    this.fuckGFWAddError = Loc.Localize("DalamudFuckGFWExists", "Fuck GFW already exists.");
+                    // no change.
+                }
+                else if (contains && fuckGFWSetting.UrlRegex != urlRegex)
+                {
+                    this.fuckGFWAddError = Loc.Localize("DalamudFuckGFWExists", "Fuck GFW exists.");
                     Task.Delay(5000).ContinueWith(t => this.fuckGFWAddError = string.Empty);
                 }
                 else
                 {
-                    this.fuckGFWList.Add(new FuckGFWSettings
-                    {
-                        UrlRegex = this.fuckGFWTempUrlRegex,
-                        ReplaceTo = this.fuckGFWTempReplaceTo,
-                        IsEnabled = true,
-                    });
-                    this.fuckGFWListChanged = true;
-                    this.fuckGFWTempUrlRegex = string.Empty;
-                    this.fuckGFWTempReplaceTo = string.Empty;
+                    fuckGFWSetting.UrlRegex = urlRegex;
+                    this.fuckGFWListChanged |= urlRegex != fuckGFWSetting.UrlRegex;
                 }
             }
 
-            ImGui.Columns(1);
-
-            if (!string.IsNullOrEmpty(this.fuckGFWAddError))
+            ImGui.NextColumn();
+            ImGui.SetNextItemWidth(-1);
+            var replaceTo = fuckGFWSetting.ReplaceTo;
+            if (ImGui.InputText($"##fuckGFWReplaceInput", ref replaceTo, 65535, ImGuiInputTextFlags.EnterReturnsTrue))
             {
-                ImGui.TextColored(new Vector4(1, 0, 0, 1), this.fuckGFWAddError);
+                var contains = this.fuckGFWList.Select(repo => repo.UrlRegex).Contains(urlRegex);
+                contains &= this.fuckGFWList.Select(repo => repo.ReplaceTo).Contains(replaceTo);
+                if (fuckGFWSetting.ReplaceTo == replaceTo)
+                {
+                    // no change.
+                }
+                else
+                {
+                    fuckGFWSetting.ReplaceTo = replaceTo;
+                    this.fuckGFWListChanged |= replaceTo != fuckGFWSetting.ReplaceTo;
+                }
+            }
+
+            ImGui.NextColumn();
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (ImGui.GetColumnWidth() / 2) - 7 - (12 * ImGuiHelpers.GlobalScale));
+            if (ImGui.Checkbox("##fuckGFWCheck", ref isEnabled))
+            {
+                this.fuckGFWListChanged |= fuckGFWSetting.IsEnabled != isEnabled;
+                fuckGFWSetting.IsEnabled = isEnabled;
+            }
+
+            ImGui.NextColumn();
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
+            {
+                fuckToRemove = fuckGFWSetting;
+            }
+
+            ImGui.PopID();
+
+            ImGui.NextColumn();
+            ImGui.Separator();
+
+            fuckNumber++;
+        }
+
+        if (fuckToRemove != null)
+        {
+            this.fuckGFWList.Remove(fuckToRemove);
+            this.fuckGFWListChanged = true;
+        }
+
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (ImGui.GetColumnWidth() / 2) - 8 - (ImGui.CalcTextSize(fuckNumber.ToString()).X / 2));
+        ImGui.Text(fuckNumber.ToString());
+        ImGui.NextColumn();
+        ImGui.SetNextItemWidth(-1);
+        ImGui.InputText("##fuckGFWUrlRegexInput", ref this.fuckGFWTempUrlRegex, 300);
+        ImGui.NextColumn();
+        ImGui.SetNextItemWidth(-1);
+        ImGui.InputText("##fuckGFWReplaceToInput", ref this.fuckGFWTempReplaceTo, 300);
+        ImGui.NextColumn();
+        // Enabled button
+        ImGui.NextColumn();
+        if (!string.IsNullOrEmpty(this.fuckGFWTempUrlRegex) && ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
+        {
+            this.fuckGFWTempUrlRegex = this.fuckGFWTempUrlRegex.TrimEnd();
+            if (this.fuckGFWList.Any(r => string.Equals(r.UrlRegex, this.fuckGFWTempUrlRegex, StringComparison.InvariantCultureIgnoreCase)))
+            {
+                this.fuckGFWAddError = Loc.Localize("DalamudFuckGFWExists", "Fuck GFW already exists.");
+                Task.Delay(5000).ContinueWith(t => this.fuckGFWAddError = string.Empty);
+            }
+            else
+            {
+                this.fuckGFWList.Add(new FuckGFWSettings
+                {
+                    UrlRegex = this.fuckGFWTempUrlRegex,
+                    ReplaceTo = this.fuckGFWTempReplaceTo,
+                    IsEnabled = true,
+                });
+                this.fuckGFWListChanged = true;
+                this.fuckGFWTempUrlRegex = string.Empty;
+                this.fuckGFWTempReplaceTo = string.Empty;
             }
         }
 
-        private void DrawCustomReposSection()
+        ImGui.Columns(1);
+
+        if (!string.IsNullOrEmpty(this.fuckGFWAddError))
         {
-            ImGui.Text(Loc.Localize("DalamudSettingsCustomRepo", "Custom Plugin Repositories"));
-            if (this.thirdRepoListChanged)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.HealerGreen);
-                ImGui.SameLine();
-                ImGui.Text(Loc.Localize("DalamudSettingsChanged", "(Changed)"));
-                ImGui.PopStyleColor();
-            }
+            ImGui.TextColored(new Vector4(1, 0, 0, 1), this.fuckGFWAddError);
+        }
+    }
+
+    private void DrawCustomReposSection()
+    {
+        ImGui.Text(Loc.Localize("DalamudSettingsCustomRepo", "Custom Plugin Repositories"));
+        if (this.thirdRepoListChanged)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.HealerGreen);
+            ImGui.SameLine();
+            ImGui.Text(Loc.Localize("DalamudSettingsChanged", "(Changed)"));
+            ImGui.PopStyleColor();
+        }
 
         ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingCustomRepoHint", "Add custom plugin repositories."));
         ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudRed, Loc.Localize("DalamudSettingCustomRepoWarning", "We cannot take any responsibility for third-party plugins and repositories."));
