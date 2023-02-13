@@ -172,7 +172,7 @@ public sealed class EntryPoint
 
             try
             {
-                Util.SetProxy(configuration.UseSystemProxy, configuration.ProxyHost, configuration.ProxyPort);
+                Util.SetProxy(configuration.ProxyType, configuration.ProxyProtocol, configuration.ProxyHost, configuration.ProxyPort);
             }
             catch (Exception ex)
             {

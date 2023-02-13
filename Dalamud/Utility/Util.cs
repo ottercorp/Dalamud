@@ -567,25 +567,38 @@ public static class Util
         return Check1() || Check2() || Check3();
     }
 
+    public enum ProxyType
+    {
+        DisableProxy,
+        SystemProxy,
+        ManualProxy,
+    }
+
     /// <summary>
     /// Set the proxy.
     /// </summary>
-    /// <param name="useSystemProxy">Use system proxy</param>
+    /// <param name="proxyType">Disable proxy/System proxy/Manual proxy.</param>
+    /// <param name="proxyProtocol">The protocol of proxy.</param>
     /// <param name="proxyHost">The proxy host.</param>
     /// <param name="proxyPort">The proxy port.</param>
-    public static void SetProxy(bool useSystemProxy, string proxyHost = "", int proxyPort = 0)
+    public static void SetProxy(ProxyType proxyType, string proxyProtocol, string proxyHost, int proxyPort)
     {
-        var proxyAddress = $"{proxyHost}:{proxyPort}";
-        var proxy = useSystemProxy ? WebRequest.GetSystemWebProxy() : new WebProxy(proxyAddress, true);
-        if (useSystemProxy)
+        var proxy = proxyType switch
         {
-            Log.Information($"Current proxy is default proxy of system.");
-        }
-        else
-        {
-            Log.Information($"Current proxy is {proxyAddress}.");
-        }
+            Util.ProxyType.DisableProxy => null,
+            Util.ProxyType.SystemProxy => WebRequest.GetSystemWebProxy(),
+            Util.ProxyType.ManualProxy => new WebProxy($"{proxyProtocol}://{proxyHost}:{proxyPort}", true),
+            _ => throw new NotImplementedException(),
+        };
 
+        var msg = proxyType switch
+        {
+            Util.ProxyType.DisableProxy => "Disable proxy",
+            Util.ProxyType.SystemProxy => "Use System proxy",
+            Util.ProxyType.ManualProxy => $"Use {proxyProtocol}://{proxyHost}:{proxyPort}",
+            _ => throw new NotImplementedException(),
+        };
+        Console.WriteLine(msg);
         WebRequest.DefaultWebProxy = proxy;
         HttpClient.DefaultProxy = proxy;
         }

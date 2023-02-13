@@ -17,6 +17,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Internal.Windows.PluginInstaller;
 using Dalamud.Interface.Windowing;
+using Dalamud.Logging;
 using Dalamud.Plugin.Internal;
 using Dalamud.Utility;
 using ImGuiNET;
@@ -30,6 +31,7 @@ internal class SettingsWindow : Window
 {
     private readonly string[] languages;
     private readonly string[] locLanguages;
+    private readonly string[] proxyProtocols;
 
     private int langIndex;
 
@@ -80,9 +82,14 @@ internal class SettingsWindow : Window
     private bool doButtonsSystemMenu;
     private bool disableRmtFiltering;
 
-    private bool useSystemProxy;
+    private Util.ProxyType proxyType;
+    private string proxyProtocol = string.Empty;
+    private int proxyProtocolIndex;
     private string proxyHost = string.Empty;
     private int proxyPort;
+
+    private string proxyStatus = "Unknown";
+
 
     #region Experimental
 
@@ -136,10 +143,6 @@ internal class SettingsWindow : Window
         this.doButtonsSystemMenu = configuration.DoButtonsSystemMenu;
         this.disableRmtFiltering = configuration.DisableRmtFiltering;
 
-        this.useSystemProxy = configuration.UseSystemProxy;
-        this.proxyHost = configuration.ProxyHost;
-        this.proxyPort = configuration.ProxyPort;
-
         this.languages = Localization.ApplicableLangCodes.Prepend("en").ToArray();
         this.langIndex = Array.IndexOf(this.languages, configuration.EffectiveLanguage);
         if (this.langIndex == -1)
@@ -168,6 +171,16 @@ internal class SettingsWindow : Window
         {
             this.locLanguages = this.languages; // Languages not localized, only codes.
         }
+
+        this.proxyType = configuration.ProxyType;
+        this.proxyHost = configuration.ProxyHost;
+        this.proxyPort = configuration.ProxyPort;
+
+        this.proxyProtocols = new string[] { "http", "https", "socks5" };
+        this.proxyProtocol = configuration.ProxyProtocol;
+        this.proxyProtocolIndex = Array.IndexOf(this.proxyProtocols, this.proxyProtocol);
+        if (this.proxyProtocolIndex == -1)
+            this.proxyProtocolIndex = 0;
     }
 
     /// <inheritdoc/>
@@ -614,40 +627,57 @@ internal class SettingsWindow : Window
         ImGui.TextColored(ImGuiColors.DalamudGrey, "Total memory used by Dalamud & Plugins: " + Util.FormatBytes(GC.GetTotalMemory(false)));
     }
 
-    private string proxyStatus = "Unknown";
-
     private void ProxySetting()
     {
-        ImGui.Checkbox("Use System Proxy", ref this.useSystemProxy);
-        if (!this.useSystemProxy)
+        ImGui.Text("代理设置");
+        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, "设置Dalamud所使用的网络代理,会影响到插件库的连接,保存后重启游戏生效");
+        var proxyType = (int)this.proxyType;
+        ImGui.RadioButton("不使用代理", ref proxyType, (int)Util.ProxyType.DisableProxy);
+        ImGui.RadioButton("使用系统代理", ref proxyType, (int)Util.ProxyType.SystemProxy);
+        ImGui.RadioButton("手动配置代理", ref proxyType, (int)Util.ProxyType.ManualProxy);
+        if (proxyType == (int)Util.ProxyType.ManualProxy)
         {
-            ImGui.Text("Proxy Host:");
+            ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, "在更改下方选项时，请确保你知道你在做什么，否则不要随便更改。");
+            ImGui.Text("协议");
             ImGui.SameLine();
-            ImGui.InputText("##proxyHost", ref this.proxyHost, 65535);
-            ImGui.Text("Proxy Port:");
+            ImGui.Combo("##proxyProtocol", ref this.proxyProtocolIndex, this.proxyProtocols, this.proxyProtocols.Length);
+            ImGui.Text("地址");
+            ImGui.SameLine();
+            ImGui.InputText("##proxyHost", ref this.proxyHost, 100);
+            ImGui.Text("端口");
             ImGui.SameLine();
             ImGui.InputInt("##proxyPort", ref this.proxyPort);
-            ImGui.Text("Socks and Http proxy are supported now. Restart game to apply the proxy");
+            this.proxyProtocol = this.proxyProtocols[this.proxyProtocolIndex];
         }
 
-        if (ImGui.Button("TestProxy"))
+        this.proxyType = (Util.ProxyType)proxyType;
+
+        if (ImGui.Button("测试GitHub连接"))
         {
             Task.Run(async () =>
             {
                 try
                 {
+                    this.proxyStatus = "测试中";
+                    var proxy = this.proxyType switch
+                    {
+                        Util.ProxyType.DisableProxy => null,
+                        Util.ProxyType.SystemProxy => WebRequest.GetSystemWebProxy(),
+                        Util.ProxyType.ManualProxy => new WebProxy($"{this.proxyProtocol}://{this.proxyHost}:{this.proxyPort}", true),
+                        _ => throw new NotImplementedException(),
+                    };
                     var handler = new HttpClientHandler
                     {
-                        Proxy = new WebProxy($"{this.proxyHost}:{this.proxyPort}", true),
+                        Proxy = proxy,
                     };
                     var httpClient = new HttpClient(handler);
                     httpClient.Timeout = TimeSpan.FromSeconds(3);
                     _ = await httpClient.GetStringAsync("https://raw.githubusercontent.com/ottercorp/dalamud-distrib/main/version");
-                    this.proxyStatus = "Valid";
+                    this.proxyStatus = "有效";
                 }
                 catch (Exception)
                 {
-                    this.proxyStatus = "Invalid";
+                    this.proxyStatus = "无效";
                 }
             });
         }
@@ -655,19 +685,19 @@ internal class SettingsWindow : Window
         var proxyStatusColor = ImGuiColors.DalamudWhite;
         switch (this.proxyStatus)
         {
-            case "Testing":
+            case "测试中":
                 proxyStatusColor = ImGuiColors.DalamudYellow;
                 break;
-            case "Valid":
+            case "有效":
                 proxyStatusColor = ImGuiColors.ParsedGreen;
                 break;
-            case "Invalid":
+            case "无效":
                 proxyStatusColor = ImGuiColors.DalamudRed;
                 break;
             default: break;
         }
 
-        ImGui.TextColored(proxyStatusColor, $"The status of porxy: {this.proxyStatus}");
+        ImGui.TextColored(proxyStatusColor, $"代理测试结果: {this.proxyStatus}");
     }
 
     private void FuckGFWAddDefault()
@@ -1261,11 +1291,12 @@ internal class SettingsWindow : Window
         configuration.DoButtonsSystemMenu = this.doButtonsSystemMenu;
         configuration.DisableRmtFiltering = this.disableRmtFiltering;
 
-        configuration.UseSystemProxy = this.useSystemProxy;
+        configuration.ProxyType = this.proxyType;
+        configuration.ProxyProtocol = this.proxyProtocol;
         configuration.ProxyHost = this.proxyHost;
         configuration.ProxyPort = this.proxyPort;
 
-        Util.SetProxy(configuration.UseSystemProxy, configuration.ProxyHost, configuration.ProxyPort);
+        Util.SetProxy(configuration.ProxyType, configuration.ProxyProtocol, configuration.ProxyHost, configuration.ProxyPort);
 
         configuration.QueueSave();
 

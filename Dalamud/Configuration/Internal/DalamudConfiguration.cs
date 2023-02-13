@@ -272,14 +272,19 @@ internal sealed class DalamudConfiguration : IServiceType
     public bool DisableRmtFiltering { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether or not the system default proxy should be used.
+    /// Gets or sets a value what type proxy Dalamud will use.
     /// </summary>
-    public bool UseSystemProxy { get; set; } = true;
+    public Util.ProxyType ProxyType { get; set; } = Util.ProxyType.DisableProxy;
+
+    /// <summary>
+    /// Gets or sets a value what type proxy Dalamud will use.
+    /// </summary>
+    public string ProxyProtocol { get; set; } = "socks5";
 
     /// <summary>
     /// Gets or sets the proxy host address.
     /// </summary>
-    public string ProxyHost { get; set; } = "http://127.0.0.1";
+    public string ProxyHost { get; set; } = "127.0.0.1";
 
     /// <summary>
     /// Gets or sets the proxy port.

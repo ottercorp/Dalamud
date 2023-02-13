@@ -23,9 +23,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
     public const string WarrantsChangelogForMajorMinor = "7.0.";
 
     private const string ChangeLog =
-        @"• 修复代理设置
-• 适配国服服务器、大区列表
-• 兼容ReShade5/GShade 4
+        @"• 此次更新旧的代理设置将会被重置，请重新设置（Dalamud设置-测试版-代理设置）
 
 如果您发现任何问题或需要帮助，请查看常见问题解答，如果您需要帮助，请联系我们的 QQ频道
 谢谢，玩得开心！";
