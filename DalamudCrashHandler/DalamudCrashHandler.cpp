@@ -739,14 +739,36 @@ int main() {
 
         std::cout << "Crash triggered" << std::endl;
 
+        /*
+        Hard won wisdom: changing symbol path with SymSetSearchPath() after modules
+        have been loaded (invadeProcess=TRUE in SymInitialize() or SymRefreshModuleList())
+        doesn't work.
+        I had to provide symbol path in SymInitialize() (and either invadeProcess=TRUE
+        or invadeProcess=FALSE and call SymRefreshModuleList()). There's probably
+        a way to force it, but I'm happy I found a way that works.
+
+        https://github.com/sumatrapdfreader/sumatrapdf/blob/master/src/utils/DbgHelpDyn.cpp
+        */
+        
         if (g_bSymbolsAvailable) {
             SymRefreshModuleList(g_hProcess);
-        } else if (g_bSymbolsAvailable = SymInitialize(g_hProcess, nullptr, true); g_bSymbolsAvailable) {
-            if (!assetDir.empty()) {
-                if (!SymSetSearchPathW(g_hProcess, std::format(L".;{}", (assetDir / "UIRes" / "pdb").wstring()).c_str()))
-                    std::wcerr << std::format(L"SymSetSearchPathW error: 0x{:x}", GetLastError()) << std::endl;
-            }
-        } else {
+        }
+        else if(!assetDir.empty())
+        {
+            auto symbol_search_path = std::format(L".;{}", (assetDir / "UIRes" / "pdb").wstring());
+            
+            g_bSymbolsAvailable = SymInitializeW(g_hProcess, symbol_search_path.c_str(), true);
+            std::wcout << std::format(L"Init symbols with PDB at {}", symbol_search_path) << std::endl;
+
+            SymRefreshModuleList(g_hProcess);
+        }
+        else
+        {
+            g_bSymbolsAvailable = SymInitializeW(g_hProcess, nullptr, true);
+            std::cout << "Init symbols without PDB" << std::endl;
+        }
+        
+        if (!g_bSymbolsAvailable) {
             std::wcerr << std::format(L"SymInitialize error: 0x{:x}", GetLastError()) << std::endl;
         }
 
