@@ -26,7 +26,7 @@ internal class DalamudChangelogManager : IDisposable
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     public async Task ReloadChangelogAsync()
     {
-        this.Changelogs = await this.client.GetFromJsonAsync<List<DalamudChangelog>>(ChangelogUrl);
+        this.Changelogs ??= await this.client.GetFromJsonAsync<List<DalamudChangelog>>(ChangelogUrl);
     }
 
     /// <inheritdoc/>
