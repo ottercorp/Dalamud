@@ -606,15 +606,16 @@ Thanks and have fun!";
     /// Reload the PluginMaster for each repo, filter, and event that the list has updated.
     /// </summary>
     /// <param name="notify">Whether to notify that available plugins have changed afterwards.</param>
+    /// <param name="skipCache">Skip MemoryCache.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    public async Task ReloadPluginMastersAsync(bool notify = true)
+    public async Task ReloadPluginMastersAsync(bool notify = true, bool skipCache = false)
     {
         Log.Information("Now reloading all PluginMasters...");
 
         Debug.Assert(!this.Repos.First().IsThirdParty, "First repository should be main repository");
-        await this.Repos.First().ReloadPluginMasterAsync(); // Load official repo first
+        await this.Repos.First().ReloadPluginMasterAsync(skipCache); // Load official repo first
 
-        await Task.WhenAll(this.Repos.Skip(1).Select(repo => repo.ReloadPluginMasterAsync()));
+        await Task.WhenAll(this.Repos.Skip(1).Select(repo => repo.ReloadPluginMasterAsync(skipCache)));
 
         Log.Information("PluginMasters reloaded, now refiltering...");
 

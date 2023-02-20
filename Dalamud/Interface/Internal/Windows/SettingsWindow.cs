@@ -1300,7 +1300,7 @@ internal class SettingsWindow : Window
 
         configuration.QueueSave();
 
-        _ = Service<PluginManager>.Get().ReloadPluginMastersAsync();
+        _ = Service<PluginManager>.Get().ReloadPluginMastersAsync(skipCache: true);
         Service<InterfaceManager>.Get().RebuildFonts();
     }
 }

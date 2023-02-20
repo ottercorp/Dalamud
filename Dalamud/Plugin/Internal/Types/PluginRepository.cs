@@ -6,6 +6,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Caching.Abstractions;
+using Microsoft.Extensions.Caching.InMemory;
 
 using Dalamud.Logging.Internal;
 using Newtonsoft.Json;
@@ -24,7 +26,8 @@ internal class PluginRepository
 
     private static readonly ModuleLog Log = new("PLUGINR");
 
-    private static readonly HttpClient HttpClient = new()
+    private static readonly InMemoryCacheHandler CacheHandler = new InMemoryCacheHandler(new HttpClientHandler(), CacheExpirationProvider.CreateSimple(TimeSpan.FromHours(3), TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(0)));
+    private static readonly HttpClient HttpClient = new(CacheHandler)
     {
         Timeout = TimeSpan.FromSeconds(20),
         DefaultRequestHeaders =
@@ -81,8 +84,9 @@ internal class PluginRepository
     /// <summary>
     /// Reload the plugin master asynchronously in a task.
     /// </summary>
+    /// <param name="skipCache">Skip MemoryCache.</param>
     /// <returns>The new state.</returns>
-    public async Task ReloadPluginMasterAsync()
+    public async Task ReloadPluginMasterAsync(bool skipCache)
     {
         this.State = PluginRepositoryState.InProgress;
         this.PluginMaster = new List<RemotePluginManifest>().AsReadOnly();
@@ -90,6 +94,12 @@ internal class PluginRepository
         try
         {
             Log.Information($"Fetching repo: {this.PluginMasterUrl}");
+
+            if (skipCache)
+            {
+                CacheHandler.InvalidateCache(new Uri(this.PluginMasterUrl));
+                Log.Information($"Cache Clear: {this.PluginMasterUrl}");
+            }
 
             using var response = await HttpClient.GetAsync(this.PluginMasterUrl);
             response.EnsureSuccessStatusCode();
@@ -143,6 +153,9 @@ internal class PluginRepository
 
             Log.Information($"Successfully fetched repo: {this.PluginMasterUrl}");
             this.State = PluginRepositoryState.Success;
+
+            var stats = CacheHandler.StatsProvider.GetStatistics().Total;
+            Log.Information($"Cache: TotalRequests:{stats.TotalRequests}/CacheHit:{stats.CacheHit}/CacheMiss:{stats.CacheMiss}");
         }
         catch (Exception ex)
         {
