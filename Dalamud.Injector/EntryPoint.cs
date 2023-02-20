@@ -280,8 +280,16 @@ namespace Dalamud.Injector
                 i--;
             }
 
-            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var xivlauncherDir = Path.Combine(appDataDir, "XIVLauncher");
+            // for otters
+            // link dalamud\bin\debug folder to XIVLauncherCN\Roaming\addon\Hooks
+            // kaigua easier!
+            var baseDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var xivlauncherDir = Path.Combine(baseDirectory, "..", "..", "..", "..", "Roaming");
+            if (!Directory.Exists(xivlauncherDir))
+            {
+                var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                xivlauncherDir = Path.Combine(appDataDir, "XIVLauncher");
+            }
 
             workingDirectory ??= Directory.GetCurrentDirectory();
             configurationPath ??= Path.Combine(xivlauncherDir, "dalamudConfig.json");
