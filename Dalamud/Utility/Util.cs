@@ -567,41 +567,23 @@ public static class Util
         return Check1() || Check2() || Check3();
     }
 
-    public enum ProxyType
-    {
-        DisableProxy,
-        SystemProxy,
-        ManualProxy,
-    }
-
     /// <summary>
     /// Set the proxy.
     /// </summary>
-    /// <param name="proxyType">Disable proxy/System proxy/Manual proxy.</param>
+    /// <param name="useManualProxy">System proxy/Manual proxy.</param>
     /// <param name="proxyProtocol">The protocol of proxy.</param>
     /// <param name="proxyHost">The proxy host.</param>
     /// <param name="proxyPort">The proxy port.</param>
-    public static void SetProxy(ProxyType proxyType, string proxyProtocol, string proxyHost, int proxyPort)
+    public static void SetProxy(bool useManualProxy, string proxyProtocol, string proxyHost, int proxyPort)
     {
-        var proxy = proxyType switch
+        if (useManualProxy)
         {
-            Util.ProxyType.DisableProxy => null,
-            Util.ProxyType.SystemProxy => WebRequest.GetSystemWebProxy(),
-            Util.ProxyType.ManualProxy => new WebProxy($"{proxyProtocol}://{proxyHost}:{proxyPort}", true),
-            _ => throw new NotImplementedException(),
-        };
-
-        var msg = proxyType switch
-        {
-            Util.ProxyType.DisableProxy => "Disable proxy",
-            Util.ProxyType.SystemProxy => "Use System proxy",
-            Util.ProxyType.ManualProxy => $"Use {proxyProtocol}://{proxyHost}:{proxyPort}",
-            _ => throw new NotImplementedException(),
-        };
-        Console.WriteLine(msg);
-        WebRequest.DefaultWebProxy = proxy;
-        HttpClient.DefaultProxy = proxy;
+            var proxy = new WebProxy($"{proxyProtocol}://{proxyHost}:{proxyPort}", true);
+            WebRequest.DefaultWebProxy = proxy;
+            HttpClient.DefaultProxy = proxy;
         }
+
+    }
 
         /// <summary>
         /// Open a link in the default browser.

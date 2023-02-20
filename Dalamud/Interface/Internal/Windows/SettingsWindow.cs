@@ -82,7 +82,7 @@ internal class SettingsWindow : Window
     private bool doButtonsSystemMenu;
     private bool disableRmtFiltering;
 
-    private Util.ProxyType proxyType;
+    private bool useManualProxy;
     private string proxyProtocol = string.Empty;
     private int proxyProtocolIndex;
     private string proxyHost = string.Empty;
@@ -172,7 +172,7 @@ internal class SettingsWindow : Window
             this.locLanguages = this.languages; // Languages not localized, only codes.
         }
 
-        this.proxyType = configuration.ProxyType;
+        this.useManualProxy = configuration.UseManualProxy;
         this.proxyHost = configuration.ProxyHost;
         this.proxyPort = configuration.ProxyPort;
 
@@ -630,12 +630,9 @@ internal class SettingsWindow : Window
     private void ProxySetting()
     {
         ImGui.Text("代理设置");
-        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, "设置Dalamud所使用的网络代理,会影响到插件库的连接,保存后重启游戏生效");
-        var proxyType = (int)this.proxyType;
-        ImGui.RadioButton("不使用代理", ref proxyType, (int)Util.ProxyType.DisableProxy);
-        ImGui.RadioButton("使用系统代理", ref proxyType, (int)Util.ProxyType.SystemProxy);
-        ImGui.RadioButton("手动配置代理", ref proxyType, (int)Util.ProxyType.ManualProxy);
-        if (proxyType == (int)Util.ProxyType.ManualProxy)
+        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudRed, "设置Dalamud所使用的网络代理,会影响到插件库的连接,保存后重启游戏生效");
+        ImGui.Checkbox("手动配置代理", ref this.useManualProxy);
+        if (this.useManualProxy)
         {
             ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, "在更改下方选项时，请确保你知道你在做什么，否则不要随便更改。");
             ImGui.Text("协议");
@@ -650,8 +647,6 @@ internal class SettingsWindow : Window
             this.proxyProtocol = this.proxyProtocols[this.proxyProtocolIndex];
         }
 
-        this.proxyType = (Util.ProxyType)proxyType;
-
         if (ImGui.Button("测试GitHub连接"))
         {
             Task.Run(async () =>
@@ -659,17 +654,17 @@ internal class SettingsWindow : Window
                 try
                 {
                     this.proxyStatus = "测试中";
-                    var proxy = this.proxyType switch
+                    var handler = new HttpClientHandler();
+                    if (this.useManualProxy)
                     {
-                        Util.ProxyType.DisableProxy => null,
-                        Util.ProxyType.SystemProxy => WebRequest.GetSystemWebProxy(),
-                        Util.ProxyType.ManualProxy => new WebProxy($"{this.proxyProtocol}://{this.proxyHost}:{this.proxyPort}", true),
-                        _ => throw new NotImplementedException(),
-                    };
-                    var handler = new HttpClientHandler
+                        handler.UseProxy = true;
+                        handler.Proxy = new WebProxy($"{this.proxyProtocol}://{this.proxyHost}:{this.proxyPort}", true);
+                    }
+                    else
                     {
-                        Proxy = proxy,
-                    };
+                        handler.UseProxy = false;
+                    }
+
                     var httpClient = new HttpClient(handler);
                     httpClient.Timeout = TimeSpan.FromSeconds(3);
                     _ = await httpClient.GetStringAsync("https://raw.githubusercontent.com/ottercorp/dalamud-distrib/main/version");
@@ -1291,12 +1286,12 @@ internal class SettingsWindow : Window
         configuration.DoButtonsSystemMenu = this.doButtonsSystemMenu;
         configuration.DisableRmtFiltering = this.disableRmtFiltering;
 
-        configuration.ProxyType = this.proxyType;
+        configuration.UseManualProxy = this.useManualProxy;
         configuration.ProxyProtocol = this.proxyProtocol;
         configuration.ProxyHost = this.proxyHost;
         configuration.ProxyPort = this.proxyPort;
 
-        Util.SetProxy(configuration.ProxyType, configuration.ProxyProtocol, configuration.ProxyHost, configuration.ProxyPort);
+        Util.SetProxy(configuration.UseManualProxy, configuration.ProxyProtocol, configuration.ProxyHost, configuration.ProxyPort);
 
         configuration.QueueSave();
 

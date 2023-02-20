@@ -272,9 +272,9 @@ internal sealed class DalamudConfiguration : IServiceType
     public bool DisableRmtFiltering { get; set; }
 
     /// <summary>
-    /// Gets or sets a value what type proxy Dalamud will use.
+    /// Gets or sets a value whether or not Dalamud use manual proxy settings.
     /// </summary>
-    public Util.ProxyType ProxyType { get; set; } = Util.ProxyType.DisableProxy;
+    public bool UseManualProxy { get; set; }
 
     /// <summary>
     /// Gets or sets a value what type proxy Dalamud will use.
