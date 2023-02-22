@@ -17,6 +17,7 @@ using Dalamud.Interface.Internal.Windows;
 using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Plugin.Internal;
+using Dalamud.Support;
 using Dalamud.Utility;
 using Serilog;
 
@@ -119,6 +120,7 @@ public class ChatHandlers : IServiceType
 
     private bool hasSeenLoadingMsg;
     private bool hasAutoUpdatedPlugins;
+    private bool hasSendMeasurement;
 
     [ServiceManager.ServiceConstructor]
     private ChatHandlers(ChatGui chatGui)
@@ -196,6 +198,15 @@ public class ChatHandlers : IServiceType
         if (!this.hasAutoUpdatedPlugins)
             this.AutoUpdatePlugins();
 
+        if (clientState.LocalPlayer != null && !this.hasSendMeasurement)
+        {
+            Task.Run(async () => await EventTracking.SendMeasurement(
+                                     EventTracking.MeasurementType.StartDalamud,
+                                     clientState.LocalContentId,
+                                     clientState.LocalPlayer.ObjectId,
+                                     clientState.LocalPlayer.HomeWorld.Id));
+            this.hasSendMeasurement = true;
+        }
 #if !DEBUG && false
             if (!this.hasSeenLoadingMsg)
                 return;
