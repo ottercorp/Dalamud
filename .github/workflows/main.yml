@@ -61,6 +61,16 @@ jobs:
       env:
         GH_BRANCH: ${{ steps.extract_branch.outputs.branch }}
       run: |
+        Write-Host "Remove useless files"
+        .\PruneDalamud.ps1
+
+        Write-Host "Create hashlist"
+        $hash = .\CreateHashList.ps1 .\scratch 
+
+        Write-Host "Create 7z package"
+        Remove-Item -Force .\${trackName}\latest.7z
+        7z a .\${trackName}\latest.7z .\scratch\* -t7z -mx=9      
+
         Compress-Archive -Force .\scratch\* .\canary.zip  # Recreate the release zip
         
         $branchName = $env:GH_BRANCH
@@ -72,15 +82,14 @@ jobs:
         $dllBytes = [System.IO.File]::ReadAllBytes("$(Get-Location)\scratch\Dalamud.dll")
         $assembly = [System.Reflection.Assembly]::Load($dllBytes)
         $newVersion = $assembly.GetCustomAttributes([System.Reflection.AssemblyMetadataAttribute]) | Where { $_.GetType() -eq [System.Reflection.AssemblyMetadataAttribute] } | Select -First 1 | Select -ExpandProperty "Value"
-        
+        Remove-Item -Force -Recurse .\scratch
+
         if (Test-Path -Path $branchName) {
             $versionData = Get-Content ".\${branchName}\version" | ConvertFrom-Json
             $oldVersion = $versionData.AssemblyVersion
             if ($oldVersion -eq $newVersion) {
               Remove-Item .\canary.zip
             } else {
-              7z a .\canary.7z .\scratch\* -t7z -mx=9 
-              Move-Item -Force ".\canary.7z" ".\${branchName}\latest.7z"
               Move-Item -Force ".\canary.zip" ".\${branchName}\latest.zip"
               $versionData.AssemblyVersion = $newVersion
               $versionData | add-member -Force -Name "GitSha" $newVersion -MemberType NoteProperty
@@ -92,7 +101,6 @@ jobs:
             Write-Host "Deployment folder doesn't exist. Not doing anything."
             Remove-Item .\canary.zip
         }
-        Remove-Item -Force -Recurse .\scratch
         
     - name: Commit changes
       shell: bash
