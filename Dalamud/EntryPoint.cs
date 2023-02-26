@@ -179,8 +179,8 @@ public sealed class EntryPoint
                 Log.Error(ex, "Proxy failed.");
             }
 
-            if (!Util.IsLinux())
-                InitSymbolHandler(info);
+            //if (!Util.IsLinux())
+            //    InitSymbolHandler(info);
 
             var dalamud = new Dalamud(info, configuration, mainThreadContinueEvent);
             Log.Information("This is Dalamud - Core: {GitHash}, CS: {CsGitHash}", Util.GetGitHash(), Util.GetGitHashClientStructs());
