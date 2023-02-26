@@ -121,3 +121,6 @@ jobs:
         git commit -m "[CI] Update staging for ${DVER} on ${GH_BRANCH}" || true
         
         git push origin main || true
+
+    - name: Clear Web Services cache
+      run: curl -X POST --fail https://aonyx.ffxiv.wang/Dalamud/Release/ClearCache?key=${{ secrets.CACHE_CLEAR_KEY }}
