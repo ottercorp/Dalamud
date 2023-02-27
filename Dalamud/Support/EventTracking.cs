@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.Net;
+using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -50,6 +50,7 @@ internal static class EventTracking
                 userEvent.Params.Add("engagement_time_msec", "100");
                 userEvent.Params.Add("session_id", userId);
                 model.Events.Add(userEvent);
+                model.Events.Add(BannedLength(userId));
                 break;
             default:
                 Log.Error($"Unknown MeasurementType:{type}");
@@ -62,6 +63,18 @@ internal static class EventTracking
         var postContent = new StringContent(JsonConvert.SerializeObject(model), Encoding.UTF8, "application/json");
         var response = await httpClient.PostAsync(GA4Endpoint, postContent);
         response.EnsureSuccessStatusCode();
+    }
+
+    private static MeasurementModel.Event BannedLength(string userId)
+    {
+        var bannedPluginsJson = File.ReadAllText(Path.Combine(Service<DalamudStartInfo>.Get().AssetDirectory!, "UIRes", "bannedplugin.json"));
+        var bannedPlugins = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
+        var userEvent = new MeasurementModel.Event();
+        userEvent.Name = "banned_plugin_length";
+        userEvent.Params.Add("banned_plugin_length", bannedPlugins.Length.ToString());
+        userEvent.Params.Add("engagement_time_msec", "100");
+        userEvent.Params.Add("session_id", userId);
+        return userEvent;
     }
 
     private class MeasurementModel
