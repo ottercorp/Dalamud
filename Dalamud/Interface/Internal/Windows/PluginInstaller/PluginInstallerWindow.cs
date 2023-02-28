@@ -384,6 +384,7 @@ internal class PluginInstallerWindow : Window, IDisposable
         var headerText = Locs.Header_Hint;
         var headerTextSize = ImGui.CalcTextSize(headerText);
         ImGui.Text(headerText);
+        ImGui.TextColored(ImGuiColors.DalamudRed, "插件使用过程中出现问题请优先通过内置反馈或GitHub Issue进行");
 
         ImGui.SameLine();
 
@@ -2391,7 +2392,8 @@ internal class PluginInstallerWindow : Window, IDisposable
     private void DrawSendFeedbackButton(PluginManifest manifest, bool isTesting)
     {
         ImGui.SameLine();
-        if (ImGuiComponents.IconButton(FontAwesomeIcon.Comment))
+        //if (ImGuiComponents.IconButton(FontAwesomeIcon.Comment))
+        if (ImGui.Button("问题反馈"))
         {
             this.feedbackPlugin = manifest;
             this.feedbackModalOnNextFrame = true;

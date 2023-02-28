@@ -23,10 +23,10 @@ internal sealed class ChangelogWindow : Window, IDisposable
     public const string WarrantsChangelogForMajorMinor = "7.0.";
 
     private const string ChangeLog =
-        @"• 此次更新旧的代理设置将会被重置，请重新设置（Dalamud设置-测试版-代理设置）
-
-如果您发现任何问题或需要帮助，请查看常见问题解答，如果您需要帮助，请联系我们的 QQ频道
-谢谢，玩得开心！";
+        @"·优化了插件问题反馈流程，插件使用过程中出现问题请优先通过内置反馈和GitHub Issue进行
+·优化了代理设置流程，因为与先前设置模式不兼容，因此需要重新设置
+·优化了Reshade支持
+·优化用户其他体验";
 
     private const string UpdatePluginsInfo =
             @"• 由于此更新，您的所有插件都被自动禁用。 这个是正常的。
