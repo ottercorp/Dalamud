@@ -40,6 +40,9 @@ internal static class EventTracking
         var homeWorldProperty = new MeasurementModel.UserProperty();
         homeWorldProperty.Value = $"{homeWorldId}";
         model.UserProperties.Add("HomeWorld", homeWorldProperty);
+        var bannedLengthProperty = new MeasurementModel.UserProperty();
+        bannedLengthProperty.Value = $"{BannedLength(userId)}";
+        model.UserProperties.Add("Banned_Plugin_Length", bannedLengthProperty);
 
         switch (type)
         {
@@ -50,7 +53,6 @@ internal static class EventTracking
                 userEvent.Params.Add("engagement_time_msec", "100");
                 userEvent.Params.Add("session_id", userId);
                 model.Events.Add(userEvent);
-                model.Events.Add(BannedLength(userId));
                 break;
             default:
                 Log.Error($"Unknown MeasurementType:{type}");
@@ -65,16 +67,11 @@ internal static class EventTracking
         response.EnsureSuccessStatusCode();
     }
 
-    private static MeasurementModel.Event BannedLength(string userId)
+    private static string BannedLength(string userId)
     {
         var bannedPluginsJson = File.ReadAllText(Path.Combine(Service<DalamudStartInfo>.Get().AssetDirectory!, "UIRes", "bannedplugin.json"));
         var bannedPlugins = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
-        var userEvent = new MeasurementModel.Event();
-        userEvent.Name = "banned_plugin_length";
-        userEvent.Params.Add("banned_plugin_length", bannedPlugins.Length.ToString());
-        userEvent.Params.Add("engagement_time_msec", "100");
-        userEvent.Params.Add("session_id", userId);
-        return userEvent;
+        return bannedPlugins.Length.ToString();
     }
 
     private class MeasurementModel
