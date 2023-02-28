@@ -1808,12 +1808,12 @@ internal class PluginInstallerWindow : Window, IDisposable
                 }
             }
 
-            this.DrawVisitRepoUrlButton(manifest.RepoUrl);
-
             if (!manifest.SourceRepo.IsThirdParty && manifest.AcceptsFeedback)
             {
                 this.DrawSendFeedbackButton(manifest, false);
             }
+
+            this.DrawVisitRepoUrlButton(manifest.RepoUrl);
 
             ImGuiHelpers.ScaledDummy(5);
 
@@ -2052,12 +2052,13 @@ internal class PluginInstallerWindow : Window, IDisposable
             this.DrawPluginControlButton(plugin, availablePluginUpdate);
             this.DrawDevPluginButtons(plugin);
             this.DrawDeletePluginButton(plugin);
-            this.DrawVisitRepoUrlButton(plugin.Manifest.RepoUrl);
 
             if (canFeedback)
             {
                 this.DrawSendFeedbackButton(plugin.Manifest, plugin.IsTesting);
             }
+
+            this.DrawVisitRepoUrlButton(plugin.Manifest.RepoUrl);
 
             if (availablePluginUpdate != default)
                 this.DrawUpdateSinglePluginButton(availablePluginUpdate);
