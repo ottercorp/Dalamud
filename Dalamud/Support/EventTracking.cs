@@ -15,16 +15,10 @@ namespace Dalamud.Support;
 /// </summary>
 internal static class EventTracking
 {
-    private const string ApiSecret = "CWTvRIdaTJuLmiZjAZ3L9w";
-    private const string MeasurementId = "G-W3HJPGVM1J";
-    private const string GA4Endpoint = $"https://www.google-analytics.com/mp/collect?measurement_id={MeasurementId}&api_secret={ApiSecret}";
 
-    public enum MeasurementType
-    {
-        StartDalamud,
-    }
+    private const string AnalyticsUrl = "https://aonyx.ffxiv.wang/Dalamud/Analytics/Start";
 
-    public static async Task SendMeasurement(MeasurementType type, ulong contentId, uint actorId, uint homeWorldId)
+    public static async Task SendMeasurement(ulong contentId, uint actorId, uint homeWorldId)
     {
         var httpClient = new HttpClient();
         var taobaoIpJs = await httpClient.GetStringAsync("https://www.taobao.com/help/getip.php");
@@ -32,49 +26,31 @@ internal static class EventTracking
         var ip = ipSplits[1];
         var clientId = $"{Hash.GetStringSha256Hash(ip)}";
         var userId = Hash.GetStringSha256Hash($"{contentId:x16}+{actorId:X8}");
-        var model = new MeasurementModel
+        var bannedPluginLength = BannedLength();
+        var os = Util.IsLinux() ? "Wine" : "Windows";
+
+        var data = new Analytics()
         {
+            BannedPluginLength = bannedPluginLength,
             ClientId = clientId,
+            ServerId = homeWorldId.ToString(),
             UserId = userId,
+            OS = os,
         };
-        var homeWorldProperty = new MeasurementModel.UserProperty();
-        homeWorldProperty.Value = $"{homeWorldId}";
-        model.UserProperties.Add("HomeWorld", homeWorldProperty);
-        var bannedLengthProperty = new MeasurementModel.UserProperty();
-        bannedLengthProperty.Value = $"{BannedLength(userId)}";
-        model.UserProperties.Add("Banned_Plugin_Length", bannedLengthProperty);
+        var postContent = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
-        switch (type)
-        {
-            case MeasurementType.StartDalamud:
-                var userEvent = new MeasurementModel.Event();
-                userEvent.Name = "start_dalamud";
-                userEvent.Params.Add("server_id", $"{homeWorldId}");
-                userEvent.Params.Add("engagement_time_msec", "100");
-                userEvent.Params.Add("session_id", userId);
-                model.Events.Add(userEvent);
-                break;
-            default:
-                Log.Error($"Unknown MeasurementType:{type}");
-                return;
-        }
-
-        var userAgent = Util.IsLinux() ? "Wine" : "Windows";
-        userAgent = $"Dalamud/{Util.GetGitHash()} ({userAgent})";
-        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
-        var postContent = new StringContent(JsonConvert.SerializeObject(model), Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync(GA4Endpoint, postContent);
+        var response = await httpClient.PostAsync(AnalyticsUrl, postContent);
         response.EnsureSuccessStatusCode();
     }
 
-    private static string BannedLength(string userId)
+    private static string BannedLength()
     {
         var bannedPluginsJson = File.ReadAllText(Path.Combine(Service<DalamudStartInfo>.Get().AssetDirectory!, "UIRes", "bannedplugin.json"));
         var bannedPlugins = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
         return bannedPlugins.Length.ToString();
     }
 
-    private class MeasurementModel
+    private class Analytics
     {
         [JsonProperty("client_id")]
         public string? ClientId { get; set; }
@@ -82,25 +58,13 @@ internal static class EventTracking
         [JsonProperty("user_id")]
         public string? UserId { get; set; }
 
-        [JsonProperty("user_properties")]
-        public Dictionary<string, UserProperty> UserProperties { get; set; } = new();
+        [JsonProperty("server_id")]
+        public string? ServerId { get; set; }
 
-        [JsonProperty("events")]
-        public List<Event> Events { get; set; } = new();
+        [JsonProperty("banned_plugin_length")]
+        public string? BannedPluginLength { get; set; }
 
-        public class UserProperty
-        {
-            [JsonProperty("value")]
-            public object? Value { get; set; }
-        }
-
-        public class Event
-        {
-            [JsonProperty("name")]
-            public string? Name { get; set; }
-
-            [JsonProperty("params")]
-            public Dictionary<string, string> Params { get; set; } = new();
-        }
+        [JsonProperty("os")]
+        public string? OS { get; set; }
     }
 }

@@ -201,7 +201,6 @@ public class ChatHandlers : IServiceType
         if (clientState.LocalPlayer != null && !this.hasSendMeasurement)
         {
             Task.Run(async () => await EventTracking.SendMeasurement(
-                                     EventTracking.MeasurementType.StartDalamud,
                                      clientState.LocalContentId,
                                      clientState.LocalPlayer.ObjectId,
                                      clientState.LocalPlayer.HomeWorld.Id));
