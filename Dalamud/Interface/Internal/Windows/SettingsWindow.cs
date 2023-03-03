@@ -1288,6 +1288,9 @@ internal class SettingsWindow : Window
 
         configuration.UseManualProxy = this.useManualProxy;
         configuration.ProxyProtocol = this.proxyProtocol;
+        var splitedHost = this.proxyHost.Split("://");
+        if (splitedHost.Length >= 2)
+            this.proxyHost = splitedHost[1];
         configuration.ProxyHost = this.proxyHost;
         configuration.ProxyPort = this.proxyPort;
 

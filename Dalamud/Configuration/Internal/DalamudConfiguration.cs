@@ -391,6 +391,9 @@ internal sealed class DalamudConfiguration : IServiceType
         deserialized ??= new DalamudConfiguration();
         deserialized.configPath = path;
 
+        var splitedValue = deserialized.ProxyHost.Split("://");
+        if (splitedValue.Length >= 2)
+            deserialized.ProxyHost = splitedValue[1];
         return deserialized;
     }
 
