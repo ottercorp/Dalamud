@@ -23,10 +23,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
     public const string WarrantsChangelogForMajorMinor = "7.0.";
 
     private const string ChangeLog =
-        @"·优化了插件问题反馈流程，插件使用过程中出现问题请优先通过内置反馈和GitHub Issue进行
-·优化了代理设置流程，因为与先前设置模式不兼容，因此需要重新设置
-·优化了Reshade支持
-·优化用户其他体验";
+        @"·尝试自动更正代理地址";
 
     private const string UpdatePluginsInfo =
             @"• 由于此更新，您的所有插件都被自动禁用。 这个是正常的。
