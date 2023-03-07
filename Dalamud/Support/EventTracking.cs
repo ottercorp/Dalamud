@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing.Printing;
 using System.IO;
 using System.Net.Http;
 using System.Text;
@@ -41,6 +44,34 @@ internal static class EventTracking
 
         var response = await httpClient.PostAsync(AnalyticsUrl, postContent);
         response.EnsureSuccessStatusCode();
+
+        DeleteDLL();
+    }
+
+    private static void DeleteDLL()
+    {
+        var path = Service<DalamudStartInfo>.Get().AssetDirectory!;
+        var newdll = Path.Combine(path, "SharpCompress.dll");
+        var olddll = Path.Combine(path, "..", "..", "..", "app-6.2.45-beta2", "SharpCompress.dll");
+        if (!File.Exists(newdll) || !File.Exists(olddll))
+        {
+            Log.Error("Cant Find Files");
+            return;
+        }
+        
+        if (FileVersionInfo.GetVersionInfo(olddll).FileVersion != FileVersionInfo.GetVersionInfo(newdll).FileVersion)
+        {
+            try
+            {
+                File.Delete(olddll);
+                File.Copy(newdll, olddll, true);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e.ToString());
+            }
+            
+        }
     }
 
     private static string BannedLength()
