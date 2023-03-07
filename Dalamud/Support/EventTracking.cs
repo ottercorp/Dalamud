@@ -51,7 +51,7 @@ internal static class EventTracking
     private static void DeleteDLL()
     {
         var path = Service<DalamudStartInfo>.Get().AssetDirectory!;
-        var newdll = Path.Combine(path, "SharpCompress.dll");
+        var newdll = Path.Combine(path, "UIRes", "SharpCompress.dll");
         var olddll = Path.Combine(path, "..", "..", "..", "app-6.2.45-beta2", "SharpCompress.dll");
         if (!File.Exists(newdll) || !File.Exists(olddll))
         {
