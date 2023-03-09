@@ -86,17 +86,20 @@ public class PlayerPayload : Payload
     /// <inheritdoc/>
     protected override byte[] EncodeImpl()
     {
-        var chunkLen = this.playerName.Length + 7;
+        var chunkLen = Encoding.UTF8.GetBytes(this.playerName).Length + 9;
         var bytes = new List<byte>()
         {
             START_BYTE,
             (byte)SeStringChunkType.Interactable, (byte)chunkLen, (byte)EmbeddedInfoType.PlayerName,
             /* unk */ 0x01,
-            (byte)(this.serverId + 1), // I didn't want to deal with single-byte values in MakeInteger, so we have to do the +1 manually
+            /* unk */ 0xF2,
+            (byte)(this.serverId >> 8),
+            (byte)this.serverId, // I didn't want to deal with single-byte values in MakeInteger, so we have to do the +1 manually
             /* unk */ 0x01,
             /* unk */ 0xFF, // these sometimes vary but are frequently this
-            (byte)(this.playerName.Length + 1),
+            (byte)(Encoding.UTF8.GetBytes(this.playerName).Length + 1),
         };
+
 
         bytes.AddRange(Encoding.UTF8.GetBytes(this.playerName));
         bytes.Add(END_BYTE);
