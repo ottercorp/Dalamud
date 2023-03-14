@@ -32,6 +32,7 @@ internal static class EventTracking
         var userId = Hash.GetStringSha256Hash($"{contentId:x16}+{actorId:X8}");
         var bannedPluginLength = BannedLength();
         var os = Util.IsLinux() ? "Wine" : "Windows";
+        var version = $"{Util.AssemblyVersion}-{Util.GetGitHash()}";
 
         var data = new Analytics()
         {
@@ -40,6 +41,7 @@ internal static class EventTracking
             ServerId = homeWorldId.ToString(),
             UserId = userId,
             OS = os,
+            DalamudVersion = version,
         };
         var postContent = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
@@ -112,5 +114,8 @@ internal static class EventTracking
 
         [JsonProperty("os")]
         public string? OS { get; set; }
+
+        [JsonProperty("dalamud_version")]
+        public string? DalamudVersion { get; set; }
     }
 }
