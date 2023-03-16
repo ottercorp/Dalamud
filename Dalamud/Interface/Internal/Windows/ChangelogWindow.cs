@@ -23,7 +23,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
     public const string WarrantsChangelogForMajorMinor = "7.0.";
 
     private const string ChangeLog =
-        @"·尝试自动更正代理地址";
+        @"·尝试修复XLCN更新BUG";
 
     private const string UpdatePluginsInfo =
             @"• 由于此更新，您的所有插件都被自动禁用。 这个是正常的。
