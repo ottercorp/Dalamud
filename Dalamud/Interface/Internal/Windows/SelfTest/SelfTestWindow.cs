@@ -41,6 +41,8 @@ internal class SelfTestWindow : Window
             new LuminaAgingStep<TerritoryType>(),
             new PartyFinderAgingStep(),
             new HandledExceptionAgingStep(),
+            new DutyStateAgingStep(),
+            new GameConfigAgingStep(),
             new LogoutEventAgingStep(),
         };
 

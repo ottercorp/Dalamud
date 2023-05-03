@@ -115,14 +115,15 @@ namespace Dalamud.Injector
             }
         }
 
-        private static string GetLogPath(string filename)
+        private static string GetLogPath(string fileName, string logName)
         {
             var baseDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            fileName = !string.IsNullOrEmpty(logName) ? $"{fileName}-{logName}.log" : $"{fileName}.log";
 
 #if DEBUG
-            var logPath = Path.Combine(baseDirectory, $"{filename}.log");
+            var logPath = Path.Combine(baseDirectory, fileName);
 #else
-            var logPath = Path.Combine(baseDirectory, "..", "..", "..", $"{filename}.log");
+            var logPath = Path.Combine(baseDirectory, "..", "..", "..", fileName);
 #endif
 
             return logPath;
@@ -130,7 +131,7 @@ namespace Dalamud.Injector
 
         private static void Init(List<string> args)
         {
-            InitLogging(args.Any(x => x == "-v"));
+            InitLogging(args.Any(x => x == "-v"), args);
             InitUnhandledException(args);
 
             var cwd = new FileInfo(Assembly.GetExecutingAssembly().Location).Directory;
@@ -171,18 +172,15 @@ namespace Dalamud.Injector
             };
         }
 
-        private static void InitLogging(bool verbose)
+        private static void InitLogging(bool verbose, IEnumerable<string> args)
         {
-#if DEBUG
-            verbose = true;
-#endif
-
             var levelSwitch = new LoggingLevelSwitch
             {
                 MinimumLevel = verbose ? LogEventLevel.Verbose : LogEventLevel.Information,
             };
 
-            var logPath = GetLogPath("dalamud.injector");
+            var logName = args.FirstOrDefault(x => x.StartsWith("--logname="))?[10..];
+            var logPath = GetLogPath("dalamud.injector", logName);
 
             CullLogFile(logPath, 1 * 1024 * 1024);
 
@@ -252,6 +250,7 @@ namespace Dalamud.Injector
             var defaultPluginDirectory = startInfo.DefaultPluginDirectory;
             var assetDirectory = startInfo.AssetDirectory;
             var delayInitializeMs = startInfo.DelayInitializeMs;
+            var logName = startInfo.LogName;
             var languageStr = startInfo.Language.ToString().ToLowerInvariant();
             var troubleshootingData = "{\"empty\": true, \"description\": \"No troubleshooting data supplied.\"}";
 
@@ -273,6 +272,8 @@ namespace Dalamud.Injector
                     languageStr = args[i][key.Length..].ToLowerInvariant();
                 else if (args[i].StartsWith(key = "--dalamud-tspack-b64="))
                     troubleshootingData = Encoding.UTF8.GetString(Convert.FromBase64String(args[i][key.Length..]));
+                else if (args[i].StartsWith(key = "--logname="))
+                    logName = args[i][key.Length..];
                 else
                     continue;
 
@@ -328,12 +329,13 @@ namespace Dalamud.Injector
             startInfo.DelayInitializeMs = delayInitializeMs;
             startInfo.GameVersion = null;
             startInfo.TroubleshootingPackData = troubleshootingData;
+            startInfo.LogName = logName;
 
             // Set boot defaults
             startInfo.BootShowConsole = args.Contains("--console");
             startInfo.BootEnableEtw = args.Contains("--etw");
-            startInfo.BootLogPath = GetLogPath("dalamud.boot");
-            startInfo.BootEnabledGameFixes = new List<string> { "prevent_devicechange_crashes", "disable_game_openprocess_access_check", "redirect_openprocess", "backup_userdata_save", "clr_failfast_hijack" };
+            startInfo.BootLogPath = GetLogPath("dalamud.boot", startInfo.LogName);
+            startInfo.BootEnabledGameFixes = new List<string> { "prevent_devicechange_crashes", "disable_game_openprocess_access_check", "redirect_openprocess", "backup_userdata_save", "clr_failfast_hijack", "prevent_icmphandle_crashes" };
             startInfo.BootDotnetOpenProcessHookMode = 0;
             startInfo.BootWaitMessageBox |= args.Contains("--msgbox1") ? 1 : 0;
             startInfo.BootWaitMessageBox |= args.Contains("--msgbox2") ? 2 : 0;
@@ -342,7 +344,7 @@ namespace Dalamud.Injector
             startInfo.BootVehEnabled = true;
             startInfo.BootVehFull = args.Contains("--veh-full");
             startInfo.NoLoadPlugins = args.Contains("--no-plugin");
-            startInfo.NoLoadThirdPartyPlugins = args.Contains("--no-third-plugin");
+            startInfo.NoLoadThirdPartyPlugins = args.Contains("--no-3rd-plugin");
             // startInfo.BootUnhookDlls = new List<string>() { "kernel32.dll", "ntdll.dll", "user32.dll" };
             startInfo.CrashHandlerShow = args.Contains("--crash-handler-console");
 

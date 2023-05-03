@@ -40,9 +40,12 @@ using Dalamud.Plugin.Ipc.Internal;
 using Dalamud.Utility;
 using ImGuiNET;
 using ImGuiScene;
+using Lumina.Excel.GeneratedSheets;
 using Newtonsoft.Json;
 using PInvoke;
 using Serilog;
+
+using Condition = Dalamud.Game.ClientState.Conditions.Condition;
 
 namespace Dalamud.Interface.Internal.Windows;
 
@@ -77,6 +80,14 @@ internal class DataWindow : Window
     private Hook<MessageBoxWDelegate>? messageBoxMinHook;
     private bool hookUseMinHook = false;
 
+    // FontAwesome
+    private List<FontAwesomeIcon>? icons;
+    private List<string> iconNames;
+    private string[]? iconCategories;
+    private int selectedIconCategory;
+    private string iconSearchInput = string.Empty;
+    private bool iconSearchChanged = true;
+
     // IPC
     private ICallGateProvider<string, string> ipcPub;
     private ICallGateSubscriber<string, string> ipcSub;
@@ -99,6 +110,7 @@ internal class DataWindow : Window
     private string flyText1 = string.Empty;
     private string flyText2 = string.Empty;
     private int flyIcon;
+    private int flyDmgIcon;
     private Vector4 flyColor = new(1, 0, 0, 1);
 
     // ImGui fields
@@ -145,7 +157,8 @@ internal class DataWindow : Window
         Address,
         Object_Table,
         Fate_Table,
-        Font_Test,
+        SE_Font_Test,
+        FontAwesome_Test,
         Party_List,
         Buddy_List,
         Plugin_IPC,
@@ -168,6 +181,8 @@ internal class DataWindow : Window
         Hook,
         Aetherytes,
         Dtr_Bar,
+        UIColor,
+        DataShare,
     }
 
     /// <inheritdoc/>
@@ -194,6 +209,7 @@ internal class DataWindow : Window
             "ai" => "Addon Inspector",
             "at" => "Object Table", // Actor Table
             "ot" => "Object Table",
+            "uic" => "UIColor",
             _ => dataKind,
         };
 
@@ -264,8 +280,12 @@ internal class DataWindow : Window
                         this.DrawFateTable();
                         break;
 
-                    case DataKind.Font_Test:
-                        this.DrawFontTest();
+                    case DataKind.SE_Font_Test:
+                        this.DrawSEFontTest();
+                        break;
+
+                    case DataKind.FontAwesome_Test:
+                        this.DrawFontAwesomeTest();
                         break;
 
                     case DataKind.Party_List:
@@ -354,6 +374,13 @@ internal class DataWindow : Window
 
                     case DataKind.Dtr_Bar:
                         this.DrawDtr();
+                        break;
+
+                    case DataKind.UIColor:
+                        this.DrawUIColor();
+                        break;
+                    case DataKind.DataShare:
+                        this.DrawDataShareTab();
                         break;
                 }
             }
@@ -449,6 +476,10 @@ internal class DataWindow : Window
         if (clientState.LocalPlayer == null)
         {
             ImGui.TextUnformatted("LocalPlayer null.");
+        }
+        else if (clientState.IsPvPExcludingDen)
+        {
+            ImGui.TextUnformatted("Cannot access object table while in PvP.");
         }
         else
         {
@@ -559,7 +590,7 @@ internal class DataWindow : Window
         }
     }
 
-    private void DrawFontTest()
+    private void DrawSEFontTest()
     {
         var specialChars = string.Empty;
 
@@ -567,15 +598,45 @@ internal class DataWindow : Window
             specialChars += $"0x{i:X} - {(SeIconChar)i} - {(char)i}\n";
 
         ImGui.TextUnformatted(specialChars);
+    }
 
-        foreach (var fontAwesomeIcon in Enum.GetValues(typeof(FontAwesomeIcon)).Cast<FontAwesomeIcon>())
+    private void DrawFontAwesomeTest()
+    {
+        this.iconCategories ??= FontAwesomeHelpers.GetCategories();
+
+        if (this.iconSearchChanged)
         {
-            ImGui.Text(((int)fontAwesomeIcon.ToIconChar()).ToString("X") + " - ");
-            ImGui.SameLine();
+            this.icons = FontAwesomeHelpers.SearchIcons(this.iconSearchInput, this.iconCategories[this.selectedIconCategory]);
+            this.iconNames = this.icons.Select(icon => Enum.GetName(icon)!).ToList();
+            this.iconSearchChanged = false;
+        }
 
+        ImGui.SetNextItemWidth(160f);
+        var categoryIndex = this.selectedIconCategory;
+        if (ImGui.Combo("####FontAwesomeCategorySearch", ref categoryIndex, this.iconCategories, this.iconCategories.Length))
+        {
+            this.selectedIconCategory = categoryIndex;
+            this.iconSearchChanged = true;
+        }
+
+        ImGui.SameLine(170f);
+        ImGui.SetNextItemWidth(180f);
+        if (ImGui.InputTextWithHint($"###FontAwesomeInputSearch", "search icons", ref this.iconSearchInput, 50))
+        {
+            this.iconSearchChanged = true;
+        }
+
+        ImGuiHelpers.ScaledDummy(10f);
+        for (var i = 0; i < this.icons?.Count; i++)
+        {
+            ImGui.Text($"0x{(int)this.icons[i].ToIconChar():X}");
+            ImGuiHelpers.ScaledRelativeSameLine(50f);
+            ImGui.Text($"{this.iconNames[i]}");
+            ImGuiHelpers.ScaledRelativeSameLine(280f);
             ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.Text(fontAwesomeIcon.ToIconString());
+            ImGui.Text(this.icons[i].ToIconString());
             ImGui.PopFont();
+            ImGuiHelpers.ScaledDummy(2f);
         }
     }
 
@@ -1157,6 +1218,7 @@ internal class DataWindow : Window
         ImGui.InputInt("Val2", ref this.flyVal2);
 
         ImGui.InputInt("Icon ID", ref this.flyIcon);
+        ImGui.InputInt("Damage Icon ID", ref this.flyDmgIcon);
         ImGui.ColorEdit4("Color", ref this.flyColor);
         ImGui.InputInt("Actor Index", ref this.flyActor);
         var sendColor = ImGui.ColorConvertFloat4ToU32(this.flyColor);
@@ -1171,7 +1233,8 @@ internal class DataWindow : Window
                 this.flyText1,
                 this.flyText2,
                 sendColor,
-                unchecked((uint)this.flyIcon));
+                unchecked((uint)this.flyIcon),
+                unchecked((uint)this.flyDmgIcon));
         }
     }
 
@@ -1704,6 +1767,69 @@ internal class DataWindow : Window
                 entry = dtrBar.Get(title, title);
             }
         }
+    }
+
+    private void DrawDataShareTab()
+    {
+        if (!ImGui.BeginTable("###DataShareTable", 4, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
+            return;
+
+        try
+        {
+            ImGui.TableSetupColumn("Shared Tag");
+            ImGui.TableSetupColumn("Creator Assembly");
+            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed, 30 * ImGuiHelpers.GlobalScale);
+            ImGui.TableSetupColumn("Consumers");
+            ImGui.TableHeadersRow();
+            foreach (var share in Service<DataShare>.Get().GetAllShares())
+            {
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(share.Tag);
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(share.CreatorAssembly);
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(share.Users.Length.ToString());
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(string.Join(", ", share.Users));
+            }
+        } finally
+        {
+            ImGui.EndTable();
+        }
+    }
+
+    private void DrawUIColor()
+    {
+        var colorSheet = Service<DataManager>.Get().GetExcelSheet<UIColor>();
+        if (colorSheet is null) return;
+
+        foreach (var color in colorSheet)
+        {
+            this.DrawUiColor(color);
+        }
+    }
+
+    private void DrawUiColor(UIColor color)
+    {
+        ImGui.Text($"[{color.RowId:D3}] ");
+        ImGui.SameLine();
+        ImGui.TextColored(this.ConvertToVector4(color.Unknown2), $"Unknown2 ");
+        ImGui.SameLine();
+        ImGui.TextColored(this.ConvertToVector4(color.UIForeground), "UIForeground ");
+        ImGui.SameLine();
+        ImGui.TextColored(this.ConvertToVector4(color.Unknown3), "Unknown3 ");
+        ImGui.SameLine();
+        ImGui.TextColored(this.ConvertToVector4(color.UIGlow), "UIGlow");
+    }
+
+    private Vector4 ConvertToVector4(uint color)
+    {
+        var r = (byte)(color >> 24);
+        var g = (byte)(color >> 16);
+        var b = (byte)(color >> 8);
+        var a = (byte)color;
+
+        return new Vector4(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
     }
 
     private async Task TestTaskInTaskDelay(CancellationToken token)

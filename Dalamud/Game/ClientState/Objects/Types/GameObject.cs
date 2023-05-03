@@ -114,6 +114,11 @@ public unsafe partial class GameObject
     public uint OwnerId => this.Struct->OwnerID;
 
     /// <summary>
+    /// Gets the index of this object in the object table.
+    /// </summary>
+    public ushort ObjectIndex => this.Struct->ObjectIndex;
+
+    /// <summary>
     /// Gets the entity kind of this <see cref="GameObject" />.
     /// See <see cref="ObjectKind">the ObjectKind enum</see> for possible values.
     /// </summary>
@@ -158,7 +163,7 @@ public unsafe partial class GameObject
     /// <summary>
     /// Gets the current target of the game object.
     /// </summary>
-    public virtual uint TargetObjectId => 0;
+    public virtual ulong TargetObjectId => 0;
 
     /// <summary>
     /// Gets the target object of the game object.

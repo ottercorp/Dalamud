@@ -9,6 +9,7 @@ using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.Gui;
 using Dalamud.Interface.Animation.EasingFunctions;
+using Dalamud.Interface.Raii;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using ImGuiScene;
@@ -134,7 +135,7 @@ internal class TitleScreenMenuWindow : Window, IDisposable
                         pos = finalPos;
                     }
 
-                    this.DrawEntry(entry, moveEasing.IsRunning && i != 0, true, i == 0, true);
+                    this.DrawEntry(entry, moveEasing.IsRunning && i != 0, true, i == 0, true, moveEasing.IsDone);
 
                     var cursor = ImGui.GetCursorPos();
                     cursor.Y = (float)pos;
@@ -169,22 +170,21 @@ internal class TitleScreenMenuWindow : Window, IDisposable
 
                 this.fadeOutEasing.Update();
 
-                ImGui.PushStyleVar(ImGuiStyleVar.Alpha, (float)this.fadeOutEasing.Value);
-
-                for (var i = 0; i < tsm.Entries.Count; i++)
+                using (ImRaii.PushStyle(ImGuiStyleVar.Alpha, (float)this.fadeOutEasing.Value))
                 {
-                    var entry = tsm.Entries[i];
+                    for (var i = 0; i < tsm.Entries.Count; i++)
+                    {
+                        var entry = tsm.Entries[i];
 
-                    var finalPos = (i + 1) * this.shadeTexture.Height * scale;
+                        var finalPos = (i + 1) * this.shadeTexture.Height * scale;
 
-                    this.DrawEntry(entry, i != 0, true, i == 0, false);
+                        this.DrawEntry(entry, i != 0, true, i == 0, false, false);
 
-                    var cursor = ImGui.GetCursorPos();
-                    cursor.Y = finalPos;
-                    ImGui.SetCursorPos(cursor);
+                        var cursor = ImGui.GetCursorPos();
+                        cursor.Y = finalPos;
+                        ImGui.SetCursorPos(cursor);
+                    }
                 }
-
-                ImGui.PopStyleVar();
 
                 var isHover = ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows |
                                                     ImGuiHoveredFlags.AllowWhenBlockedByActiveItem);
@@ -205,7 +205,7 @@ internal class TitleScreenMenuWindow : Window, IDisposable
 
             case State.Hide:
             {
-                if (this.DrawEntry(tsm.Entries[0], true, false, true, true))
+                if (this.DrawEntry(tsm.Entries[0], true, false, true, true, false))
                 {
                     this.state = State.Show;
                 }
@@ -228,7 +228,7 @@ internal class TitleScreenMenuWindow : Window, IDisposable
     }
 
     private bool DrawEntry(
-        TitleScreenMenu.TitleScreenMenuEntry entry, bool inhibitFadeout, bool showText, bool isFirst, bool overrideAlpha)
+        TitleScreenMenu.TitleScreenMenuEntry entry, bool inhibitFadeout, bool showText, bool isFirst, bool overrideAlpha, bool interactable)
     {
         InterfaceManager.SpecialGlyphRequest fontHandle;
         if (this.specialGlyphRequests.TryGetValue(entry.Name, out fontHandle) && fontHandle.Size != TargetFontSizePx)
@@ -254,9 +254,11 @@ internal class TitleScreenMenuWindow : Window, IDisposable
 
         var initialCursor = ImGui.GetCursorPos();
 
-        ImGui.PushStyleVar(ImGuiStyleVar.Alpha, (float)shadeEasing.Value);
-        ImGui.Image(this.shadeTexture.ImGuiHandle, new Vector2(this.shadeTexture.Width * scale, this.shadeTexture.Height * scale));
-        ImGui.PopStyleVar();
+
+        using (ImRaii.PushStyle(ImGuiStyleVar.Alpha, (float)shadeEasing.Value))
+        {
+            ImGui.Image(this.shadeTexture.ImGuiHandle, new Vector2(this.shadeTexture.Width * scale, this.shadeTexture.Height * scale));
+        }
 
         var isHover = ImGui.IsItemHovered();
         if (isHover && (!shadeEasing.IsRunning || (shadeEasing.IsDone && shadeEasing.IsInverse)) && !inhibitFadeout)
@@ -271,7 +273,7 @@ internal class TitleScreenMenuWindow : Window, IDisposable
         }
 
         var isClick = ImGui.IsItemClicked();
-        if (isClick)
+        if (isClick && interactable)
         {
             entry.Trigger();
         }
@@ -331,14 +333,14 @@ internal class TitleScreenMenuWindow : Window, IDisposable
         }
 
         // Drop shadow
-        ImGui.PushStyleColor(ImGuiCol.Text, 0xFF000000);
-        for (int i = 0, i_ = (int)Math.Ceiling(1 * scale); i < i_; i++)
+        using (ImRaii.PushColor(ImGuiCol.Text, 0xFF000000))
         {
-            ImGui.SetCursorPos(new Vector2(cursor.X, cursor.Y + i));
-            ImGui.Text(entry.Name);
+            for (int i = 0, i_ = (int)Math.Ceiling(1 * scale); i < i_; i++)
+            {
+                ImGui.SetCursorPos(new Vector2(cursor.X, cursor.Y + i));
+                ImGui.Text(entry.Name);
+            }
         }
-
-        ImGui.PopStyleColor();
 
         ImGui.SetCursorPos(cursor);
         ImGui.Text(entry.Name);

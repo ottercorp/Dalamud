@@ -23,6 +23,7 @@ namespace Dalamud.Game.ClientState;
 [ServiceManager.BlockingEarlyLoadedService]
 public sealed class ClientState : IDisposable, IServiceType
 {
+    private readonly GameLifecycle lifecycle;
     private readonly ClientStateAddressResolver address;
     private readonly Hook<SetupTerritoryTypeDelegate> setupTerritoryTypeHook;
 
@@ -36,8 +37,9 @@ public sealed class ClientState : IDisposable, IServiceType
     private bool lastFramePvP = false;
 
     [ServiceManager.ServiceConstructor]
-    private ClientState(SigScanner sigScanner, DalamudStartInfo startInfo)
+    private ClientState(SigScanner sigScanner, DalamudStartInfo startInfo, GameLifecycle lifecycle)
     {
+        this.lifecycle = lifecycle;
         this.address = new ClientStateAddressResolver();
         this.address.Setup(sigScanner);
 
@@ -63,7 +65,7 @@ public sealed class ClientState : IDisposable, IServiceType
     public event EventHandler<ushort> TerritoryChanged;
 
     /// <summary>
-    /// Event that fires when a character is logging in.
+    /// Event that fires when a character is logging in, and the local character object is available.
     /// </summary>
     public event EventHandler Login;
 
@@ -167,13 +169,15 @@ public sealed class ClientState : IDisposable, IServiceType
         if (condition == null || gameGui == null || data == null)
             return;
 
-        if (condition.Any() && this.lastConditionNone == true)
+        if (condition.Any() && this.lastConditionNone == true && this.LocalPlayer != null)
         {
             Log.Debug("Is login");
             this.lastConditionNone = false;
             this.IsLoggedIn = true;
             this.Login?.InvokeSafely(this, null);
             gameGui.ResetUiHideState();
+
+            this.lifecycle.ResetLogout();
         }
 
         if (!condition.Any() && this.lastConditionNone == false)
@@ -183,6 +187,8 @@ public sealed class ClientState : IDisposable, IServiceType
             this.IsLoggedIn = false;
             this.Logout?.InvokeSafely(this, null);
             gameGui.ResetUiHideState();
+
+            this.lifecycle.SetLogout();
         }
 
         this.IsPvP = GameMain.IsInPvPArea();

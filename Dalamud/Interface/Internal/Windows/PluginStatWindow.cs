@@ -6,11 +6,14 @@ using System.Reflection;
 
 using Dalamud.Game;
 using Dalamud.Hooking.Internal;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Internal;
 using Dalamud.Plugin.Internal.Types;
+using Dalamud.Utility;
 using ImGuiNET;
+using Serilog;
 
 namespace Dalamud.Interface.Internal.Windows;
 
@@ -20,6 +23,7 @@ namespace Dalamud.Interface.Internal.Windows;
 internal class PluginStatWindow : Window
 {
     private bool showDalamudHooks;
+    private string hookSearchText = string.Empty;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PluginStatWindow"/> class.
@@ -65,6 +69,16 @@ internal class PluginStatWindow : Window
                     }
                 }
 
+                var loadedPlugins = pluginManager.InstalledPlugins.Where(plugin => plugin.State == PluginState.Loaded);
+                var totalLast = loadedPlugins.Sum(plugin => plugin.DalamudInterface?.UiBuilder.LastDrawTime ?? 0);
+                var totalAverage = loadedPlugins.Sum(plugin => plugin.DalamudInterface?.UiBuilder.DrawTimeHistory.DefaultIfEmpty().Average() ?? 0);
+
+                ImGuiComponents.TextWithLabel("Total Last", $"{totalLast / 10000f:F4}ms", "All last draw times added together");
+                ImGui.SameLine();
+                ImGuiComponents.TextWithLabel("Total Average", $"{totalAverage / 10000f:F4}ms", "All average draw times added together");
+                ImGui.SameLine();
+                ImGuiComponents.TextWithLabel("Collective Average", $"{(loadedPlugins.Any() ? totalAverage / loadedPlugins.Count() / 10000f : 0):F4}ms", "Average of all average draw times");
+
                 if (ImGui.BeginTable(
                         "##PluginStatsDrawTimes",
                         4,
@@ -82,8 +96,6 @@ internal class PluginStatWindow : Window
                     ImGui.TableSetupColumn("Longest");
                     ImGui.TableSetupColumn("Average");
                     ImGui.TableHeadersRow();
-
-                    var loadedPlugins = pluginManager.InstalledPlugins.Where(plugin => plugin.State == PluginState.Loaded);
 
                     var sortSpecs = ImGui.TableGetSortSpecs();
                     loadedPlugins = sortSpecs.Specs.ColumnIndex switch
@@ -146,6 +158,16 @@ internal class PluginStatWindow : Window
                     Framework.StatsHistory.Clear();
                 }
 
+                var statsHistory = Framework.StatsHistory.ToArray();
+                var totalLast = statsHistory.Sum(stats => stats.Value.LastOrDefault());
+                var totalAverage = statsHistory.Sum(stats => stats.Value.DefaultIfEmpty().Average());
+
+                ImGuiComponents.TextWithLabel("Total Last", $"{totalLast:F4}ms", "All last update times added together");
+                ImGui.SameLine();
+                ImGuiComponents.TextWithLabel("Total Average", $"{totalAverage:F4}ms", "All average update times added together");
+                ImGui.SameLine();
+                ImGuiComponents.TextWithLabel("Collective Average", $"{(statsHistory.Any() ? totalAverage / statsHistory.Length : 0):F4}ms", "Average of all average update times");
+
                 if (ImGui.BeginTable(
                         "##PluginStatsFrameworkTimes",
                         4,
@@ -164,8 +186,6 @@ internal class PluginStatWindow : Window
                     ImGui.TableSetupColumn("Average", ImGuiTableColumnFlags.None, 50);
                     ImGui.TableHeadersRow();
 
-                    var statsHistory = Framework.StatsHistory.ToArray();
-
                     var sortSpecs = ImGui.TableGetSortSpecs();
                     statsHistory = sortSpecs.Specs.ColumnIndex switch
                     {
@@ -173,16 +193,21 @@ internal class PluginStatWindow : Window
                                  ? statsHistory.OrderBy(handler => handler.Key).ToArray()
                                  : statsHistory.OrderByDescending(handler => handler.Key).ToArray(),
                         2 => sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending
-                                 ? statsHistory.OrderBy(handler => handler.Value.Max()).ToArray()
-                                 : statsHistory.OrderByDescending(handler => handler.Value.Max()).ToArray(),
+                                 ? statsHistory.OrderBy(handler => handler.Value.DefaultIfEmpty().Max()).ToArray()
+                                 : statsHistory.OrderByDescending(handler => handler.Value.DefaultIfEmpty().Max()).ToArray(),
                         3 => sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending
-                                 ? statsHistory.OrderBy(handler => handler.Value.Average()).ToArray()
-                                 : statsHistory.OrderByDescending(handler => handler.Value.Average()).ToArray(),
+                                 ? statsHistory.OrderBy(handler => handler.Value.DefaultIfEmpty().Average()).ToArray()
+                                 : statsHistory.OrderByDescending(handler => handler.Value.DefaultIfEmpty().Average()).ToArray(),
                         _ => statsHistory,
                     };
 
                     foreach (var handlerHistory in statsHistory)
                     {
+                        if (!handlerHistory.Value.Any())
+                        {
+                            continue;
+                        }
+
                         ImGui.TableNextRow();
 
                         ImGui.TableNextColumn();
@@ -211,6 +236,12 @@ internal class PluginStatWindow : Window
         {
             ImGui.Checkbox("Show Dalamud Hooks", ref this.showDalamudHooks);
 
+            ImGui.InputTextWithHint(
+                "###PluginStatWindow_HookSearch",
+                "Search",
+                ref this.hookSearchText,
+                500);
+
             if (ImGui.BeginTable(
                     "##PluginStatsHooks",
                     4,
@@ -237,6 +268,13 @@ internal class PluginStatWindow : Window
 
                         if (!this.showDalamudHooks && trackedHook.Assembly == Assembly.GetExecutingAssembly())
                             continue;
+
+                        if (!this.hookSearchText.IsNullOrEmpty())
+                        {
+                            if ((trackedHook.Delegate.Target == null || !trackedHook.Delegate.Target.ToString().Contains(this.hookSearchText, StringComparison.OrdinalIgnoreCase))
+                                && !trackedHook.Delegate.Method.Name.Contains(this.hookSearchText, StringComparison.OrdinalIgnoreCase))
+                                continue;
+                        }
 
                         ImGui.TableNextRow();
 
@@ -281,7 +319,7 @@ internal class PluginStatWindow : Window
                     }
                     catch (Exception ex)
                     {
-                        ImGui.Text(ex.Message);
+                        Log.Error(ex, "Error drawing hooks in plugin stats");
                     }
                 }
 

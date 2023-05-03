@@ -62,6 +62,8 @@ public class WindowSystem
 
     /// <summary>
     /// Add a window to this <see cref="WindowSystem"/>.
+    /// The window system doesn't own your window, it just renders it
+    /// You need to store a reference to it to use it later.
     /// </summary>
     /// <param name="window">The window to add.</param>
     public void AddWindow(Window window)
@@ -74,6 +76,7 @@ public class WindowSystem
 
     /// <summary>
     /// Remove a window from this <see cref="WindowSystem"/>.
+    /// Will not dispose your window, if it is disposable.
     /// </summary>
     /// <param name="window">The window to remove.</param>
     public void RemoveWindow(Window window)
@@ -86,6 +89,7 @@ public class WindowSystem
 
     /// <summary>
     /// Remove all windows from this <see cref="WindowSystem"/>.
+    /// Will not dispose your windows, if they are disposable.
     /// </summary>
     public void RemoveAllWindows() => this.windows.Clear();
 
@@ -94,6 +98,7 @@ public class WindowSystem
     /// </summary>
     /// <param name="windowName">The name of the <see cref="Window"/>.</param>
     /// <returns>The <see cref="Window"/> object with matching name or null.</returns>
+    [Obsolete("WindowSystem does not own your window - you should store a reference to it and use that instead.")]
     public Window? GetWindow(string windowName) => this.windows.FirstOrDefault(w => w.WindowName == windowName);
 
     /// <summary>

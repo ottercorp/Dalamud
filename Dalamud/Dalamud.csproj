@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup Label="Target">
-        <TargetFramework>net6.0-windows</TargetFramework>
+        <TargetFramework>net7.0-windows</TargetFramework>
         <PlatformTarget>x64</PlatformTarget>
         <Platforms>x64;AnyCPU</Platforms>
-        <LangVersion>10.0</LangVersion>
+        <LangVersion>11.0</LangVersion>
     </PropertyGroup>
 
     <PropertyGroup Label="Feature">
-        <DalamudVersion>7.3.5.2</DalamudVersion>
+        <DalamudVersion>7.5.0.3</DalamudVersion>
         <Description>XIV Launcher addon framework</Description>
         <AssemblyVersion>$(DalamudVersion)</AssemblyVersion>
         <Version>$(DalamudVersion)</Version>
@@ -63,17 +63,17 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="CheapLoc" Version="1.1.6" />
+        <PackageReference Include="CheapLoc" Version="1.1.8" />
         <PackageReference Include="goaaats.Reloaded.Hooks" Version="4.2.0-goat.4" />
         <PackageReference Include="goaaats.Reloaded.Assembler" Version="1.0.14-goat.2" />
         <PackageReference Include="HttpClient.Caching" Version="1.3.7" />
         <PackageReference Include="JetBrains.Annotations" Version="2021.2.0" />
-        <PackageReference Include="Lumina" Version="3.10.0" />
-        <PackageReference Include="Lumina.Excel" Version="6.2.1" />
+        <PackageReference Include="Lumina" Version="3.10.2" />
+        <PackageReference Include="Lumina.Excel" Version="6.3.2" />
         <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="7.0.0" />
         <PackageReference Include="MinSharp" Version="1.0.4" />
-        <PackageReference Include="MonoMod.RuntimeDetour" Version="21.10.10.01" />
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+        <PackageReference Include="MonoModReorg.RuntimeDetour" Version="23.1.2-prerelease.1" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
         <PackageReference Include="Serilog" Version="2.11.0" />
         <PackageReference Include="Serilog.Sinks.Async" Version="1.5.0" />
         <PackageReference Include="Serilog.Sinks.Console" Version="4.0.1" />
@@ -82,12 +82,14 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="System.Collections.Immutable" Version="5.0.0" />
-        <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
-        <PackageReference Include="System.Reflection.MetadataLoadContext" Version="5.0.1" />
-        <PackageReference Include="System.Resources.Extensions" Version="5.0.0" />
+        <PackageReference Include="System.Collections.Immutable" Version="7.0.0" />
+        <PackageReference Include="System.Drawing.Common" Version="7.0.0" />
+        <PackageReference Include="System.Reactive" Version="5.0.0" />
+        <PackageReference Include="System.Reflection.MetadataLoadContext" Version="7.0.0" />
+        <PackageReference Include="System.Resources.Extensions" Version="7.0.0" />
     </ItemGroup>
     <ItemGroup>
+        <ProjectReference Include="..\Dalamud.Interface\Dalamud.Interface.csproj" />
         <ProjectReference Include="..\lib\FFXIVClientStructs\FFXIVClientStructs\FFXIVClientStructs.csproj" />
         <ProjectReference Include="..\lib\ImGuiScene\deps\ImGui.NET\src\ImGui.NET-472\ImGui.NET-472.csproj" />
         <ProjectReference Include="..\lib\ImGuiScene\deps\SDL2-CS\SDL2-CS.csproj" />
@@ -112,28 +114,64 @@
         </ItemGroup>
     </Target>
 
-    <Target Name="GetGitHash" BeforeTargets="WriteGitHash" Condition="'$(BuildHash)' == ''">
-        <PropertyGroup>
-            <!-- temp file for the git version (lives in "obj" folder)-->
-            <VerFile>$(IntermediateOutputPath)gitver</VerFile>
-            <VerFileClientStructs>$(IntermediateOutputPath)csver</VerFileClientStructs>
-        </PropertyGroup>
-        <!-- write the hash to the temp file.-->
-        <Exec Command="git -C &quot;$(ProjectDir.Replace('\','\\'))&quot; describe --long --always --dirty &gt; $(VerFile)" />
-        <Exec Command="git -C &quot;$(ProjectDir.Replace('\','\\'))\..\lib\FFXIVClientStructs&quot; describe --long --always --dirty &gt; $(VerFileClientStructs)" />
-        <!-- read the version into the GitVersion itemGroup-->
-        <ReadLinesFromFile File="$(VerFile)">
-            <Output TaskParameter="Lines" ItemName="GitVersion" />
-        </ReadLinesFromFile>
-        <ReadLinesFromFile File="$(VerFileClientStructs)">
-            <Output TaskParameter="Lines" ItemName="GitVersionClientStructs" />
-        </ReadLinesFromFile>
+    <Target Name="ChangeAliasesOfNugetRefs" BeforeTargets="FindReferenceAssembliesForReferences;ResolveReferences">
+        <ItemGroup>
+            <ReferencePath Condition="'%(FileName)' == 'MonoMod.Iced'">
+                <Aliases>monomod</Aliases>
+            </ReferencePath>
+        </ItemGroup>
+    </Target>
+
+    <PropertyGroup>
+        <!-- Needed temporarily for CI -->
+        <TempVerFile>$(OutputPath)TEMP_gitver.txt</TempVerFile>
+        <DalamudRevisionFile>$(OutputPath)revision.txt</DalamudRevisionFile>
+    </PropertyGroup>
+
+    <Target Name="GetGitCommitCount" BeforeTargets="WriteGitHash" Condition="'$(CommitCount)'==''">
+        <Exec Command="git -C &quot;$(ProjectDir.Replace('\','\\'))&quot; rev-list --count HEAD" ConsoleToMSBuild="true">
+            <Output TaskParameter="ConsoleOutput" PropertyName="DalamudGitCommitCount" />
+        </Exec>
+
         <!-- Set the BuildHash property to contain the GitVersion, if it wasn't already set.-->
         <PropertyGroup>
-            <BuildHash>@(GitVersion)</BuildHash>
-            <BuildHashClientStructs>@(GitVersionClientStructs)</BuildHashClientStructs>
+            <CommitCount>$([System.Text.RegularExpressions.Regex]::Replace($(DalamudGitCommitCount), @"\t|\n|\r", ""))</CommitCount>
         </PropertyGroup>
+
+        <Exec Command="echo|set /P =&quot;$(CommitCount)&quot; &gt; $(DalamudRevisionFile)" IgnoreExitCode="true" />
     </Target>
+
+    <Target Name="GetGitHash" BeforeTargets="WriteGitHash" Condition="'$(BuildHash)'=='' And '$(Configuration)'=='Release'">
+        <!-- write the hash to the temp file.-->
+        <Exec Command="git -C &quot;$(ProjectDir.Replace('\','\\'))&quot; describe --long --always --dirty" ConsoleToMSBuild="true">
+            <Output TaskParameter="ConsoleOutput" PropertyName="DalamudGitDescribeOutput" />
+        </Exec>
+        <Exec Command="git -C &quot;$(ProjectDir.Replace('\','\\'))\..\lib\FFXIVClientStructs&quot; describe --long --always --dirty" ConsoleToMSBuild="true">
+            <Output TaskParameter="ConsoleOutput" PropertyName="ClientStructsGitDescribeOutput" />
+        </Exec>
+        
+        <!-- Set the BuildHash property to contain the GitVersion, if it wasn't already set.-->
+        <PropertyGroup>
+            <BuildHash>$([System.Text.RegularExpressions.Regex]::Replace($(DalamudGitDescribeOutput), @"\t|\n|\r", ""))</BuildHash>
+            <BuildHashClientStructs>$([System.Text.RegularExpressions.Regex]::Replace($(ClientStructsGitDescribeOutput), @"\t|\n|\r", ""))</BuildHashClientStructs>
+        </PropertyGroup>
+
+        <!-- Looks like this is the only way to write a file without a carriage return in msbuild... -->
+        <Exec Command="echo|set /P =&quot;$(BuildHash)&quot; &gt; $(TempVerFile)" IgnoreExitCode="true" />
+    </Target>
+
+    <Target Name="GetGitHashStub" BeforeTargets="WriteGitHash" Condition="'$(BuildHash)'=='' And '$(Configuration)'=='Debug'">
+        <!-- Set the BuildHash property to contain some placeholder, if it wasn't already set.-->
+        <PropertyGroup>
+            <LocalBuildText>Local build at $([System.DateTime]::Now.ToString(yyyy-MM-dd HH:mm:ss))</LocalBuildText>
+            <BuildHash>$(LocalBuildText)</BuildHash>
+            <BuildHashClientStructs>???</BuildHashClientStructs>
+        </PropertyGroup>
+
+        <!-- Looks like this is the only way to write a file without a carriage return in msbuild... -->
+        <Exec Command="echo|set /P =&quot;$(BuildHash)&quot; &gt; $(TempVerFile)" IgnoreExitCode="true" />
+    </Target>
+    
     <Target Name="WriteGitHash" BeforeTargets="CoreCompile">
         <!-- names the obj/.../CustomAssemblyInfo.cs file -->
         <PropertyGroup>
@@ -150,11 +188,20 @@
                 <_Parameter2>$(BuildHash)</_Parameter2>
             </AssemblyAttributes>
             <AssemblyAttributes Include="AssemblyMetadata">
+                <_Parameter1>GitCommitCount</_Parameter1>
+                <_Parameter2>$(CommitCount)</_Parameter2>
+            </AssemblyAttributes>
+            <AssemblyAttributes Include="AssemblyMetadata">
                 <_Parameter1>GitHashClientStructs</_Parameter1>
                 <_Parameter2>$(BuildHashClientStructs)</_Parameter2>
             </AssemblyAttributes>
         </ItemGroup>
         <!-- writes the attribute to the customAssemblyInfo file -->
         <WriteCodeFragment Language="C#" OutputFile="$(CustomAssemblyInfoFile)" AssemblyAttributes="@(AssemblyAttributes)" />
+    </Target>
+
+    <!-- Copy plugin .targets folder into distrib -->
+    <Target Name="CopyPluginTargets" AfterTargets="Build">
+        <Copy SourceFiles="$(ProjectDir)\..\targets\Dalamud.Plugin.targets;$(ProjectDir)\..\targets\Dalamud.Plugin.Bootstrap.targets" DestinationFolder="$(OutDir)\targets" />
     </Target>
 </Project>

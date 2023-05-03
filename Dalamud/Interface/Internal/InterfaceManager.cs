@@ -26,7 +26,6 @@ using ImGuiNET;
 using ImGuiScene;
 using PInvoke;
 using Serilog;
-using SharpDX.Direct3D11;
 
 // general dev notes, here because it's easiest
 
@@ -55,6 +54,8 @@ internal class InterfaceManager : IDisposable, IServiceType
 
     private readonly HashSet<SpecialGlyphRequest> glyphRequests = new();
     private readonly Dictionary<ImFontPtr, TargetFontModification> loadedFontInfo = new();
+
+    private readonly List<DalamudTextureWrap> deferredDisposeTextures = new();
 
     [ServiceManager.ServiceDependency]
     private readonly Framework framework = Service<Framework>.Get();
@@ -145,7 +146,7 @@ internal class InterfaceManager : IDisposable, IServiceType
     /// <summary>
     /// Gets the D3D11 device instance.
     /// </summary>
-    public Device? Device => this.scene?.Device;
+    public SharpDX.Direct3D11.Device? Device => this.scene?.Device;
 
     /// <summary>
     /// Gets the address handle to the main process window.
@@ -242,7 +243,8 @@ internal class InterfaceManager : IDisposable, IServiceType
 
         try
         {
-            return this.scene?.LoadImage(filePath) ?? null;
+            var wrap = this.scene?.LoadImage(filePath);
+            return wrap != null ? new DalamudTextureWrap(wrap) : null;
         }
         catch (Exception ex)
         {
@@ -264,7 +266,8 @@ internal class InterfaceManager : IDisposable, IServiceType
 
         try
         {
-            return this.scene?.LoadImage(imageData) ?? null;
+            var wrap = this.scene?.LoadImage(imageData);
+            return wrap != null ? new DalamudTextureWrap(wrap) : null;
         }
         catch (Exception ex)
         {
@@ -289,7 +292,8 @@ internal class InterfaceManager : IDisposable, IServiceType
 
         try
         {
-            return this.scene?.LoadImageRaw(imageData, width, height, numChannels) ?? null;
+            var wrap = this.scene?.LoadImageRaw(imageData, width, height, numChannels);
+            return wrap != null ? new DalamudTextureWrap(wrap) : null;
         }
         catch (Exception ex)
         {
@@ -393,6 +397,59 @@ internal class InterfaceManager : IDisposable, IServiceType
         }
 
         return this.NewFontSizeRef(size, ranges);
+    }
+
+    /// <summary>
+    /// Enqueue a texture to be disposed at the end of the frame.
+    /// </summary>
+    /// <param name="wrap">The texture.</param>
+    public void EnqueueDeferredDispose(DalamudTextureWrap wrap)
+    {
+        this.deferredDisposeTextures.Add(wrap);
+    }
+
+    /// <summary>
+    /// Get video memory information.
+    /// </summary>
+    /// <returns>The currently used video memory, or null if not available.</returns>
+    public (long Used, long Available)? GetD3dMemoryInfo()
+    {
+        if (this.Device == null)
+            return null;
+
+        try
+        {
+            var dxgiDev = this.Device.QueryInterfaceOrNull<SharpDX.DXGI.Device>();
+            var dxgiAdapter = dxgiDev?.Adapter.QueryInterfaceOrNull<SharpDX.DXGI.Adapter4>();
+            if (dxgiAdapter == null)
+                return null;
+
+            var memInfo = dxgiAdapter.QueryVideoMemoryInfo(0, SharpDX.DXGI.MemorySegmentGroup.Local);
+            return (memInfo.CurrentUsage, memInfo.CurrentReservation);
+        }
+        catch
+        {
+            // ignored
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Toggle Windows 11 immersive mode on the game window.
+    /// </summary>
+    /// <param name="enabled">Value.</param>
+    internal void SetImmersiveMode(bool enabled)
+    {
+        if (this.GameWindowHandle == nint.Zero)
+            return;
+
+        int value = enabled ? 1 : 0;
+        var hr = NativeFunctions.DwmSetWindowAttribute(
+            this.GameWindowHandle,
+            NativeFunctions.DWMWINDOWATTRIBUTE.DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ref value,
+            sizeof(int));
     }
 
     private static void ShowFontError(string path)
@@ -549,6 +606,17 @@ internal class InterfaceManager : IDisposable, IServiceType
 
         this.RenderImGui();
 
+        if (this.deferredDisposeTextures.Count > 0)
+        {
+            Log.Verbose("[IM] Disposing {Count} textures", this.deferredDisposeTextures.Count);
+            foreach (var texture in this.deferredDisposeTextures)
+            {
+                texture.RealDispose();
+            }
+
+            this.deferredDisposeTextures.Clear();
+        }
+
         return this.presentHook.Original(swapChain, syncInterval, presentFlags);
     }
 
@@ -673,7 +741,7 @@ internal class InterfaceManager : IDisposable, IServiceType
             // FontAwesome icon font
             Log.Verbose("[FONT] SetupFonts - FontAwesome icon font");
             {
-                var fontPathIcon = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "FontAwesome5FreeSolid.otf");
+                var fontPathIcon = Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "FontAwesomeFreeSolid.otf");
                 if (!File.Exists(fontPathIcon))
                     ShowFontError(fontPathIcon);
 
@@ -929,6 +997,16 @@ internal class InterfaceManager : IDisposable, IServiceType
 
                 if (pid == Environment.ProcessId && User32.IsWindowVisible(this.GameWindowHandle))
                     break;
+            }
+
+            try
+            {
+                if (Service<DalamudConfiguration>.Get().WindowIsImmersive)
+                    this.SetImmersiveMode(true);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Could not enable immersive mode");
             }
 
             this.presentHook = Hook<PresentDelegate>.FromAddress(this.address.Present, this.PresentDetour);

@@ -184,9 +184,18 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
     /// </summary>
     /// <param name="worldPos">Coordinates in the world.</param>
     /// <param name="screenPos">Converted coordinates.</param>
-    /// <returns>True if worldPos corresponds to a position in front of the camera.</returns>
-    /* TODO: Hold for 6.2 since FFXIVClientStruct not updated
+    /// <returns>True if worldPos corresponds to a position in front of the camera and screenPos is in the viewport.</returns>
     public bool WorldToScreen(Vector3 worldPos, out Vector2 screenPos)
+        => this.WorldToScreen(worldPos, out screenPos, out var inView) && inView;
+
+    /// <summary>
+    /// Converts in-world coordinates to screen coordinates (upper left corner origin).
+    /// </summary>
+    /// <param name="worldPos">Coordinates in the world.</param>
+    /// <param name="screenPos">Converted coordinates.</param>
+    /// <param name="inView">True if screenPos corresponds to a position inside the camera viewport.</param>
+    /// <returns>True if worldPos corresponds to a position in front of the camera.</returns>
+    public bool WorldToScreen(Vector3 worldPos, out Vector2 screenPos, out bool inView)
     {
         // Get base object with matrices
         var matrixSingleton = this.getMatrixSingleton();
@@ -204,43 +213,12 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
         screenPos.X = (0.5f * width * (screenPos.X + 1f)) + windowPos.X;
         screenPos.Y = (0.5f * height * (1f - screenPos.Y)) + windowPos.Y;
 
-        return pCoords.Z > 0 &&
-               screenPos.X > windowPos.X && screenPos.X < windowPos.X + width &&
-               screenPos.Y > windowPos.Y && screenPos.Y < windowPos.Y + height;
-    }
-    */
-    public bool WorldToScreen(Vector3 worldPos, out Vector2 screenPos)
-    {
-        // Get base object with matrices
-        var matrixSingleton = this.getMatrixSingleton();
+        var inFront = pCoords.Z > 0;
+        inView = inFront &&
+                 screenPos.X > windowPos.X && screenPos.X < windowPos.X + width &&
+                 screenPos.Y > windowPos.Y && screenPos.Y < windowPos.Y + height;
 
-        // Read current ViewProjectionMatrix plus game window size
-        var viewProjectionMatrix = default(SharpDX.Matrix);
-        float width, height;
-        var windowPos = ImGuiHelpers.MainViewport.Pos;
-
-        unsafe
-        {
-            var rawMatrix = (float*)(matrixSingleton + 0x1b4).ToPointer();
-
-            for (var i = 0; i < 16; i++, rawMatrix++)
-                viewProjectionMatrix[i] = *rawMatrix;
-
-            width = *rawMatrix;
-            height = *(rawMatrix + 1);
-        }
-
-        var worldPosDx = worldPos.ToSharpDX();
-        SharpDX.Vector3.Transform(ref worldPosDx, ref viewProjectionMatrix, out SharpDX.Vector3 pCoords);
-
-        screenPos = new Vector2(pCoords.X / pCoords.Z, pCoords.Y / pCoords.Z);
-
-        screenPos.X = (0.5f * width * (screenPos.X + 1f)) + windowPos.X;
-        screenPos.Y = (0.5f * height * (1f - screenPos.Y)) + windowPos.Y;
-
-        return pCoords.Z > 0 &&
-               screenPos.X > windowPos.X && screenPos.X < windowPos.X + width &&
-               screenPos.Y > windowPos.Y && screenPos.Y < windowPos.Y + height;
+        return inFront;
     }
 
     /// <summary>
@@ -358,7 +336,7 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
     /// <param name="name">Name of addon to find.</param>
     /// <param name="index">Index of addon to find (1-indexed).</param>
     /// <returns>IntPtr.Zero if unable to find UI, otherwise IntPtr pointing to the start of the addon.</returns>
-    public unsafe IntPtr GetAddonByName(string name, int index)
+    public unsafe IntPtr GetAddonByName(string name, int index = 1)
     {
         var atkStage = FFXIVClientStructs.FFXIV.Component.GUI.AtkStage.GetSingleton();
         if (atkStage == null)
@@ -398,7 +376,7 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
     /// </summary>
     /// <param name="addonPtr">The addon address.</param>
     /// <returns>A pointer to the agent interface.</returns>
-    public unsafe IntPtr FindAgentInterface(IntPtr addonPtr)
+    public IntPtr FindAgentInterface(IntPtr addonPtr)
     {
         if (addonPtr == IntPtr.Zero)
             return IntPtr.Zero;
@@ -447,10 +425,25 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
     }
 
     /// <summary>
+    /// Indicates if the game is on the title screen.
+    /// </summary>
+    /// <returns>A value indicating whether or not the game is on the title screen.</returns>
+    internal bool IsOnTitleScreen()
+    {
+        var charaSelect = this.GetAddonByName("CharaSelect", 1);
+        var charaMake = this.GetAddonByName("CharaMake", 1);
+        var titleDcWorldMap = this.GetAddonByName("TitleDCWorldMap", 1);
+        if (charaMake != nint.Zero || charaSelect != nint.Zero || titleDcWorldMap != nint.Zero)
+            return false;
+
+        return !Service<ClientState.ClientState>.Get().IsLoggedIn;
+    }
+
+    /// <summary>
     /// Set the current background music.
     /// </summary>
     /// <param name="bgmKey">The background music key.</param>
-    public void SetBgm(ushort bgmKey) => this.setGlobalBgmHook.Original(bgmKey, 0, 0, 0, 0, 0);
+    internal void SetBgm(ushort bgmKey) => this.setGlobalBgmHook.Original(bgmKey, 0, 0, 0, 0, 0);
 
     /// <summary>
     /// Reset the stored "UI hide" state.

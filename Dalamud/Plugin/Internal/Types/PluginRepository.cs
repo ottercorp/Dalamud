@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
@@ -10,6 +11,7 @@ using Microsoft.Extensions.Caching.Abstractions;
 using Microsoft.Extensions.Caching.InMemory;
 
 using Dalamud.Logging.Internal;
+using Dalamud.Networking.Http;
 using Newtonsoft.Json;
 
 namespace Dalamud.Plugin.Internal.Types;
@@ -26,7 +28,14 @@ internal class PluginRepository
 
     private static readonly ModuleLog Log = new("PLUGINR");
 
-    private static readonly InMemoryCacheHandler CacheHandler = new InMemoryCacheHandler(new HttpClientHandler(), CacheExpirationProvider.CreateSimple(TimeSpan.FromHours(3), TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(0)));
+    private static readonly InMemoryCacheHandler CacheHandler = new(
+        new SocketsHttpHandler
+        {
+            AutomaticDecompression = DecompressionMethods.All,
+            ConnectCallback = Service<HappyHttpClient>.Get().SharedHappyEyeballsCallback.ConnectCallback,
+        },
+        CacheExpirationProvider.CreateSimple(TimeSpan.FromHours(3), TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(0)));
+
     private static readonly HttpClient HttpClient = new(CacheHandler)
     {
         Timeout = TimeSpan.FromSeconds(20),

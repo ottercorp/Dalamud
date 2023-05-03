@@ -19,6 +19,7 @@ using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Logging.Internal;
+using Dalamud.Networking.Http;
 using ImGuiNET;
 using Microsoft.Win32;
 using Serilog;
@@ -31,6 +32,7 @@ namespace Dalamud.Utility;
 public static class Util
 {
     private static string? gitHashInternal;
+    private static int? gitCommitCountInternal;
     private static string? gitHashClientStructsInternal;
     private static List<FuckGFWSettings> fuckGFWList;
 
@@ -41,7 +43,8 @@ public static class Util
     /// Gets an httpclient for usage.
     /// Do NOT await this.
     /// </summary>
-    public static HttpClient HttpClient { get; } = new();
+    [Obsolete($"Use Service<{nameof(HappyHttpClient)}> instead.")]
+    public static HttpClient HttpClient { get; } = Service<HappyHttpClient>.Get().SharedHttpClient;
 
     /// <summary>
     /// Gets the assembly version of Dalamud.
@@ -116,6 +119,26 @@ public static class Util
         gitHashInternal = attrs.First(a => a.Key == "GitHash").Value;
 
         return gitHashInternal;
+    }
+
+    /// <summary>
+    /// Gets the amount of commits in the current branch, or null if undetermined.
+    /// </summary>
+    /// <returns>The amount of commits in the current branch.</returns>
+    public static int? GetGitCommitCount()
+    {
+        if (gitCommitCountInternal != null)
+            return gitCommitCountInternal.Value;
+
+        var asm = typeof(Util).Assembly;
+        var attrs = asm.GetCustomAttributes<AssemblyMetadataAttribute>();
+
+        var value = attrs.First(a => a.Key == "GitCommitCount").Value;
+        if (value == null)
+            return null;
+
+        gitCommitCountInternal = int.Parse(value);
+        return gitCommitCountInternal.Value;
     }
 
     /// <summary>
@@ -566,6 +589,12 @@ public static class Util
 
         return Check1() || Check2() || Check3();
     }
+    
+    /// <summary>
+    /// Heuristically determine if the Windows version is higher than Windows 11's first build.
+    /// </summary>
+    /// <returns>If Windows 11 has been detected.</returns>
+    public static bool IsWindows11() => Environment.OSVersion.Version.Build >= 22000;
 
     /// <summary>
     /// Set the proxy.
@@ -631,6 +660,22 @@ public static class Util
             else
                 Log.Error(e, logMessage);
         }
+    }
+
+    /// <summary>
+    /// Overwrite text in a file by first writing it to a temporary file, and then
+    /// moving that file to the path specified.
+    /// </summary>
+    /// <param name="path">The path of the file to write to.</param>
+    /// <param name="text">The text to write.</param>
+    internal static void WriteAllTextSafe(string path, string text)
+    {
+        var tmpPath = path + ".tmp";
+        if (File.Exists(tmpPath))
+            File.Delete(tmpPath);
+
+        File.WriteAllText(tmpPath, text);
+        File.Move(tmpPath, path, true);
     }
 
     private static unsafe void ShowValue(ulong addr, IEnumerable<string> path, Type type, object value)
