@@ -42,14 +42,7 @@ public static class StringExtensions
     public static bool IsValidCharacterName(this string value)
     {
         if (string.IsNullOrEmpty(value)) return false;
-        if (value.Length > 21) return false; // add 1 to allow for space
-        var names = value.Split(' ');
-        if (names.Length != 2) return false;
-        var forename = names[0];
-        var surname = names[1];
-        if (!IsValidName(forename)) return false;
-        if (!IsValidName(surname)) return false;
-        return true;
+        return (FFXIVClientStructs.FFXIV.Client.UI.UIModule.IsPlayerCharacterName(value));
     }
 
     private static bool IsValidName(string name)
