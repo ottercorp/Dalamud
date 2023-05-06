@@ -60,7 +60,7 @@ public sealed partial class ObjectTable : IServiceType
     /// </summary>
     /// <param name="objectId">Object ID to find.</param>
     /// <returns>A game object or null.</returns>
-    public GameObject? SearchById(uint objectId)
+    public GameObject? SearchById(ulong objectId)
     {
         if (objectId is GameObject.InvalidGameObjectId or 0)
             return null;
@@ -111,8 +111,12 @@ public sealed partial class ObjectTable : IServiceType
         {
             ObjectKind.Player => new PlayerCharacter(address),
             ObjectKind.BattleNpc => new BattleNpc(address),
+            ObjectKind.EventNpc => new Npc(address),
+            ObjectKind.Retainer => new Npc(address),
             ObjectKind.EventObj => new EventObj(address),
             ObjectKind.Companion => new Npc(address),
+            ObjectKind.MountType => new Npc(address),
+            ObjectKind.Ornament => new Npc(address),
             _ => new GameObject(address),
         };
     }

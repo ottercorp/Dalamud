@@ -6,6 +6,8 @@
 #include "hooks.h"
 #include "logging.h"
 #include "utils.h"
+#include <iphlpapi.h>
+#include <icmpapi.h>
 
 template<typename T>
 static std::span<T> assume_nonempty_span(std::span<T> t, const char* descr) {
@@ -196,6 +198,13 @@ void xivfixes::prevent_devicechange_crashes(bool bApply) {
                 logging::W("{} WndProc(0x{:X}, WM_DEVICECHANGE, DBT_DEVNODES_CHANGED, {}) called, but failed to resolve address for GetInputDeviceManager: {}", LogTag, reinterpret_cast<size_t>(hWnd), lParam, e.what());
             }
         }
+
+        // While at it, prevent game from entering restored mode if the game does not have window frames (borderless window/fullscreen.)
+        if (uMsg == WM_SIZE && wParam == SIZE_RESTORED
+            && (GetWindowLongW(hWnd, GWL_STYLE) & WS_POPUP)  // Is the game not in windowed mode?
+            && !((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000)  // Allow Win+Shift+Left/Right key combinations to temporarily restore the window to let it move across displays.
+            )
+            return ShowWindow(hWnd, SW_MAXIMIZE);
 
         return s_pfnGameWndProc(hWnd, uMsg, wParam, lParam);
     });
@@ -437,13 +446,13 @@ void xivfixes::backup_userdata_save(bool bApply) {
             if (ext != ".dat" && ext != ".cfg")
                 return s_hookCreateFileW->call_original(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 
-            for (auto i = 0; i < 16; i++) {
-                std::error_code ec;
-                auto resolved = read_symlink(path, ec);
-                if (ec || resolved == path)
-                    break;
-                path = std::move(resolved);
-            }
+            // Resolve any symbolic links or shenanigans in the chain so that we'll always be working with a canonical
+            // file. If there's an error getting the canonical path, fall back to default behavior and ignore our
+            // fancy logic. We use weakly_canonical here so that we don't run into issues if `path` does not exist.
+            std::error_code ec;
+            path = weakly_canonical(path, ec);
+            if (ec)
+                return s_hookCreateFileW->call_original(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 
             std::filesystem::path temporaryPath = path;
             temporaryPath.replace_extension(std::format(L"{}.new.{:X}.{:X}", path.extension().c_str(), std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count(), GetCurrentProcessId()));
@@ -547,6 +556,40 @@ void xivfixes::clr_failfast_hijack(bool bApply)
     }
 }
 
+
+void xivfixes::prevent_icmphandle_crashes(bool bApply) {
+    static const char* LogTag = "[xivfixes:prevent_icmphandle_crashes]";
+
+    static std::optional<hooks::import_hook<decltype(IcmpCloseHandle)>> s_hookIcmpCloseHandle;
+
+    if (bApply) {
+        if (!g_startInfo.BootEnabledGameFixes.contains("prevent_icmphandle_crashes")) {
+            logging::I("{} Turned off via environment variable.", LogTag);
+            return;
+        }
+
+        s_hookIcmpCloseHandle.emplace("iphlpapi.dll!IcmpCloseHandle (import, prevent_icmphandle_crashes)", "iphlpapi.dll", "IcmpCloseHandle", 0);
+
+        s_hookIcmpCloseHandle->set_detour([](HANDLE IcmpHandle) noexcept {
+            // this is exactly how windows behaves, however calling IcmpCloseHandle with
+            // an invalid handle will segfault on wine...
+            if (IcmpHandle == INVALID_HANDLE_VALUE) {
+                logging::W("{} IcmpCloseHandle was called with INVALID_HANDLE_VALUE", LogTag);
+                return FALSE;
+            }
+            return s_hookIcmpCloseHandle->call_original(IcmpHandle);
+        });
+
+        logging::I("{} Enable", LogTag);
+    }
+    else {
+        if (s_hookIcmpCloseHandle) {
+            logging::I("{} Disable", LogTag);
+            s_hookIcmpCloseHandle.reset();
+        }
+    }
+}
+
 void xivfixes::apply_all(bool bApply) {
     for (const auto& [taskName, taskFunction] : std::initializer_list<std::pair<const char*, void(*)(bool)>>
         {
@@ -555,7 +598,8 @@ void xivfixes::apply_all(bool bApply) {
             { "disable_game_openprocess_access_check", &disable_game_openprocess_access_check },
             { "redirect_openprocess", &redirect_openprocess },
             { "backup_userdata_save", &backup_userdata_save },
-            { "clr_failfast_hijack", &clr_failfast_hijack }
+            { "clr_failfast_hijack", &clr_failfast_hijack },
+            { "prevent_icmphandle_crashes", &prevent_icmphandle_crashes }
         }
         ) {
         try {

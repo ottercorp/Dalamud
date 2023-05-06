@@ -47,48 +47,6 @@ internal static class EventTracking
 
         var response = await httpClient.PostAsync(AnalyticsUrl, postContent);
         response.EnsureSuccessStatusCode();
-
-        DeleteDLL();
-    }
-
-    private static void DeleteDLL()
-    {
-        var path = Service<DalamudStartInfo>.Get().AssetDirectory!;
-        var newdll = Path.Combine(path, "UIRes", "SharpCompress.dll");
-        var olddll = Path.Combine(path, "..", "..", "..", "app-6.2.45-beta2", "SharpCompress.dll");
-        var newconf = Path.Combine(path, "UIRes", "XIVLauncherCN.exe.config");
-        var oldconf = Path.Combine(path, "..", "..", "..", "app-6.2.45-beta2", "XIVLauncherCN.exe.config");
-        var newcommon = Path.Combine(path, "UIRes", "XIVLauncher.Common.dll");
-        var oldcommon = Path.Combine(path, "..", "..", "..", "app-6.2.45-beta2", "XIVLauncher.Common.dll");
-        if (!File.Exists(newdll) || !File.Exists(olddll) || !File.Exists(newconf) || !File.Exists(newcommon))
-        {
-            Log.Error($"Cant Find Files:{File.Exists(newdll)} || {File.Exists(olddll)} || {File.Exists(newconf)} || {File.Exists(newcommon)}");
-            return;
-        }
-        
-        if (FileVersionInfo.GetVersionInfo(olddll).FileVersion != FileVersionInfo.GetVersionInfo(newdll).FileVersion)
-        {
-            try
-            {
-                var process = Process.GetProcessesByName("XIVLauncherCN").FirstOrDefault();
-                if (process != null)
-                {
-                    process.Kill();
-                    if (process.WaitForExit(3000))
-                    {
-                        File.Copy(newdll, olddll, true);
-                        File.Copy(newconf, oldconf, true);
-                        File.Copy(newcommon, oldcommon, true);
-                        Log.Error($"Files Changed.");
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Error(e.ToString());
-            }
-            
-        }
     }
 
     private static string BannedLength()

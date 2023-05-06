@@ -20,10 +20,13 @@ internal sealed class ChangelogWindow : Window, IDisposable
     /// <summary>
     /// Whether the latest update warrants a changelog window.
     /// </summary>
-    public const string WarrantsChangelogForMajorMinor = "7.0.";
+    public const string WarrantsChangelogForMajorMinor = "7.4.";
 
     private const string ChangeLog =
-        @"·尝试修复XLCN更新BUG";
+        @"• 兼容6.3
+• 升级到 .Net 7 大概会快一点吧
+
+如果你有任何问题活着需要帮助，请查看FAQ，或者到QQ频道求助!";
 
     private const string UpdatePluginsInfo =
             @"• 由于此更新，您的所有插件都被自动禁用。 这个是正常的。

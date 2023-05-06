@@ -15,7 +15,6 @@ using Dalamud.Logging.Internal;
 using Dalamud.Plugin.Internal.Exceptions;
 using Dalamud.Plugin.Internal.Loader;
 using Dalamud.Utility;
-using Dalamud.Utility.Signatures;
 
 namespace Dalamud.Plugin.Internal.Types;
 
@@ -148,7 +147,7 @@ internal class LocalPlugin : IDisposable
         }
 
         var pluginManager = Service<PluginManager>.Get();
-        this.IsBanned = pluginManager.IsManifestBanned(this.Manifest);
+        this.IsBanned = pluginManager.IsManifestBanned(this.Manifest) && !this.IsDev;
         this.BanReason = pluginManager.GetBanReason(this.Manifest);
 
         this.SaveManifest();
@@ -220,8 +219,14 @@ internal class LocalPlugin : IDisposable
     /// </summary>
     public bool IsOrphaned => !this.IsDev &&
                               !this.Manifest.InstalledFromUrl.IsNullOrEmpty() && // TODO(api8): Remove this, all plugins will have a proper flag
-                              Service<PluginManager>.Get().Repos.All(x => x.PluginMasterUrl != this.Manifest.InstalledFromUrl) &&
-                              this.Manifest.InstalledFromUrl != LocalPluginManifest.FlagMainRepo;
+                              this.GetSourceRepository() == null;
+
+    /// <summary>
+    /// Gets a value indicating whether or not this plugin is serviced(repo still exists, but plugin no longer does).
+    /// </summary>
+    public bool IsDecommissioned => !this.IsDev &&
+                                    this.GetSourceRepository()?.State == PluginRepositoryState.Success &&
+                                    this.GetSourceRepository()?.PluginMaster?.FirstOrDefault(x => x.InternalName == this.Manifest.InternalName) == null;
 
     /// <summary>
     /// Gets a value indicating whether this plugin has been banned.
@@ -300,8 +305,13 @@ internal class LocalPlugin : IDisposable
                     throw new InvalidPluginOperationException(
                         $"Unable to load {this.Name}, load previously faulted, unload first");
                 case PluginState.UnloadError:
-                    throw new InvalidPluginOperationException(
+                    if (!this.IsDev)
+                    {
+                        throw new InvalidPluginOperationException(
                         $"Unable to load {this.Name}, unload previously faulted, restart Dalamud");
+                    }
+
+                    break;
                 case PluginState.Unloaded:
                     break;
                 case PluginState.Loading:
@@ -310,7 +320,7 @@ internal class LocalPlugin : IDisposable
                     throw new ArgumentOutOfRangeException(this.State.ToString());
             }
 
-            if (pluginManager.IsManifestBanned(this.Manifest))
+            if (pluginManager.IsManifestBanned(this.Manifest) && !this.IsDev)
                 throw new BannedPluginException($"Unable to load {this.Name}, banned");
 
             if (this.Manifest.ApplicableVersion < startInfo.GameVersion)
@@ -397,11 +407,10 @@ internal class LocalPlugin : IDisposable
             }
 
             // Update the location for the Location and CodeBase patches
-            PluginManager.PluginLocations[this.pluginType.Assembly.FullName] =
-                new PluginPatchData(this.DllFile);
+            PluginManager.PluginLocations[this.pluginType.Assembly.FullName] = new PluginPatchData(this.DllFile);
 
             this.DalamudInterface =
-                new DalamudPluginInterface(this.pluginAssembly.GetName().Name!, this.DllFile, reason, this.IsDev, this.Manifest.InstalledFromUrl);
+                new DalamudPluginInterface(this.pluginAssembly.GetName().Name!, this.DllFile, reason, this.IsDev, this.Manifest);
 
             if (this.Manifest.LoadSync && this.Manifest.LoadRequiredState is 0 or 1)
             {
@@ -466,8 +475,13 @@ internal class LocalPlugin : IDisposable
                 case PluginState.Unloaded:
                     throw new InvalidPluginOperationException($"Unable to unload {this.Name}, already unloaded");
                 case PluginState.UnloadError:
-                    throw new InvalidPluginOperationException(
-                        $"Unable to unload {this.Name}, unload previously faulted, restart Dalamud");
+                    if (!this.IsDev)
+                    {
+                        throw new InvalidPluginOperationException(
+                            $"Unable to unload {this.Name}, unload previously faulted, restart Dalamud");
+                    }
+
+                    break;
                 case PluginState.Loaded:
                 case PluginState.LoadError:
                     break;
@@ -526,7 +540,10 @@ internal class LocalPlugin : IDisposable
     /// <returns>A task.</returns>
     public async Task ReloadAsync()
     {
-        await this.UnloadAsync(true);
+        // Don't unload if we're a dev plugin and have an unload error, this is a bad idea but whatever
+        if (this.IsDev && this.State != PluginState.UnloadError)
+            await this.UnloadAsync(true);
+
         await this.LoadAsync(PluginLoadReason.Reload, true);
     }
 
@@ -553,8 +570,11 @@ internal class LocalPlugin : IDisposable
                 throw new ArgumentOutOfRangeException(this.State.ToString());
         }
 
-        if (!this.Manifest.Disabled)
-            throw new InvalidPluginOperationException($"Unable to enable {this.Name}, not disabled");
+        // NOTE(goat): This is inconsequential, and we do have situations where a plugin can end up enabled but not loaded:
+        // Orphaned plugins can have their repo added back, but may not have been loaded at boot and may still be enabled.
+        // We don't want to disable orphaned plugins when they are orphaned so this is how it's going to be.
+        // if (!this.Manifest.Disabled)
+        //    throw new InvalidPluginOperationException($"Unable to enable {this.Name}, not disabled");
 
         this.Manifest.Disabled = false;
         this.Manifest.ScheduledForDeletion = false;
@@ -636,6 +656,25 @@ internal class LocalPlugin : IDisposable
 
             this.SaveManifest();
         }
+    }
+
+    /// <summary>
+    /// Get the repository this plugin was installed from.
+    /// </summary>
+    /// <returns>The plugin repository this plugin was installed from, or null if it is no longer there or if the plugin is a dev plugin.</returns>
+    public PluginRepository? GetSourceRepository()
+    {
+        if (this.IsDev)
+            return null;
+
+        var repos = Service<PluginManager>.Get().Repos;
+        return repos.FirstOrDefault(x =>
+        {
+            if (!x.IsThirdParty && !this.Manifest.IsThirdParty)
+                return true;
+
+            return x.PluginMasterUrl == this.Manifest.InstalledFromUrl;
+        });
     }
 
     private static void SetupLoaderConfig(LoaderConfig config)

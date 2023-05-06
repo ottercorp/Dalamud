@@ -17,6 +17,7 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Interface;
 using Dalamud.Interface.Internal;
+using Dalamud.Interface.Internal.Windows.PluginInstaller;
 using Dalamud.Plugin.Internal;
 using Dalamud.Plugin.Internal.Types;
 using Dalamud.Plugin.Ipc;
@@ -42,8 +43,8 @@ public sealed class DalamudPluginInterface : IDisposable
     /// <param name="assemblyLocation">Location of the assembly.</param>
     /// <param name="reason">The reason the plugin was loaded.</param>
     /// <param name="isDev">A value indicating whether this is a dev plugin.</param>
-    /// <param name="sourceRepository">The repository from which the plugin is installed.</param>
-    internal DalamudPluginInterface(string pluginName, FileInfo assemblyLocation, PluginLoadReason reason, bool isDev, string sourceRepository)
+    /// <param name="manifest">The local manifest for this plugin.</param>
+    internal DalamudPluginInterface(string pluginName, FileInfo assemblyLocation, PluginLoadReason reason, bool isDev, LocalPluginManifest manifest)
     {
         var configuration = Service<DalamudConfiguration>.Get();
         var dataManager = Service<DataManager>.Get();
@@ -56,7 +57,8 @@ public sealed class DalamudPluginInterface : IDisposable
         this.configs = Service<PluginManager>.Get().PluginConfigs;
         this.Reason = reason;
         this.IsDev = isDev;
-        this.SourceRepository = isDev ? LocalPluginManifest.FlagDevPlugin : sourceRepository;
+        this.SourceRepository = isDev ? LocalPluginManifest.FlagDevPlugin : manifest.InstalledFromUrl;
+        this.IsTesting = manifest.Testing;
 
         this.LoadTime = DateTime.Now;
         this.LoadTimeUTC = DateTime.UtcNow;
@@ -97,14 +99,31 @@ public sealed class DalamudPluginInterface : IDisposable
     public PluginLoadReason Reason { get; }
 
     /// <summary>
-    /// Gets the custom repository from which this plugin is installed, <inheritdoc cref="LocalPluginManifest.FlagMainRepo"/>, or <inheritdoc cref="LocalPluginManifest.FlagDevPlugin"/>.
+    /// Gets the repository from which this plugin was installed.
+    ///
+    /// If a plugin was installed from the official/main repository, this will return the value of
+    /// <see cref="LocalPluginManifest.FlagMainRepo"/>. Developer plugins will return the value of
+    /// <see cref="LocalPluginManifest.FlagDevPlugin"/>.
     /// </summary>
     public string SourceRepository { get; }
 
     /// <summary>
+    /// Gets the current internal plugin name.
+    /// </summary>
+    public string InternalName => this.pluginName;
+    
+    /// <summary>
     /// Gets a value indicating whether this is a dev plugin.
     /// </summary>
     public bool IsDev { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether this is a testing release of a plugin.
+    /// </summary>
+    /// <remarks>
+    /// Dev plugins have undefined behavior for this value, but can be expected to return <c>false</c>.
+    /// </remarks>
+    public bool IsTesting { get; }
 
     /// <summary>
     /// Gets the time that this plugin was loaded.
@@ -180,6 +199,24 @@ public sealed class DalamudPluginInterface : IDisposable
     /// Gets a list of installed plugin internal names.
     /// </summary>
     public List<string> PluginInternalNames => Service<PluginManager>.Get().InstalledPlugins.Select(p => p.Manifest.InternalName).ToList();
+
+    /// <summary>
+    /// Opens the <see cref="PluginInstallerWindow"/> with the plugin name set as search target.
+    /// </summary>
+    /// <returns>Returns false if the DalamudInterface was null.</returns>
+    public bool OpenPluginInstaller()
+    {
+        var dalamudInterface = Service<DalamudInterface>.GetNullable(); // Can be null during boot
+        if (dalamudInterface == null)
+        {
+            return false;
+        }
+
+        dalamudInterface.OpenPluginInstallerPluginInstalled();
+        dalamudInterface.SetPluginInstallerSearchText(this.pluginName);
+
+        return true;
+    }
 
     #region IPC
 

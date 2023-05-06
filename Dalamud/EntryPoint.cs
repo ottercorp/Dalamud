@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 
 using Dalamud.Configuration.Internal;
 using Dalamud.Logging.Internal;
+using Dalamud.Plugin.Internal;
 using Dalamud.Support;
 using Dalamud.Utility;
 using Newtonsoft.Json;
@@ -81,16 +82,19 @@ public sealed class EntryPoint
     /// <param name="baseDirectory">Base directory.</param>
     /// <param name="logConsole">Whether to log to console.</param>
     /// <param name="logSynchronously">Log synchronously.</param>
-    internal static void InitLogging(string baseDirectory, bool logConsole, bool logSynchronously)
+    /// <param name="logName">Name that should be appended to the log file.</param>
+    internal static void InitLogging(string baseDirectory, bool logConsole, bool logSynchronously, string? logName)
     {
+        var logFileName = logName.IsNullOrEmpty() ? "dalamud" : $"dalamud-{logName}";
+
 #if DEBUG
-        var logPath = Path.Combine(baseDirectory, "dalamud.log");
-        var oldPath = Path.Combine(baseDirectory, "dalamud.old.log");
-        var oldPathOld = Path.Combine(baseDirectory, "dalamud.log.old");
+        var logPath = Path.Combine(baseDirectory, $"{logFileName}.log");
+        var oldPath = Path.Combine(baseDirectory, $"{logFileName}.old.log");
+        var oldPathOld = Path.Combine(baseDirectory, $"{logFileName}.log.old");
 #else
-        var logPath = Path.Combine(baseDirectory, "..", "..", "..", "dalamud.log");
-        var oldPath = Path.Combine(baseDirectory, "..", "..", "..", "dalamud.old.log");
-        var oldPathOld = Path.Combine(baseDirectory, "..", "..", "..", "dalamud.log.old");
+        var logPath = Path.Combine(baseDirectory, "..", "..", "..", $"{logFileName}.log");
+        var oldPath = Path.Combine(baseDirectory, "..", "..", "..", $"{logFileName}.old.log");
+        var oldPathOld = Path.Combine(baseDirectory, "..", "..", "..", $"{logFileName}.log.old");
 #endif
         Log.CloseAndFlush();
 
@@ -137,18 +141,16 @@ public sealed class EntryPoint
     private static void RunThread(DalamudStartInfo info, IntPtr mainThreadContinueEvent)
     {
         // Setup logger
-        InitLogging(info.WorkingDirectory!, info.BootShowConsole, true);
+        InitLogging(info.WorkingDirectory!, info.BootShowConsole, true, info.LogName);
         SerilogEventSink.Instance.LogLine += SerilogOnLogLine;
 
         // Load configuration first to get some early persistent state, like log level
         var configuration = DalamudConfiguration.Load(info.ConfigurationPath!);
 
         // Set the appropriate logging level from the configuration
-#if !DEBUG
         if (!configuration.LogSynchronously)
-            InitLogging(info.WorkingDirectory!, info.BootShowConsole, configuration.LogSynchronously);
+            InitLogging(info.WorkingDirectory!, info.BootShowConsole, configuration.LogSynchronously, info.LogName);
         LogLevelSwitch.MinimumLevel = configuration.LogLevel;
-#endif
 
         // Log any unhandled exception.
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
@@ -183,7 +185,7 @@ public sealed class EntryPoint
             //    InitSymbolHandler(info);
 
             var dalamud = new Dalamud(info, configuration, mainThreadContinueEvent);
-            Log.Information("This is Dalamud - Core: {GitHash}, CS: {CsGitHash}", Util.GetGitHash(), Util.GetGitHashClientStructs());
+            Log.Information("This is Dalamud - Core: {GitHash}, CS: {CsGitHash} [{CsVersion}]", Util.GetGitHash(), Util.GetGitHashClientStructs(), FFXIVClientStructs.Interop.Resolver.Version);
 
             dalamud.WaitForUnload();
 
@@ -333,10 +335,29 @@ public sealed class EntryPoint
                     info = $"{ex.TargetSite.DeclaringType.Assembly.GetName().Name}, {ex.TargetSite.DeclaringType.FullName}::{ex.TargetSite.Name}";
                 }
 
+                var pluginInfo = string.Empty;
+                var supportText = ", please visit us on Discord for more help.";
+                try
+                {
+                    var pm = Service<PluginManager>.GetNullable();
+                    var plugin = pm?.FindCallingPlugin(new StackTrace(ex));
+                    if (plugin != null)
+                    {
+                        pluginInfo = $"Plugin that caused this:\n{plugin.Name}\n\nClick \"Yes\" and remove it.\n\n";
+
+                        if (plugin.Manifest.IsThirdParty)
+                            supportText = string.Empty;
+                    }
+                }
+                catch
+                {
+                    // ignored
+                }
+
                 const MessageBoxType flags = NativeFunctions.MessageBoxType.YesNo | NativeFunctions.MessageBoxType.IconError | NativeFunctions.MessageBoxType.SystemModal;
                 var result = MessageBoxW(
                     Process.GetCurrentProcess().MainWindowHandle,
-                    $"An internal error in a Dalamud plugin occurred.\nThe game must close.\n\nType: {ex.GetType().Name}\n{info}\n\nMore information has been recorded separately, please contact us in our Discord or on GitHub.\n\nDo you want to disable all plugins the next time you start the game?",
+                    $"An internal error in a Dalamud plugin occurred.\nThe game must close.\n\n{ex.GetType().Name}\n{info}\n\n{pluginInfo}More information has been recorded separately{supportText}.\n\nDo you want to disable all plugins the next time you start the game?",
                     "Dalamud",
                     flags);
 

@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Dalamud.Game;
+using Dalamud.Networking.Http;
 using Dalamud.Plugin.Internal;
 using Dalamud.Plugin.Internal.Types;
 using Dalamud.Utility;
@@ -45,6 +46,12 @@ internal class PluginImageCache : IDisposable, IServiceType
     private const string MainRepoImageUrl = "https://raw.githubusercontent.com/ottercorp/DalamudPlugins/api6/{0}/{1}/images/{2}";
     private const string MainRepoDip17ImageUrl = "https://raw.githubusercontent.com/ottercorp/PluginDistD17/main/{0}/{1}/images/{2}";
 
+    [ServiceManager.ServiceDependency]
+    private readonly InterfaceManager.InterfaceManagerWithScene imWithScene = Service<InterfaceManager.InterfaceManagerWithScene>.Get();
+
+    [ServiceManager.ServiceDependency]
+    private readonly HappyHttpClient happyHttpClient = Service<HappyHttpClient>.Get();
+
     private readonly BlockingCollection<Tuple<ulong, Func<Task>>> downloadQueue = new();
     private readonly BlockingCollection<Func<Task>> loadQueue = new();
     private readonly CancellationTokenSource cancelToken = new();
@@ -68,9 +75,8 @@ internal class PluginImageCache : IDisposable, IServiceType
     [ServiceManager.ServiceConstructor]
     private PluginImageCache(Dalamud dalamud)
     {
-        var imwst = Service<InterfaceManager.InterfaceManagerWithScene>.GetAsync();
-
         Task<TextureWrap>? TaskWrapIfNonNull(TextureWrap? tw) => tw == null ? null : Task.FromResult(tw!);
+        var imwst = Task.Run(() => this.imWithScene);
 
         this.emptyTextureTask = imwst.ContinueWith(task => task.Result.Manager.LoadImageRaw(new byte[64], 8, 8, 4)!);
         this.defaultIconTask = imwst.ContinueWith(task => TaskWrapIfNonNull(task.Result.Manager.LoadImage(Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "defaultIcon.png"))) ?? this.emptyTextureTask).Unwrap();
@@ -299,7 +305,7 @@ internal class PluginImageCache : IDisposable, IServiceType
         return false;
     }
 
-    private static async Task<TextureWrap?> TryLoadImage(
+    private async Task<TextureWrap?> TryLoadImage(
         byte[]? bytes,
         string name,
         string? loc,
@@ -311,7 +317,7 @@ internal class PluginImageCache : IDisposable, IServiceType
         if (bytes == null)
             return null;
 
-        var interfaceManager = (await Service<InterfaceManager.InterfaceManagerWithScene>.GetAsync()).Manager;
+        var interfaceManager = this.imWithScene.Manager;
         var framework = await Service<Framework>.GetAsync();
 
         TextureWrap? image;
@@ -455,8 +461,6 @@ internal class PluginImageCache : IDisposable, IServiceType
 
     private async Task LoadTask(int concurrency)
     {
-        await Service<InterfaceManager.InterfaceManagerWithScene>.GetAsync();
-
         var token = this.cancelToken.Token;
         var runningTasks = new List<Task>();
         while (true)
@@ -502,7 +506,7 @@ internal class PluginImageCache : IDisposable, IServiceType
                                     () => File.ReadAllBytesAsync(file.FullName),
                                     requestedFrame);
                 var fileIcon = await this.RunInLoadQueue(
-                                   () => TryLoadImage(
+                                   () => this.TryLoadImage(
                                        fileBytes,
                                        "icon",
                                        file.FullName,
@@ -537,7 +541,7 @@ internal class PluginImageCache : IDisposable, IServiceType
         var bytes = await this.RunInDownloadQueue<byte[]?>(
                         async () =>
                         {
-                            var data = await Util.HttpClient.GetAsync(url);
+                            var data = await this.happyHttpClient.SharedHttpClient.GetAsync(url);
                             if (data.StatusCode == HttpStatusCode.NotFound)
                                 return null;
 
@@ -550,7 +554,7 @@ internal class PluginImageCache : IDisposable, IServiceType
             return null;
 
         var icon = await this.RunInLoadQueue(
-                       () => TryLoadImage(bytes, "icon", url, manifest, PluginIconWidth, PluginIconHeight, true));
+                       () => this.TryLoadImage(bytes, "icon", url, manifest, PluginIconWidth, PluginIconHeight, true));
         if (icon != null)
             Log.Verbose($"Plugin icon for {manifest.InternalName} loaded");
         return icon;
@@ -575,7 +579,7 @@ internal class PluginImageCache : IDisposable, IServiceType
                                     () => File.ReadAllBytesAsync(file.FullName),
                                     requestedFrame);
                     var image = await this.RunInLoadQueue(
-                                    () => TryLoadImage(
+                                    () => this.TryLoadImage(
                                         bytes,
                                         $"image{i2 + 1}",
                                         file.FullName,
@@ -629,7 +633,9 @@ internal class PluginImageCache : IDisposable, IServiceType
                 var bytes = await this.RunInDownloadQueue<byte[]?>(
                                 async () =>
                                 {
-                                    var data = await Util.HttpClient.GetAsync(url);
+                                    var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
+
+                                    var data = await httpClient.GetAsync(url);
                                     if (data.StatusCode == HttpStatusCode.NotFound)
                                         return null;
 
@@ -641,7 +647,7 @@ internal class PluginImageCache : IDisposable, IServiceType
                 if (bytes == null)
                     return;
 
-                var image = await TryLoadImage(
+                var image = await this.TryLoadImage(
                                 bytes,
                                 $"image{i2 + 1}",
                                 "queue",
