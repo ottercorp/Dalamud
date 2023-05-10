@@ -739,7 +739,7 @@ Thanks and have fun!";
         var version = useTesting ? repoManifest.TestingAssemblyVersion : repoManifest.AssemblyVersion;
 
         // var response = await this.happyHttpClient.SharedHttpClient.GetAsync(downloadUrl);
-        var response = await Util.HttpClient.GetAsync(Util.FuckGFW(downloadUrl));
+        var response = await Util.HttpClient.GetAsync(downloadUrl);
         response.EnsureSuccessStatusCode();
 
         var outputDir = new DirectoryInfo(Path.Combine(this.pluginDirectory.FullName, repoManifest.InternalName, version?.ToString() ?? string.Empty));

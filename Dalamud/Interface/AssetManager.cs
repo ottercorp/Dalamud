@@ -43,7 +43,6 @@ namespace Dalamud.Interface
 
             foreach (var entry in info.Assets)
             {
-                entry.Url = Utility.Util.FuckGFW(entry.Url);
                 var filePath = Path.Combine(baseDir.FullName, entry.FileName);
 
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath));
@@ -121,7 +120,7 @@ namespace Dalamud.Interface
                     Log.Error(ex, "[DASSET] Could not read asset.ver");
                 }
 
-                var remoteVer = JsonConvert.DeserializeObject<AssetInfo>(client.DownloadString(Utility.Util.FuckGFW(ASSET_STORE_URL + "asset.json")));
+                var remoteVer = JsonConvert.DeserializeObject<AssetInfo>(client.DownloadString(ASSET_STORE_URL + "asset.json"));
 
                 Log.Information("[DASSET] Ver check - local:{0} remote:{1}", localVer, remoteVer.Version);
 

@@ -34,7 +34,6 @@ public static class Util
     private static string? gitHashInternal;
     private static int? gitCommitCountInternal;
     private static string? gitHashClientStructsInternal;
-    private static List<FuckGFWSettings> fuckGFWList;
 
     private static ulong moduleStartAddr;
     private static ulong moduleEndAddr;
@@ -460,56 +459,7 @@ public static class Util
 
         return text;
     }
-
-    /// <summary>
-    /// Set the list of fuck GFWs from configure.
-    /// </summary>
-    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    public static void SetFuckGFWFromConfig()
-    {
-        var configuration = Service<DalamudConfiguration>.Get();
-        fuckGFWList = configuration.FuckGFWList;
-    }
-
-    /// <summary>
-    /// This is a FUCK-GFW replacement of urls.
-    /// </summary>
-    /// <param name="url">A url to be fucked.</param>
-    /// <returns>A fucked url.</returns>
-    public static string FuckGFW(string url)
-    {
-        if (url == null) return null;
-        if (fuckGFWList == null)
-        {
-            SetFuckGFWFromConfig();
-        }
-
-        var originalUrl = url;
-        if (fuckGFWList != null)
-        {
-            foreach (var fuckGFW in fuckGFWList)
-            {
-                if (fuckGFW.IsEnabled)
-                {
-                    var oldUrl = url;
-                    url = Regex.Replace(url, fuckGFW.UrlRegex, fuckGFW.ReplaceTo);
-                    if (url != oldUrl)
-                    {
-                        Log.Debug($"GFW fucked by {fuckGFW.UrlRegex} -> {fuckGFW.ReplaceTo}:");
-                        Log.Debug($"\t{url}");
-                    }
-                }
-            }
-        }
-
-        if (originalUrl != url)
-        {
-            Log.Information($"Fucked GFW from {originalUrl} \n\tto {url}");
-        }
-
-        return url;
-    }
-
+    
     /// <summary>
     /// Compress a string using GZip.
     /// </summary>
