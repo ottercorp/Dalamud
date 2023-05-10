@@ -274,7 +274,7 @@ public sealed class DataManager : IDisposable, IServiceType
     /// <returns>The <see cref="ExcelSheet{T}"/>, giving access to game rows.</returns>
     public ExcelSheet<T>? GetExcelSheet<T>(ClientLanguage language) where T : ExcelRow
     {
-        return this.Excel.GetSheet<T>(language.ToLumina());
+        return this.Excel.GetSheet<T>(ClientLanguage.ChineseSimplified.ToLumina());
     }
 
     /// <summary>
