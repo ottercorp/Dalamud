@@ -20,13 +20,18 @@ internal sealed class ChangelogWindow : Window, IDisposable
     /// <summary>
     /// Whether the latest update warrants a changelog window.
     /// </summary>
-    public const string WarrantsChangelogForMajorMinor = "7.4.";
+    public const string WarrantsChangelogForMajorMinor = "7.5.1.2";
 
     private const string ChangeLog =
         @"• 兼容6.3
 • 升级到 .Net 7 大概会快一点吧
-
-如果你有任何问题活着需要帮助，请查看FAQ，或者到QQ频道求助!";
+• 为了优化网络、预测CDN花费、减少滥用和缓解网络攻击，会匿名收集以下数据：
+    角色标志的sha256摘要
+    IP地址的sha256摘要
+    插件数量
+    所有数据会通过服务端转发到Google Analytics,不会在服务端保存.
+    
+如果你有任何问题或者需要帮助，请查看FAQ，或者到QQ频道求助!";
 
     private const string UpdatePluginsInfo =
             @"• 由于此更新，您的所有插件都被自动禁用。 这个是正常的。
