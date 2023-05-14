@@ -20,21 +20,15 @@ internal sealed class ChangelogWindow : Window, IDisposable
     /// <summary>
     /// Whether the latest update warrants a changelog window.
     /// </summary>
-    public const string WarrantsChangelogForMajorMinor = "7.5.1.2";
+    public const string WarrantsChangelogForMajorMinor = "7.5.1.3";
 
     private const string ChangeLog =
-        @"• 兼容6.3
-• 升级到 .Net 7 大概会快一点吧
-• 为了优化网络、预测CDN花费、减少滥用和缓解网络攻击，会匿名收集以下数据：
-    角色标志的sha256摘要
-    IP地址的sha256摘要
-    插件数量
-    所有数据会通过服务端转发到Google Analytics,不会在服务端保存.
+        @"• 重置了代理设置,取消了F**KGFW设置,请重新设置代理并重启游戏
     
 如果你有任何问题或者需要帮助，请查看FAQ，或者到QQ频道求助!";
 
     private const string UpdatePluginsInfo =
-            @"• 由于此更新，您的所有插件都被自动禁用。 这个是正常的。
+            @"• 由于此更新，您的所有插件可能会被禁用。 这是正常的。
 • 打开插件安装程序，然后单击“更新插件”。更新的插件应该更新然后重新启用自己。
     => 请记住，并非所有插件都已针对新版本进行了更新。
     => 如果某些插件在“已安装插件”选项卡中显示为红色叉号，则它们可能尚不可用。";

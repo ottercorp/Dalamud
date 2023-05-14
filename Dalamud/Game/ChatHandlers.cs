@@ -286,6 +286,11 @@ public class ChatHandlers : IServiceType
             {
                 dalamudInterface.OpenChangelogWindow();
                 this.configuration.LastChangelogMajorMinor = ChangelogWindow.WarrantsChangelogForMajorMinor;
+                // Remove following configs before next update.
+                this.configuration.ProxyProtocol = "socks5";
+                this.configuration.ProxyPort = 1080;
+                this.configuration.ProxyHost = "127.0.0.1";
+                this.configuration.UseManualProxy = false;
             }
 
             this.configuration.LastVersion = assemblyVersion;
