@@ -23,7 +23,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
     public const string WarrantsChangelogForMajorMinor = "7.5.1.3";
 
     private const string ChangeLog =
-        @"• 重置了代理设置,取消了F**KGFW设置,请重新设置代理并重启游戏
+        @"• 重置了代理设置,取消了F**KGFW设置,如有必要请重新设置代理,重启游戏后生效
     
 如果你有任何问题或者需要帮助，请查看FAQ，或者到QQ频道求助!";
 
