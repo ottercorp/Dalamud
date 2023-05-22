@@ -126,9 +126,13 @@ Thanks and have fun!";
 
         var bannedPluginsJson = File.ReadAllText(Path.Combine(this.startInfo.AssetDirectory!, "UIRes", "bannedplugin.json"));
         var cheatPluginsJson = File.ReadAllText(Path.Combine(this.startInfo.AssetDirectory!, "UIRes", "cheatplugin.json"));
-        if (bannedPluginsJson == "[]" || cheatPluginsJson == "[]")
+        if (bannedPluginsJson == "[]")
         {
-            throw new InvalidDataException("Banned Plugins or Cheat Plugins should not be empty.");
+            throw new InvalidDataException("Banned plugin list should not be empty.");
+        }
+        if (cheatPluginsJson == "[]")
+        {
+            Log.Debug("Cheat plugin list are somehow cleared, ignore for now.");
         }
         var bannedPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
         var cheatPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(cheatPluginsJson);
