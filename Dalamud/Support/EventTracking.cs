@@ -30,13 +30,13 @@ internal static class EventTracking
         var ip = ipSplits[1];
         var clientId = $"{Hash.GetStringSha256Hash(ip)}";
         var userId = Hash.GetStringSha256Hash($"{contentId:x16}+{actorId:X8}");
-        var bannedPluginLength = BannedLength();
+        var cheatBannedLength = CheatBannedLength();
         var os = Util.IsLinux() ? "Wine" : "Windows";
         var version = $"{Util.AssemblyVersion}-{Util.GetGitHash()}";
 
         var data = new Analytics()
         {
-            BannedPluginLength = bannedPluginLength,
+            BannedPluginLength = cheatBannedLength,
             ClientId = clientId,
             ServerId = homeWorldId.ToString(),
             UserId = userId,
@@ -49,11 +49,11 @@ internal static class EventTracking
         response.EnsureSuccessStatusCode();
     }
 
-    private static string BannedLength()
+    private static string CheatBannedLength()
     {
-        var bannedPluginsJson = File.ReadAllText(Path.Combine(Service<DalamudStartInfo>.Get().AssetDirectory!, "UIRes", "bannedplugin.json"));
-        var bannedPlugins = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
-        return bannedPlugins.Length.ToString();
+        var cheatPluginsJson = File.ReadAllText(Path.Combine(Service<DalamudStartInfo>.Get().AssetDirectory!, "UIRes", "cheatplugin.json"));
+        var cheatPlugins = JsonConvert.DeserializeObject<BannedPlugin[]>(cheatPluginsJson);
+        return cheatPlugins.Length.ToString();
     }
 
     private class Analytics
