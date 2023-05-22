@@ -126,13 +126,17 @@ Thanks and have fun!";
 
         var bannedPluginsJson = File.ReadAllText(Path.Combine(this.startInfo.AssetDirectory!, "UIRes", "bannedplugin.json"));
         var cheatPluginsJson = File.ReadAllText(Path.Combine(this.startInfo.AssetDirectory!, "UIRes", "cheatplugin.json"));
+        if (bannedPluginsJson == "[]" || cheatPluginsJson == "[]")
+        {
+            throw new InvalidDataException("Banned Plugins or Cheat Plugins should not be empty.");
+        }
         var bannedPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
         var cheatPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(cheatPluginsJson);
-        this.bannedPlugins = bannedPluginsTemp.Concat(cheatPluginsTemp).ToArray();
-        if (this.bannedPlugins == null)
+        if (bannedPluginsTemp == null || cheatPluginsTemp == null)
         {
-            throw new InvalidDataException("Couldn't deserialize banned plugins manifest.");
+            throw new InvalidDataException("Couldn't deserialize banned or cheat plugins manifest.");
         }
+        this.bannedPlugins = bannedPluginsTemp.Concat(cheatPluginsTemp).ToArray();
 
         this.openInstallerWindowPluginChangelogsLink = Service<ChatGui>.Get().AddChatLinkHandler("Dalamud", 1003, (_, _) =>
         {
