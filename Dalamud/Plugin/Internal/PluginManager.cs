@@ -132,7 +132,7 @@ Thanks and have fun!";
         }
         if (cheatPluginsJson == "[]")
         {
-            Log.Debug("Cheat plugin list are somehow cleared, ignore for now.");
+            Log.Debug("Cheat plugin list was somehow cleared, ignore for now.");
         }
         var bannedPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
         var cheatPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(cheatPluginsJson);
