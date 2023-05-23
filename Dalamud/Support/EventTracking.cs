@@ -26,7 +26,7 @@ internal static class EventTracking
         var ip = ipSplits[1];
         var clientId = $"{Hash.GetStringSha256Hash(ip)}";
         var userId = Hash.GetStringSha256Hash($"{contentId:x16}+{actorId:X8}");
-        var cheatBannedLength = CheatBannedLength();
+        var cheatBannedHash = CheatBannedHash();
         var os = Util.IsLinux() ? "Wine" : "Windows";
         var version = $"{Util.AssemblyVersion}-{Util.GetGitHash()}";
         var pluginManager = Service<PluginManager>.GetNullable();
@@ -34,13 +34,13 @@ internal static class EventTracking
 
         var data = new Analytics()
         {
-            BannedPluginLength = cheatBannedLength,
+            CheatBannedHash = cheatBannedHash,
             ClientId = clientId,
             ServerId = homeWorldId.ToString(),
             UserId = userId,
             OS = os,
             DalamudVersion = version,
-            PluginCount = count.ToString()
+            PluginCount = count.ToString(),
         };
 
         var postContent = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -49,11 +49,11 @@ internal static class EventTracking
         response.EnsureSuccessStatusCode();
     }
 
-    private static string CheatBannedLength()
+    private static string CheatBannedHash()
     {
         var cheatPluginsJson = File.ReadAllText(Path.Combine(Service<DalamudStartInfo>.Get().AssetDirectory!, "UIRes", "cheatplugin.json"));
-        var cheatPlugins = JsonConvert.DeserializeObject<BannedPlugin[]>(cheatPluginsJson);
-        return cheatPlugins.Length.ToString();
+        var cheatPluginsHash = Hash.GetStringSha256Hash(cheatPluginsJson);
+        return cheatPluginsHash;
     }
 
     private class Analytics
@@ -67,8 +67,8 @@ internal static class EventTracking
         [JsonProperty("server_id")]
         public string? ServerId { get; set; }
 
-        [JsonProperty("banned_plugin_length")]
-        public string? BannedPluginLength { get; set; }
+        [JsonProperty("cheat_banned_hash")]
+        public string? CheatBannedHash { get; set; }
 
         [JsonProperty("os")]
         public string? OS { get; set; }
