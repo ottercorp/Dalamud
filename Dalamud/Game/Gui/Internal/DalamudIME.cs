@@ -177,12 +177,14 @@ internal unsafe class DalamudIME : IDisposable, IServiceType
                         break;
                 }
             }
-            
+            else 
+            {
             //不需输入时关闭待选框
             this.ImmComp = string.Empty;
             this.ImmCandNative = default;
             this.ImmCand.Clear();
             this.ToggleWindow(false);
+            }
         }
         catch (Exception ex)
         {
