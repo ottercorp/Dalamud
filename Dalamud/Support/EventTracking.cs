@@ -1,16 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Dalamud.Plugin.Internal;
 using Dalamud.Plugin.Internal.Types;
 using Dalamud.Utility;
 using Newtonsoft.Json;
-using Serilog;
 
 namespace Dalamud.Support;
 
@@ -33,6 +29,8 @@ internal static class EventTracking
         var cheatBannedLength = CheatBannedLength();
         var os = Util.IsLinux() ? "Wine" : "Windows";
         var version = $"{Util.AssemblyVersion}-{Util.GetGitHash()}";
+        var pluginManager = Service<PluginManager>.GetNullable();
+        var count = pluginManager is null ? -1 : pluginManager.InstalledPlugins.Count(x => x.Manifest.InstalledFromUrl is not "OFFICIAL");
 
         var data = new Analytics()
         {
@@ -42,7 +40,9 @@ internal static class EventTracking
             UserId = userId,
             OS = os,
             DalamudVersion = version,
+            PluginCount = count.ToString()
         };
+
         var postContent = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
         var response = await httpClient.PostAsync(AnalyticsUrl, postContent);
@@ -75,5 +75,8 @@ internal static class EventTracking
 
         [JsonProperty("dalamud_version")]
         public string? DalamudVersion { get; set; }
+
+        [JsonProperty("plugin_count")]
+        public string? PluginCount { get; set; }
     }
 }
