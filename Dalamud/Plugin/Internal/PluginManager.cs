@@ -130,16 +130,19 @@ Thanks and have fun!";
         {
             throw new InvalidDataException("Banned plugin list should not be empty.");
         }
+
         if (cheatPluginsJson == "[]")
         {
             Log.Debug("Cheat plugin list was somehow cleared, ignore for now.");
         }
+
         var bannedPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
         var cheatPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(cheatPluginsJson);
         if (bannedPluginsTemp == null || cheatPluginsTemp == null)
         {
             throw new InvalidDataException("Couldn't deserialize banned or cheat plugins manifest.");
         }
+
         this.bannedPlugins = bannedPluginsTemp.Concat(cheatPluginsTemp).ToArray();
 
         this.openInstallerWindowPluginChangelogsLink = Service<ChatGui>.Get().AddChatLinkHandler("Dalamud", 1003, (_, _) =>
