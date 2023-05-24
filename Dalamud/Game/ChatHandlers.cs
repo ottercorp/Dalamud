@@ -291,18 +291,6 @@ public class ChatHandlers : IServiceType
             this.configuration.LastVersion = assemblyVersion;
             this.configuration.QueueSave();
         }
-        if (string.IsNullOrEmpty(this.configuration.AcceptedTOSHash))
-        {
-
-            if (string.IsNullOrEmpty(this.configuration.LastChangelogMajorMinor) || (!ChangelogWindow.WarrantsChangelogForMajorMinor.StartsWith(this.configuration.LastChangelogMajorMinor) && assemblyVersion.StartsWith(ChangelogWindow.WarrantsChangelogForMajorMinor)))
-            {
-                dalamudInterface.OpenChangelogWindow();
-                this.configuration.LastChangelogMajorMinor = ChangelogWindow.WarrantsChangelogForMajorMinor;
-            }
-
-            this.configuration.LastVersion = assemblyVersion;
-            this.configuration.QueueSave();
-        }
 
         this.hasSeenLoadingMsg = true;
 

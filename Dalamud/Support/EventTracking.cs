@@ -20,7 +20,7 @@ internal static class EventTracking
 
     public static async Task SendMeasurement(ulong contentId, uint actorId, uint homeWorldId)
     {
-        var httpClient = new HttpClient();
+        var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
         var taobaoIpJs = await httpClient.GetStringAsync("https://www.taobao.com/help/getip.php");
         var ipSplits = taobaoIpJs.Split('"');
         var ip = ipSplits[1];

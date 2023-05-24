@@ -48,7 +48,7 @@ internal sealed class ToSWindow : Window, IDisposable
         {
             if (!this.tosRequested)
             {
-                _ = this.GetRemoteTOS();
+                this.GetRemoteTOS();
             }
 
             ImGui.OpenPopup("Dalamud ToS");
@@ -124,18 +124,17 @@ internal sealed class ToSWindow : Window, IDisposable
     {
     }
 
-    internal async Task<string> GetRemoteTOS()
+    internal async void GetRemoteTOS()
     {
         this.tosRequested = true;
         await requestSemaphore.WaitAsync();
         try
         {
             Log.Information("Requesting TOS...");
-            var httpClient = new HttpClient();
+            var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
             httpClient.Timeout = TimeSpan.FromSeconds(5);
             var response = await httpClient.GetStringAsync($"{Util.TOSRemoteUrl}");
             this.TOSContent = response;
-            return response;
         }
         catch (Exception ex)
         {
@@ -145,7 +144,5 @@ internal sealed class ToSWindow : Window, IDisposable
         {
             requestSemaphore.Release();
         }
-
-        return "Failed to get TOS.";
     }
 }

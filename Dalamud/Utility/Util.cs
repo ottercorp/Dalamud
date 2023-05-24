@@ -739,7 +739,7 @@ public static class Util
 
     internal static async Task<string> GetRemoteTOSHash()
     {
-        var httpClient = new HttpClient();
+        var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
         httpClient.Timeout = TimeSpan.FromSeconds(5);
         var response = await httpClient.GetStringAsync($"{TOSRemoteUrl}?tosHash=true");
         var tosResponse = JsonConvert.DeserializeObject<TosResponse>(response);
