@@ -31,7 +31,7 @@ internal sealed class ToSWindow : Window, IDisposable
     /// Initializes a new instance of the <see cref="ChangelogWindow"/> class.
     /// </summary>
     public ToSWindow()
-        : base("Dalamud ToS", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoTitleBar)
+        : base("Dalamud Terms of Service", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoTitleBar)
     {
         this.Namespace = "DalamudTosWindow";
 
@@ -50,6 +50,7 @@ internal sealed class ToSWindow : Window, IDisposable
             {
                 _ = this.GetRemoteTOS();
             }
+
             ImGui.OpenPopup("Dalamud ToS");
         }
 
