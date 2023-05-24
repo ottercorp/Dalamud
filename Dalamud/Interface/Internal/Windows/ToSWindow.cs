@@ -133,7 +133,6 @@ internal sealed class ToSWindow : Window, IDisposable
         {
             Log.Information("Requesting TOS...");
             var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
-            httpClient.Timeout = TimeSpan.FromSeconds(5);
             var response = await httpClient.GetStringAsync($"{Util.TOSRemoteUrl}");
             this.TOSContent = response;
         }
