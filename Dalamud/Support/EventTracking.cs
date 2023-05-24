@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Dalamud.Plugin.Internal;
 using Dalamud.Plugin.Internal.Types;
 using Dalamud.Utility;
+using Dalamud.Networking.Http;
 using Newtonsoft.Json;
 
 namespace Dalamud.Support;
