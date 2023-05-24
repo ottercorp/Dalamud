@@ -291,8 +291,40 @@ public class ChatHandlers : IServiceType
             this.configuration.LastVersion = assemblyVersion;
             this.configuration.QueueSave();
         }
+        if (string.IsNullOrEmpty(this.configuration.AcceptedTOSHash))
+        {
+
+            if (string.IsNullOrEmpty(this.configuration.LastChangelogMajorMinor) || (!ChangelogWindow.WarrantsChangelogForMajorMinor.StartsWith(this.configuration.LastChangelogMajorMinor) && assemblyVersion.StartsWith(ChangelogWindow.WarrantsChangelogForMajorMinor)))
+            {
+                dalamudInterface.OpenChangelogWindow();
+                this.configuration.LastChangelogMajorMinor = ChangelogWindow.WarrantsChangelogForMajorMinor;
+            }
+
+            this.configuration.LastVersion = assemblyVersion;
+            this.configuration.QueueSave();
+        }
 
         this.hasSeenLoadingMsg = true;
+
+        Task.Run(() =>
+        {
+            try
+            {
+                Util.GetRemoteTOSHash().ContinueWith(task =>
+                {
+                    var remoteHash = task.Result;
+                    if (string.IsNullOrEmpty(this.configuration.AcceptedTOSHash) || remoteHash != this.configuration.AcceptedTOSHash)
+                    {
+                        dalamudInterface.OpenToSWindow();
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Remote TOS hash check failed");
+            }
+        });
+
     }
 
     private void AutoUpdatePlugins()

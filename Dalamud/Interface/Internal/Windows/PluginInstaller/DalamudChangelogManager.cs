@@ -15,7 +15,7 @@ namespace Dalamud.Interface.Internal.Windows.PluginInstaller;
 internal class DalamudChangelogManager
 {
     private const string DalamudChangelogUrl = "https://aonyx.ffxiv.wang/Plugin/CoreChangelog";
-    private const string PluginChangelogUrl = "https://kamori.goats.dev/Plugin/History/{0}?track={1}";
+    private const string PluginChangelogUrl = "https://aonyx.ffxiv.wang/Plugin/History/{0}?track={1}";
 
     private readonly PluginManager manager;
 

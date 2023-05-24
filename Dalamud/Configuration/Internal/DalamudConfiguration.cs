@@ -8,6 +8,7 @@ using Dalamud.Game.Text;
 using Dalamud.Interface.Style;
 using Dalamud.Utility;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Serilog;
 using Serilog.Events;
 
@@ -19,6 +20,7 @@ namespace Dalamud.Configuration.Internal;
 [Serializable]
 internal sealed class DalamudConfiguration : IServiceType
 {
+
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
         TypeNameHandling = TypeNameHandling.All,
@@ -329,6 +331,12 @@ internal sealed class DalamudConfiguration : IServiceType
     /// Gets or sets a value indicating whether or not market board data should be uploaded.
     /// </summary>
     public bool IsMbCollect { get; set; } = true;
+
+    /// <summary>
+    /// Gets the accepted TOS hash.
+    /// </summary>
+    public string AcceptedTOSHash { get; set; } = string.Empty;
+
 
     /// <summary>
     /// Gets the ISO 639-1 two-letter code for the language of the effective Dalamud display language.

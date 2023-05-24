@@ -62,7 +62,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
         ImGuiHelpers.ScaledDummy(10);
 
-            ImGui.Text("包含了以下更新:");
+        ImGui.Text("包含了以下更新:");
 
         ImGui.SameLine();
         ImGuiHelpers.ScaledDummy(0);
@@ -72,7 +72,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
         ImGuiHelpers.ScaledDummy(5);
 
-            ImGui.TextColored(ImGuiColors.DalamudRed, " !!! 注意 !!!");
+        ImGui.TextColored(ImGuiColors.DalamudRed, " !!! 注意 !!!");
 
         ImGui.TextWrapped(UpdatePluginsInfo);
 
@@ -89,90 +89,90 @@ internal sealed class ChangelogWindow : Window, IDisposable
             Service<DalamudInterface>.Get().OpenPluginInstaller();
         }
 
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.PopFont();
-                ImGui.SetTooltip("打开插件安装器");
-                ImGui.PushFont(UiBuilder.IconFont);
-            }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.PopFont();
+            ImGui.SetTooltip("打开插件安装器");
+            ImGui.PushFont(UiBuilder.IconFont);
+        }
 
         ImGui.SameLine();
 
-            if (ImGui.Button(FontAwesomeIcon.LaughBeam.ToIconString()))
+        if (ImGui.Button(FontAwesomeIcon.LaughBeam.ToIconString()))
+        {
+            try
             {
-                try
+                Process.Start(new ProcessStartInfo()
                 {
-                    Process.Start(new ProcessStartInfo()
-                    {
-                        FileName = "https://discord.gg/3NMcUV5",
-                        UseShellExecute = true,
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Could not open discord url");
-                }
+                    FileName = "https://discord.gg/3NMcUV5",
+                    UseShellExecute = true,
+                });
             }
-
-            if (ImGui.IsItemHovered())
+            catch (Exception ex)
             {
-                ImGui.PopFont();
-                ImGui.SetTooltip("加入我们的 Discord 服务器（国际服）");
-                ImGui.PushFont(UiBuilder.IconFont);
+                Log.Error(ex, "Could not open discord url");
             }
+        }
 
-            ImGui.SameLine();
-
-            if (ImGui.Button(FontAwesomeIcon.LaughSquint.ToIconString()))
-            {
-                try
-                {
-                    Process.Start(new ProcessStartInfo()
-                    {
-                        FileName = "https://qun.qq.com/qqweb/qunpro/share?_wv=3&_wwv=128&appChannel=share&inviteCode=CZtWN&businessType=9&from=181074&biz=ka&shareSource=5",
-                        UseShellExecute = true,
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Could not open QQ url");
-                }
-            }
-
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.PopFont();
-                ImGui.SetTooltip("加入我们的 QQ 频道");
-                ImGui.PushFont(UiBuilder.IconFont);
-            }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.PopFont();
+            ImGui.SetTooltip("加入我们的 Discord 服务器（国际服）");
+            ImGui.PushFont(UiBuilder.IconFont);
+        }
 
         ImGui.SameLine();
 
-            if (ImGui.Button(FontAwesomeIcon.Globe.ToIconString()))
+        if (ImGui.Button(FontAwesomeIcon.LaughSquint.ToIconString()))
+        {
+            try
             {
-                Util.OpenLink("https://ottercorp.github.io/faq/");
+                Process.Start(new ProcessStartInfo()
+                {
+                    FileName = "https://qun.qq.com/qqweb/qunpro/share?_wv=3&_wwv=128&appChannel=share&inviteCode=CZtWN&businessType=9&from=181074&biz=ka&shareSource=5",
+                    UseShellExecute = true,
+                });
             }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Could not open QQ url");
+            }
+        }
 
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.PopFont();
-                ImGui.SetTooltip("查看 FAQ");
-                ImGui.PushFont(UiBuilder.IconFont);
-            }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.PopFont();
+            ImGui.SetTooltip("加入我们的 QQ 频道");
+            ImGui.PushFont(UiBuilder.IconFont);
+        }
 
         ImGui.SameLine();
 
-            if (ImGui.Button(FontAwesomeIcon.Heart.ToIconString()))
-            {
-                Util.OpenLink("https://ottercorp.github.io/faq/support");
-            }
+        if (ImGui.Button(FontAwesomeIcon.Globe.ToIconString()))
+        {
+            Util.OpenLink("https://ottercorp.github.io/faq/");
+        }
 
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.PopFont();
-                ImGui.SetTooltip("支持我们");
-                ImGui.PushFont(UiBuilder.IconFont);
-            }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.PopFont();
+            ImGui.SetTooltip("查看 FAQ");
+            ImGui.PushFont(UiBuilder.IconFont);
+        }
+
+        ImGui.SameLine();
+
+        if (ImGui.Button(FontAwesomeIcon.Heart.ToIconString()))
+        {
+            Util.OpenLink("https://ottercorp.github.io/faq/support");
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.PopFont();
+            ImGui.SetTooltip("支持我们");
+            ImGui.PushFont(UiBuilder.IconFont);
+        }
 
         ImGui.PopFont();
 
@@ -180,10 +180,10 @@ internal sealed class ChangelogWindow : Window, IDisposable
         ImGuiHelpers.ScaledDummy(20, 0);
         ImGui.SameLine();
 
-            if (ImGui.Button("关闭"))
-            {
-                this.IsOpen = false;
-            }
+        if (ImGui.Button("关闭"))
+        {
+            this.IsOpen = false;
+        }
 
         imgCursor.X += 750;
         imgCursor.Y -= 30;

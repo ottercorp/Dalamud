@@ -23,6 +23,7 @@ using Dalamud.Networking.Http;
 using ImGuiNET;
 using Microsoft.Win32;
 using Serilog;
+using Newtonsoft.Json;
 
 namespace Dalamud.Utility;
 
@@ -31,6 +32,8 @@ namespace Dalamud.Utility;
 /// </summary>
 public static class Util
 {
+    internal static string TOSRemoteUrl = "https://aonyx.ffxiv.wang/Dalamud/ToS";
+
     private static string? gitHashInternal;
     private static int? gitCommitCountInternal;
     private static string? gitHashClientStructsInternal;
@@ -678,6 +681,7 @@ public static class Util
         File.Move(tmpPath, path, true);
     }
 
+
     private static unsafe void ShowValue(ulong addr, IEnumerable<string> path, Type type, object value)
     {
         if (type.IsPointer)
@@ -731,5 +735,24 @@ public static class Util
                 ImGui.Text($"{value}");
             }
         }
+    }
+
+    internal static async Task<string> GetRemoteTOSHash()
+    {
+        var httpClient = new HttpClient();
+        httpClient.Timeout = TimeSpan.FromSeconds(5);
+        var response = await httpClient.GetStringAsync($"{TOSRemoteUrl}?tosHash=true");
+        var tosResponse = JsonConvert.DeserializeObject<TosResponse>(response);
+        return tosResponse.tosHash;
+    }
+
+
+    private class TosResponse
+    {
+        [JsonProperty("message")]
+        public string? message { get; set; }
+
+        [JsonProperty("tosHash")]
+        public string? tosHash { get; set; }
     }
 }
