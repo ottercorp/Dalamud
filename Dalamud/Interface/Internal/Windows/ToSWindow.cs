@@ -23,21 +23,22 @@ namespace Dalamud.Interface.Internal.Windows;
 /// </summary>
 internal sealed class ToSWindow : Window, IDisposable
 {
+    private static SemaphoreSlim requestSemaphore = new SemaphoreSlim(1, 1);
     private string? TOSContent;
     private bool tosRead = false;
     private bool tosRequested = false;
-    private static SemaphoreSlim requestSemaphore = new SemaphoreSlim(1, 1);
     private DalamudConfiguration configuration;
     /// <summary>
     /// Initializes a new instance of the <see cref="ChangelogWindow"/> class.
     /// </summary>
     public ToSWindow()
-        : base("Dalamud Terms of Service", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoTitleBar)
+        : base("Dalamud Terms of Service", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse)
     {
         this.Namespace = "DalamudTosWindow";
 
-        this.Size = new Vector2(0, 0);
+        this.Size = new Vector2(885, 463);
         this.SizeCondition = ImGuiCond.Appearing;
+        this.ShowCloseButton = false;
         this.configuration = Service<DalamudConfiguration>.Get();
     }
 
@@ -45,76 +46,75 @@ internal sealed class ToSWindow : Window, IDisposable
     public override void Draw()
     {
         var isOpen = this.IsOpen;
-        if (isOpen)
+        if (!isOpen)
         {
-            if (!this.tosRequested)
-            {
-                this.GetRemoteTOS();
-            }
-
-            ImGui.OpenPopup("Dalamud ToS");
+            return;
         }
 
-        var center = ImGui.GetMainViewport().GetCenter();
-        ImGui.SetNextWindowPos(center, ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
-        ImGui.SetNextWindowSize(new Vector2(885, 463));
-        if (ImGui.BeginPopupModal("Dalamud ToS", ref isOpen, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove ))
+        if (!this.tosRequested)
         {
-            var tosContent = this.TOSContent == null ? "请等待获取用户协议..." : this.TOSContent;
-            ImGui.PushTextWrapPos(850);
-            ImGui.TextUnformatted(tosContent);
-            ImGui.PopTextWrapPos();
+            this.GetRemoteTOS();
+        }
 
-            ImGui.Spacing();
+        this.BringToFront();
 
-            if (this.TOSContent == null)
+        var center = ImGui.GetMainViewport().GetCenter();
+        ImGui.SetWindowPos(new Vector2(center.X - (this.Size.Value.X / 2.0f), center.Y - (this.Size.Value.Y / 2.0f)));
+
+        var tosContent = this.TOSContent == null ? "请等待获取用户协议..." : this.TOSContent;
+        ImGui.PushTextWrapPos(850);
+        ImGui.TextUnformatted(tosContent);
+        ImGui.PopTextWrapPos();
+
+        ImGui.Spacing();
+
+        if (this.TOSContent == null)
+        {
+            ImGui.BeginDisabled();
+        }
+
+        ImGui.Checkbox("我已阅读完毕以上内容并同意", ref this.tosRead);
+
+        if (this.TOSContent == null)
+        {
+            ImGui.EndDisabled();
+        }
+
+        if (!this.tosRead)
+        {
+            ImGui.BeginDisabled();
+        }
+
+        if (ImGui.Button("我同意"))
+        {
+            Log.Debug(tosContent);
+            var readHash = Hash.GetStringSha256Hash(tosContent);
+            Log.Information($"TOS Read Hash: {readHash}");
+            this.configuration.AcceptedTOSHash = readHash;
+            this.configuration.QueueSave();
+            this.IsOpen = false;
+        }
+
+        if (!this.tosRead)
+        {
+            ImGui.EndDisabled();
+        }
+
+        ImGui.SameLine();
+        var disagreeText = "我不同意";
+        ImGui.SetCursorPosX(ImGui.GetContentRegionAvail().X - ImGui.CalcTextSize(disagreeText).X);
+
+        if (ImGui.Button(disagreeText))
+        {
+            Log.Information($"TOS failed to get accepted.");
+            this.configuration.AcceptedTOSHash = string.Empty;
+            this.configuration.QueueSave();
+            this.IsOpen = false;
+            Task.Run(() =>
             {
-                ImGui.BeginDisabled();
-            }
-            ImGui.Checkbox("我已阅读完毕以上内容并同意", ref this.tosRead);
-            if (this.TOSContent == null)
-            {
-                ImGui.EndDisabled();
-            }
-
-            if (!this.tosRead)
-            {
-                ImGui.BeginDisabled();
-            }
-
-            if (ImGui.Button("我同意"))
-            {
-                Log.Debug(tosContent);
-                var readHash = Hash.GetStringSha256Hash(tosContent);
-                Log.Information($"TOS Read Hash: {readHash}");
-                this.configuration.AcceptedTOSHash = readHash;
-                this.configuration.QueueSave();
-                this.IsOpen = false;
-                ImGui.CloseCurrentPopup();
-            }
-
-            if (!this.tosRead)
-            {
-                ImGui.EndDisabled();
-            }
-
-            ImGui.SameLine();
-            var disagreeText = "我不同意";
-            ImGui.SetCursorPosX(ImGui.GetContentRegionAvail().X - ImGui.CalcTextSize(disagreeText).X);
-
-            if (ImGui.Button(disagreeText))
-            {
-                Log.Information($"TOS failed to get accepted.");
-                this.configuration.AcceptedTOSHash = string.Empty;
-                this.configuration.QueueSave();
-                this.IsOpen = false;
-                ImGui.CloseCurrentPopup();
-                Task.Run(() =>
-                {
-                    Thread.Sleep(1000);
-                    Service<Dalamud>.Get().Unload();
-                });
-            }
+                Thread.Sleep(1000);
+                Service<Dalamud>.Get().Unload();
+            });
         }
     }
 
@@ -127,6 +127,11 @@ internal sealed class ToSWindow : Window, IDisposable
 
     internal async void GetRemoteTOS()
     {
+        if (this.tosRequested && this.TOSContent != null)
+        {
+            return;
+        }
+
         this.tosRequested = true;
         await requestSemaphore.WaitAsync();
         try
