@@ -14,6 +14,8 @@ using Dalamud.IoC.Internal;
 using Dalamud.Logging.Internal;
 using Dalamud.Plugin.Internal.Exceptions;
 using Dalamud.Plugin.Internal.Loader;
+using Dalamud.Plugin.Internal.Profiles;
+using Dalamud.Plugin.Internal.Types.Manifest;
 using Dalamud.Utility;
 
 namespace Dalamud.Plugin.Internal.Types;
@@ -36,6 +38,8 @@ internal class LocalPlugin : IDisposable
     private Assembly? pluginAssembly;
     private Type? pluginType;
     private IDalamudPlugin? instance;
+
+    private LocalPluginManifest manifest;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalPlugin"/> class.
@@ -109,7 +113,7 @@ internal class LocalPlugin : IDisposable
         // If the parameter manifest was null
         if (manifest == null)
         {
-            this.Manifest = new LocalPluginManifest()
+            this.manifest = new LocalPluginManifest()
             {
                 Author = "developer",
                 Name = Path.GetFileNameWithoutExtension(this.DllFile.Name),
@@ -123,34 +127,51 @@ internal class LocalPlugin : IDisposable
 
             // Save the manifest to disk so there won't be any problems later.
             // We'll update the name property after it can be retrieved from the instance.
-            this.Manifest.Save(this.manifestFile);
+            this.manifest.Save(this.manifestFile, "manifest was null");
         }
         else
         {
-            this.Manifest = manifest;
+            this.manifest = manifest;
         }
+
+        var needsSaveDueToLegacyFiles = false;
 
         // This converts from the ".disabled" file feature to the manifest instead.
         this.disabledFile = LocalPluginManifest.GetDisabledFile(this.DllFile);
         if (this.disabledFile.Exists)
         {
-            this.Manifest.Disabled = true;
+#pragma warning disable CS0618
+            this.manifest.Disabled = true;
+#pragma warning restore CS0618
             this.disabledFile.Delete();
+
+            needsSaveDueToLegacyFiles = true;
         }
 
         // This converts from the ".testing" file feature to the manifest instead.
         this.testingFile = LocalPluginManifest.GetTestingFile(this.DllFile);
         if (this.testingFile.Exists)
         {
-            this.Manifest.Testing = true;
+            this.manifest.Testing = true;
             this.testingFile.Delete();
+
+            needsSaveDueToLegacyFiles = true;
+        }
+
+        // Create an installation instance ID for this plugin, if it doesn't have one yet
+        if (this.manifest.WorkingPluginId == Guid.Empty)
+        {
+            this.manifest.WorkingPluginId = Guid.NewGuid();
+
+            needsSaveDueToLegacyFiles = true;
         }
 
         var pluginManager = Service<PluginManager>.Get();
         this.IsBanned = pluginManager.IsManifestBanned(this.Manifest); // && !this.IsDev;
         this.BanReason = pluginManager.GetBanReason(this.Manifest);
 
-        this.SaveManifest();
+        if (needsSaveDueToLegacyFiles)
+            this.SaveManifest("legacy");
     }
 
     /// <summary>
@@ -164,9 +185,9 @@ internal class LocalPlugin : IDisposable
     public FileInfo DllFile { get; }
 
     /// <summary>
-    /// Gets the plugin manifest, if one exists.
+    /// Gets the plugin manifest.
     /// </summary>
-    public LocalPluginManifest Manifest { get; private set; }
+    public ILocalPluginManifest Manifest => this.manifest;
 
     /// <summary>
     /// Gets or sets the current state of the plugin.
@@ -180,9 +201,14 @@ internal class LocalPlugin : IDisposable
     public AssemblyName? AssemblyName { get; private set; }
 
     /// <summary>
-    /// Gets the plugin name, directly from the plugin or if it is not loaded from the manifest.
+    /// Gets the plugin name from the manifest.
     /// </summary>
-    public string Name => this.Manifest.Name;
+    public string Name => this.manifest.Name;
+
+    /// <summary>
+    /// Gets the plugin internal name from the manifest.
+    /// </summary>
+    public string InternalName => this.manifest.InternalName;
 
     /// <summary>
     /// Gets an optional reason, if the plugin is banned.
@@ -200,25 +226,27 @@ internal class LocalPlugin : IDisposable
     public bool IsLoaded => this.State == PluginState.Loaded;
 
     /// <summary>
-    /// Gets a value indicating whether the plugin is disabled.
+    /// Gets a value indicating whether this plugin is wanted active by any profile.
+    /// INCLUDES the default profile.
     /// </summary>
-    public bool IsDisabled => this.Manifest.Disabled;
+    public bool IsWantedByAnyProfile =>
+        Service<ProfileManager>.Get().GetWantStateAsync(this.manifest.InternalName, false, false).GetAwaiter().GetResult();
 
     /// <summary>
     /// Gets a value indicating whether this plugin's API level is out of date.
     /// </summary>
-    public bool IsOutdated => this.Manifest.DalamudApiLevel < PluginManager.DalamudApiLevel;
+    public bool IsOutdated => this.manifest.DalamudApiLevel < PluginManager.DalamudApiLevel;
 
     /// <summary>
     /// Gets a value indicating whether the plugin is for testing use only.
     /// </summary>
-    public bool IsTesting => this.Manifest.IsTestingExclusive || this.Manifest.Testing;
+    public bool IsTesting => this.manifest.IsTestingExclusive || this.manifest.Testing;
 
     /// <summary>
     /// Gets a value indicating whether or not this plugin is orphaned(belongs to a repo) or not.
     /// </summary>
     public bool IsOrphaned => !this.IsDev &&
-                              !this.Manifest.InstalledFromUrl.IsNullOrEmpty() && // TODO(api8): Remove this, all plugins will have a proper flag
+                              !this.manifest.InstalledFromUrl.IsNullOrEmpty() && // TODO(api8): Remove this, all plugins will have a proper flag
                               this.GetSourceRepository() == null;
 
     /// <summary>
@@ -226,7 +254,7 @@ internal class LocalPlugin : IDisposable
     /// </summary>
     public bool IsDecommissioned => !this.IsDev &&
                                     this.GetSourceRepository()?.State == PluginRepositoryState.Success &&
-                                    this.GetSourceRepository()?.PluginMaster?.FirstOrDefault(x => x.InternalName == this.Manifest.InternalName) == null;
+                                    this.GetSourceRepository()?.PluginMaster?.FirstOrDefault(x => x.InternalName == this.manifest.InternalName) == null;
 
     /// <summary>
     /// Gets a value indicating whether this plugin has been banned.
@@ -238,6 +266,28 @@ internal class LocalPlugin : IDisposable
     /// </summary>
     public bool IsDev => this is LocalDevPlugin;
 
+    /// <summary>
+    /// Gets a value indicating whether this manifest is associated with a plugin that was installed from a third party
+    /// repo.
+    /// </summary>
+    public bool IsThirdParty => this.manifest.IsThirdParty;
+
+    /// <summary>
+    /// Gets a value indicating whether this plugin should be allowed to load.
+    /// </summary>
+    public bool ApplicableForLoad => !this.IsBanned && !this.IsDecommissioned && !this.IsOrphaned && !this.IsOutdated
+                                     && !(!this.IsDev && this.State == PluginState.UnloadError) && this.CheckPolicy();
+
+    /// <summary>
+    /// Gets the effective version of this plugin.
+    /// </summary>
+    public Version EffectiveVersion => this.manifest.EffectiveVersion;
+
+    /// <summary>
+    /// Gets the service scope for this plugin.
+    /// </summary>
+    public IServiceScope? ServiceScope { get; private set; }
+
     /// <inheritdoc/>
     public void Dispose()
     {
@@ -248,7 +298,7 @@ internal class LocalPlugin : IDisposable
         if (this.instance != null)
         {
             didPluginDispose = true;
-            if (this.Manifest.CanUnloadAsync || framework == null)
+            if (this.manifest.CanUnloadAsync || framework == null)
                 this.instance.Dispose();
             else
                 framework.RunOnFrameworkThread(() => this.instance.Dispose()).Wait();
@@ -258,6 +308,9 @@ internal class LocalPlugin : IDisposable
 
         this.DalamudInterface?.ExplicitDispose();
         this.DalamudInterface = null;
+
+        this.ServiceScope?.Dispose();
+        this.ServiceScope = null;
 
         this.pluginType = null;
         this.pluginAssembly = null;
@@ -275,7 +328,6 @@ internal class LocalPlugin : IDisposable
     /// <returns>A task.</returns>
     public async Task LoadAsync(PluginLoadReason reason, bool reloading = false)
     {
-        var configuration = await Service<DalamudConfiguration>.GetAsync();
         var framework = await Service<Framework>.GetAsync();
         var ioc = await Service<ServiceContainer>.GetAsync();
         var pluginManager = await Service<PluginManager>.GetAsync();
@@ -285,7 +337,7 @@ internal class LocalPlugin : IDisposable
         await Service<InterfaceManager>.GetAsync();
         await Service<GameFontManager>.GetAsync();
 
-        if (this.Manifest.LoadRequiredState == 0)
+        if (this.manifest.LoadRequiredState == 0)
             _ = await Service<InterfaceManager.InterfaceManagerWithScene>.GetAsync();
 
         await this.pluginLoadStateLock.WaitAsync();
@@ -297,13 +349,25 @@ internal class LocalPlugin : IDisposable
                 this.ReloadManifest();
             }
 
+            // If we reload a plugin we don't want to delete it. Makes sense, right?
+            if (this.manifest.ScheduledForDeletion)
+            {
+                this.manifest.ScheduledForDeletion = false;
+                this.SaveManifest("Scheduled for deletion, but loading");
+            }
+
             switch (this.State)
             {
                 case PluginState.Loaded:
                     throw new InvalidPluginOperationException($"Unable to load {this.Name}, already loaded");
                 case PluginState.LoadError:
-                    throw new InvalidPluginOperationException(
-                        $"Unable to load {this.Name}, load previously faulted, unload first");
+                    if (!this.IsDev)
+                    {
+                        throw new InvalidPluginOperationException(
+                            $"Unable to load {this.Name}, load previously faulted, unload first");
+                    }
+
+                    break;
                 case PluginState.UnloadError:
                     if (!this.IsDev)
                     {
@@ -324,14 +388,15 @@ internal class LocalPlugin : IDisposable
             if (pluginManager.IsManifestBanned(this.Manifest))
                     throw new BannedPluginException($"Unable to load {this.Name}, banned");
 
-            if (this.Manifest.ApplicableVersion < startInfo.GameVersion)
+            if (this.manifest.ApplicableVersion < startInfo.GameVersion)
                 throw new InvalidPluginOperationException($"Unable to load {this.Name}, no applicable version");
 
-            if (this.Manifest.DalamudApiLevel < PluginManager.DalamudApiLevel && !pluginManager.LoadAllApiLevels)
+            if (this.manifest.DalamudApiLevel < PluginManager.DalamudApiLevel && !pluginManager.LoadAllApiLevels)
                 throw new InvalidPluginOperationException($"Unable to load {this.Name}, incompatible API level");
 
-            if (this.Manifest.Disabled)
-                throw new InvalidPluginOperationException($"Unable to load {this.Name}, disabled");
+            // We might want to throw here?
+            if (!this.IsWantedByAnyProfile)
+                Log.Warning("{Name} is loading, but isn't wanted by any profile", this.Name);
 
             if (this.IsOrphaned)
                 throw new InvalidPluginOperationException($"Plugin {this.Name} had no associated repo.");
@@ -347,8 +412,8 @@ internal class LocalPlugin : IDisposable
             {
                 Log.Error(
                     "==== IMPORTANT MESSAGE TO {0}, THE DEVELOPER OF {1} ====",
-                    this.Manifest.Author!,
-                    this.Manifest.InternalName);
+                    this.manifest.Author!,
+                    this.manifest.InternalName);
                 Log.Error(
                     "YOU ARE INCLUDING DALAMUD DEPENDENCIES IN YOUR BUILDS!!!");
                 Log.Error(
@@ -411,17 +476,20 @@ internal class LocalPlugin : IDisposable
             PluginManager.PluginLocations[this.pluginType.Assembly.FullName] = new PluginPatchData(this.DllFile);
 
             this.DalamudInterface =
-                new DalamudPluginInterface(this.pluginAssembly.GetName().Name!, this.DllFile, reason, this.IsDev, this.Manifest);
+                new DalamudPluginInterface(this, reason);
 
-            if (this.Manifest.LoadSync && this.Manifest.LoadRequiredState is 0 or 1)
+            this.ServiceScope = ioc.GetScope();
+            this.ServiceScope.RegisterPrivateScopes(this); // Add this LocalPlugin as a private scope, so services can get it
+
+            if (this.manifest.LoadSync && this.manifest.LoadRequiredState is 0 or 1)
             {
                 this.instance = await framework.RunOnFrameworkThread(
-                                    () => ioc.CreateAsync(this.pluginType!, this.DalamudInterface!)) as IDalamudPlugin;
+                                    () => this.ServiceScope.CreateAsync(this.pluginType!, this.DalamudInterface!)) as IDalamudPlugin;
             }
             else
             {
                 this.instance =
-                    await ioc.CreateAsync(this.pluginType!, this.DalamudInterface!) as IDalamudPlugin;
+                    await this.ServiceScope.CreateAsync(this.pluginType!, this.DalamudInterface!) as IDalamudPlugin;
             }
 
             if (this.instance == null)
@@ -434,10 +502,10 @@ internal class LocalPlugin : IDisposable
             }
 
             // In-case the manifest name was a placeholder. Can occur when no manifest was included.
-            if (this.Manifest.Name.IsNullOrEmpty())
+            if (this.manifest.Name.IsNullOrEmpty() && !this.IsDev)
             {
-                this.Manifest.Name = this.instance.Name;
-                this.Manifest.Save(this.manifestFile);
+                this.manifest.Name = this.instance.Name;
+                this.manifest.Save(this.manifestFile, "manifest name null or empty");
             }
 
             this.State = PluginState.Loaded;
@@ -446,7 +514,9 @@ internal class LocalPlugin : IDisposable
         catch (Exception ex)
         {
             this.State = PluginState.LoadError;
-            Log.Error(ex, $"Error while loading {this.Name}");
+
+            if (ex is not BannedPluginException)
+                Log.Error(ex, $"Error while loading {this.Name}");
 
             throw;
         }
@@ -495,7 +565,7 @@ internal class LocalPlugin : IDisposable
             this.State = PluginState.Unloading;
             Log.Information($"Unloading {this.DllFile.Name}");
 
-            if (this.Manifest.CanUnloadAsync || framework == null)
+            if (this.manifest.CanUnloadAsync || framework == null)
                 this.instance?.Dispose();
             else
                 await framework.RunOnFrameworkThread(() => this.instance?.Dispose());
@@ -504,6 +574,9 @@ internal class LocalPlugin : IDisposable
 
             this.DalamudInterface?.ExplicitDispose();
             this.DalamudInterface = null;
+
+            this.ServiceScope?.Dispose();
+            this.ServiceScope = null;
 
             this.pluginType = null;
             this.pluginAssembly = null;
@@ -549,40 +622,6 @@ internal class LocalPlugin : IDisposable
     }
 
     /// <summary>
-    /// Revert a disable. Must be unloaded first, does not load.
-    /// </summary>
-    public void Enable()
-    {
-        // Allowed: Unloaded, UnloadError
-        switch (this.State)
-        {
-            case PluginState.Loading:
-            case PluginState.Unloading:
-            case PluginState.Loaded:
-            case PluginState.LoadError:
-                throw new InvalidPluginOperationException($"Unable to enable {this.Name}, still loaded");
-            case PluginState.Unloaded:
-                break;
-            case PluginState.UnloadError:
-                break;
-            case PluginState.DependencyResolutionFailed:
-                throw new InvalidPluginOperationException($"Unable to enable {this.Name}, dependency resolution failed");
-            default:
-                throw new ArgumentOutOfRangeException(this.State.ToString());
-        }
-
-        // NOTE(goat): This is inconsequential, and we do have situations where a plugin can end up enabled but not loaded:
-        // Orphaned plugins can have their repo added back, but may not have been loaded at boot and may still be enabled.
-        // We don't want to disable orphaned plugins when they are orphaned so this is how it's going to be.
-        // if (!this.Manifest.Disabled)
-        //    throw new InvalidPluginOperationException($"Unable to enable {this.Name}, not disabled");
-
-        this.Manifest.Disabled = false;
-        this.Manifest.ScheduledForDeletion = false;
-        this.SaveManifest();
-    }
-
-    /// <summary>
     /// Check if anything forbids this plugin from loading.
     /// </summary>
     /// <returns>Whether or not this plugin shouldn't load.</returns>
@@ -594,7 +633,7 @@ internal class LocalPlugin : IDisposable
         if (startInfo.NoLoadPlugins)
             return false;
 
-        if (startInfo.NoLoadThirdPartyPlugins && this.Manifest.IsThirdParty)
+        if (startInfo.NoLoadThirdPartyPlugins && this.manifest.IsThirdParty)
             return false;
 
         if (manager.SafeMode)
@@ -604,43 +643,13 @@ internal class LocalPlugin : IDisposable
     }
 
     /// <summary>
-    /// Disable this plugin, must be unloaded first.
-    /// </summary>
-    public void Disable()
-    {
-        // Allowed: Unloaded, UnloadError
-        switch (this.State)
-        {
-            case PluginState.Loading:
-            case PluginState.Unloading:
-            case PluginState.Loaded:
-            case PluginState.LoadError:
-                throw new InvalidPluginOperationException($"Unable to disable {this.Name}, still loaded");
-            case PluginState.Unloaded:
-                break;
-            case PluginState.UnloadError:
-                break;
-            case PluginState.DependencyResolutionFailed:
-                return; // This is a no-op.
-            default:
-                throw new ArgumentOutOfRangeException(this.State.ToString());
-        }
-
-        if (this.Manifest.Disabled)
-            throw new InvalidPluginOperationException($"Unable to disable {this.Name}, already disabled");
-
-        this.Manifest.Disabled = true;
-        this.SaveManifest();
-    }
-
-    /// <summary>
     /// Schedule the deletion of this plugin on next cleanup.
     /// </summary>
     /// <param name="status">Schedule or cancel the deletion.</param>
     public void ScheduleDeletion(bool status = true)
     {
-        this.Manifest.ScheduledForDeletion = status;
-        this.SaveManifest();
+        this.manifest.ScheduledForDeletion = status;
+        this.SaveManifest("scheduling for deletion");
     }
 
     /// <summary>
@@ -648,14 +657,14 @@ internal class LocalPlugin : IDisposable
     /// </summary>
     public void ReloadManifest()
     {
-        var manifest = LocalPluginManifest.GetManifestFile(this.DllFile);
-        if (manifest.Exists)
+        var manifestPath = LocalPluginManifest.GetManifestFile(this.DllFile);
+        if (manifestPath.Exists)
         {
-            var isDisabled = this.IsDisabled; // saving the internal state because it could have been deleted
-            this.Manifest = LocalPluginManifest.Load(manifest);
-            this.Manifest.Disabled = isDisabled;
+            // var isDisabled = this.IsDisabled; // saving the internal state because it could have been deleted
+            this.manifest = LocalPluginManifest.Load(manifestPath) ?? throw new Exception("Could not reload manifest.");
+            // this.manifest.Disabled = isDisabled;
 
-            this.SaveManifest();
+            this.SaveManifest("dev reload");
         }
     }
 
@@ -671,10 +680,10 @@ internal class LocalPlugin : IDisposable
         var repos = Service<PluginManager>.Get().Repos;
         return repos.FirstOrDefault(x =>
         {
-            if (!x.IsThirdParty && !this.Manifest.IsThirdParty)
+            if (!x.IsThirdParty && !this.manifest.IsThirdParty)
                 return true;
 
-            return x.PluginMasterUrl == this.Manifest.InstalledFromUrl;
+            return x.PluginMasterUrl == this.manifest.InstalledFromUrl;
         });
     }
 
@@ -687,5 +696,5 @@ internal class LocalPlugin : IDisposable
         config.SharedAssemblies.Add(typeof(Lumina.Excel.ExcelSheetImpl).Assembly.GetName());
     }
 
-    private void SaveManifest() => this.Manifest.Save(this.manifestFile);
+    private void SaveManifest(string reason) => this.manifest.Save(this.manifestFile, reason);
 }

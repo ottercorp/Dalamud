@@ -29,6 +29,12 @@ jobs:
         run: .\build.ps1 compile
       - name: Test Dalamud
         run: .\build.ps1 test
+      - name: Sign Dalamud
+        if: ${{ github.repository_owner == 'goatcorp' && github.event_name == 'push' }}
+        env:
+          CODESIGN_CERT_PFX: ${{ secrets.CODESIGN_CERT_PFX }}
+          CODESIGN_CERT_PASSWORD: ${{ secrets.CODESIGN_CERT_PASSWORD }}
+        run: .\sign.ps1 .\bin\Release
       - name: Create hashlist
         run: .\CreateHashList.ps1 .\bin\Release
       - name: Upload artifact
@@ -108,13 +114,8 @@ jobs:
     - name: Commit changes
       shell: bash
       env:
-        DEPLOY_SSH: ${{ secrets.DEPLOY_SSH }}
-        GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
         GH_BRANCH: ${{ steps.extract_branch.outputs.branch }}
       run: |
-        eval "$(ssh-agent -s)"
-        ssh-add - <<< "${DEPLOY_SSH}"
-        
         git config --global user.name "Actions User"
         git config --global user.email "actions@github.com"
         

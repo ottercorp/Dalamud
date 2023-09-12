@@ -7,13 +7,19 @@ using Dalamud.Hooking;
 using Dalamud.Interface;
 using Dalamud.IoC;
 using Dalamud.IoC.Internal;
+using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
 using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Common.Component.BGCollision;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using ImGuiNET;
 using Serilog;
+using SharpDX;
+
+using Vector2 = System.Numerics.Vector2;
+using Vector3 = System.Numerics.Vector3;
 
 namespace Dalamud.Game.Gui;
 
@@ -23,12 +29,14 @@ namespace Dalamud.Game.Gui;
 [PluginInterface]
 [InterfaceVersion("1.0")]
 [ServiceManager.BlockingEarlyLoadedService]
-public sealed unsafe class GameGui : IDisposable, IServiceType
+#pragma warning disable SA1015
+[ResolveVia<IGameGui>]
+#pragma warning restore SA1015
+public sealed unsafe class GameGui : IDisposable, IServiceType, IGameGui
 {
     private readonly GameGuiAddressResolver address;
 
     private readonly GetMatrixSingletonDelegate getMatrixSingleton;
-    private readonly ScreenToWorldNativeDelegate screenToWorldNative;
 
     private readonly Hook<SetGlobalBgmDelegate> setGlobalBgmHook;
     private readonly Hook<HandleItemHoverDelegate> handleItemHoverHook;
@@ -66,9 +74,7 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
         this.handleImmHook = Hook<HandleImmDelegate>.FromAddress(this.address.HandleImm, this.HandleImmDetour);
 
         this.getMatrixSingleton = Marshal.GetDelegateForFunctionPointer<GetMatrixSingletonDelegate>(this.address.GetMatrixSingleton);
-
-        this.screenToWorldNative = Marshal.GetDelegateForFunctionPointer<ScreenToWorldNativeDelegate>(this.address.ScreenToWorld);
-
+        
         this.toggleUiHideHook = Hook<ToggleUiHideDelegate>.FromAddress(this.address.ToggleUiHide, this.ToggleUiHideDetour);
 
         this.utf8StringFromSequenceHook = Hook<Utf8StringFromSequenceDelegate>.FromAddress(this.address.Utf8StringFromSequence, this.Utf8StringFromSequenceDetour);
@@ -78,9 +84,6 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr GetMatrixSingletonDelegate();
-
-    [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
-    private unsafe delegate bool ScreenToWorldNativeDelegate(float* camPos, float* clipPos, float rayDistance, float* worldPos, int* unknown);
 
     // Hooked delegates
 
@@ -113,43 +116,26 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
 
     [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
     private delegate IntPtr ToggleUiHideDelegate(IntPtr thisPtr, byte unknownByte);
-
-    /// <summary>
-    /// Event which is fired when the game UI hiding is toggled.
-    /// </summary>
+    
+    /// <inheritdoc/>
     public event EventHandler<bool> UiHideToggled;
 
-    /// <summary>
-    /// Event that is fired when the currently hovered item changes.
-    /// </summary>
+    /// <inheritdoc/>
     public event EventHandler<ulong> HoveredItemChanged;
 
-    /// <summary>
-    /// Event that is fired when the currently hovered action changes.
-    /// </summary>
+    /// <inheritdoc/>
     public event EventHandler<HoveredAction> HoveredActionChanged;
 
-    /// <summary>
-    /// Gets a value indicating whether the game UI is hidden.
-    /// </summary>
+    /// <inheritdoc/>
     public bool GameUiHidden { get; private set; }
 
-    /// <summary>
-    /// Gets or sets the item ID that is currently hovered by the player. 0 when no item is hovered.
-    /// If > 1.000.000, subtract 1.000.000 and treat it as HQ.
-    /// </summary>
+    /// <inheritdoc/>
     public ulong HoveredItem { get; set; }
 
-    /// <summary>
-    /// Gets the action ID that is current hovered by the player. 0 when no action is hovered.
-    /// </summary>
+    /// <inheritdoc/>
     public HoveredAction HoveredAction { get; } = new HoveredAction();
 
-    /// <summary>
-    /// Opens the in-game map with a flag on the location of the parameter.
-    /// </summary>
-    /// <param name="mapLink">Link to the map to be opened.</param>
-    /// <returns>True if there were no errors and it could open the map.</returns>
+    /// <inheritdoc/>
     public bool OpenMapWithMapLink(MapLinkPayload mapLink)
     {
         var uiModule = this.GetUIModule();
@@ -179,22 +165,11 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
         return this.openMapWithFlag(uiMapObjectPtr, mapLinkString);
     }
 
-    /// <summary>
-    /// Converts in-world coordinates to screen coordinates (upper left corner origin).
-    /// </summary>
-    /// <param name="worldPos">Coordinates in the world.</param>
-    /// <param name="screenPos">Converted coordinates.</param>
-    /// <returns>True if worldPos corresponds to a position in front of the camera and screenPos is in the viewport.</returns>
+    /// <inheritdoc/>
     public bool WorldToScreen(Vector3 worldPos, out Vector2 screenPos)
         => this.WorldToScreen(worldPos, out screenPos, out var inView) && inView;
 
-    /// <summary>
-    /// Converts in-world coordinates to screen coordinates (upper left corner origin).
-    /// </summary>
-    /// <param name="worldPos">Coordinates in the world.</param>
-    /// <param name="screenPos">Converted coordinates.</param>
-    /// <param name="inView">True if screenPos corresponds to a position inside the camera viewport.</param>
-    /// <returns>True if worldPos corresponds to a position in front of the camera.</returns>
+    /// <inheritdoc/>
     public bool WorldToScreen(Vector3 worldPos, out Vector2 screenPos, out bool inView)
     {
         // Get base object with matrices
@@ -221,13 +196,7 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
         return inFront;
     }
 
-    /// <summary>
-    /// Converts screen coordinates to in-world coordinates via raycasting.
-    /// </summary>
-    /// <param name="screenPos">Screen coordinates.</param>
-    /// <param name="worldPos">Converted coordinates.</param>
-    /// <param name="rayDistance">How far to search for a collision.</param>
-    /// <returns>True if successful. On false, worldPos's contents are undefined.</returns>
+    /// <inheritdoc/>
     public bool ScreenToWorld(Vector2 screenPos, out Vector3 worldPos, float rayDistance = 100000.0f)
     {
         // The game is only visible in the main viewport, so if the cursor is outside
@@ -246,18 +215,15 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
         var matrixSingleton = this.getMatrixSingleton();
 
         // Read current ViewProjectionMatrix plus game window size
-        var viewProjectionMatrix = default(SharpDX.Matrix);
+        var viewProjectionMatrix = default(Matrix);
         float width, height;
-        unsafe
-        {
-            var rawMatrix = (float*)(matrixSingleton + 0x1b4).ToPointer();
+        var rawMatrix = (float*)(matrixSingleton + 0x1b4).ToPointer();
 
-            for (var i = 0; i < 16; i++, rawMatrix++)
-                viewProjectionMatrix[i] = *rawMatrix;
+        for (var i = 0; i < 16; i++, rawMatrix++)
+            viewProjectionMatrix[i] = *rawMatrix;
 
-            width = *rawMatrix;
-            height = *(rawMatrix + 1);
-        }
+        width = *rawMatrix;
+        height = *(rawMatrix + 1);
 
         viewProjectionMatrix.Invert();
 
@@ -277,47 +243,25 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
         var clipPos = camPosOne - camPos;
         clipPos.Normalize();
 
-        bool isSuccess;
-        unsafe
+        // This array is larger than necessary because it contains more info than we currently use
+        var worldPosArray = default(RaycastHit);
+
+        // Theory: this is some kind of flag on what type of things the ray collides with
+        var unknown = stackalloc int[3]
         {
-            var camPosArray = camPos.ToArray();
-            var clipPosArray = clipPos.ToArray();
+            0x4000,
+            0x4000,
+            0x0,
+        };
 
-            // This array is larger than necessary because it contains more info than we currently use
-            var worldPosArray = stackalloc float[32];
-
-            // Theory: this is some kind of flag on what type of things the ray collides with
-            var unknown = stackalloc int[3]
-            {
-                0x4000,
-                0x4000,
-                0x0,
-            };
-
-            fixed (float* pCamPos = camPosArray)
-            {
-                fixed (float* pClipPos = clipPosArray)
-                {
-                    isSuccess = this.screenToWorldNative(pCamPos, pClipPos, rayDistance, worldPosArray, unknown);
-                }
-            }
-
-            worldPos = new Vector3
-            {
-                X = worldPosArray[0],
-                Y = worldPosArray[1],
-                Z = worldPosArray[2],
-            };
-        }
+        var isSuccess = BGCollisionModule.Raycast2(camPos.ToSystem(), clipPos.ToSystem(), rayDistance, &worldPosArray, unknown);
+        worldPos = worldPosArray.Point;
 
         return isSuccess;
     }
 
-    /// <summary>
-    /// Gets a pointer to the game's UI module.
-    /// </summary>
-    /// <returns>IntPtr pointing to UI module.</returns>
-    public unsafe IntPtr GetUIModule()
+    /// <inheritdoc/>
+    public IntPtr GetUIModule()
     {
         var framework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
         if (framework == null)
@@ -330,15 +274,10 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
         return (IntPtr)uiModule;
     }
 
-    /// <summary>
-    /// Gets the pointer to the Addon with the given name and index.
-    /// </summary>
-    /// <param name="name">Name of addon to find.</param>
-    /// <param name="index">Index of addon to find (1-indexed).</param>
-    /// <returns>IntPtr.Zero if unable to find UI, otherwise IntPtr pointing to the start of the addon.</returns>
-    public unsafe IntPtr GetAddonByName(string name, int index = 1)
+    /// <inheritdoc/>
+    public IntPtr GetAddonByName(string name, int index = 1)
     {
-        var atkStage = FFXIVClientStructs.FFXIV.Component.GUI.AtkStage.GetSingleton();
+        var atkStage = AtkStage.GetSingleton();
         if (atkStage == null)
             return IntPtr.Zero;
 
@@ -353,29 +292,17 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
         return (IntPtr)addon;
     }
 
-    /// <summary>
-    /// Find the agent associated with an addon, if possible.
-    /// </summary>
-    /// <param name="addonName">The addon name.</param>
-    /// <returns>A pointer to the agent interface.</returns>
+    /// <inheritdoc/>
     public IntPtr FindAgentInterface(string addonName)
     {
-        var addon = this.GetAddonByName(addonName, 1);
+        var addon = this.GetAddonByName(addonName);
         return this.FindAgentInterface(addon);
     }
 
-    /// <summary>
-    /// Find the agent associated with an addon, if possible.
-    /// </summary>
-    /// <param name="addon">The addon address.</param>
-    /// <returns>A pointer to the agent interface.</returns>
-    public unsafe IntPtr FindAgentInterface(void* addon) => this.FindAgentInterface((IntPtr)addon);
-
-    /// <summary>
-    /// Find the agent associated with an addon, if possible.
-    /// </summary>
-    /// <param name="addonPtr">The addon address.</param>
-    /// <returns>A pointer to the agent interface.</returns>
+    /// <inheritdoc/>
+    public IntPtr FindAgentInterface(void* addon) => this.FindAgentInterface((IntPtr)addon);
+    
+    /// <inheritdoc/>
     public IntPtr FindAgentInterface(IntPtr addonPtr)
     {
         if (addonPtr == IntPtr.Zero)
@@ -430,9 +357,9 @@ public sealed unsafe class GameGui : IDisposable, IServiceType
     /// <returns>A value indicating whether or not the game is on the title screen.</returns>
     internal bool IsOnTitleScreen()
     {
-        var charaSelect = this.GetAddonByName("CharaSelect", 1);
-        var charaMake = this.GetAddonByName("CharaMake", 1);
-        var titleDcWorldMap = this.GetAddonByName("TitleDCWorldMap", 1);
+        var charaSelect = this.GetAddonByName("CharaSelect");
+        var charaMake = this.GetAddonByName("CharaMake");
+        var titleDcWorldMap = this.GetAddonByName("TitleDCWorldMap");
         if (charaMake != nint.Zero || charaSelect != nint.Zero || titleDcWorldMap != nint.Zero)
             return false;
 

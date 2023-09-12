@@ -3,31 +3,21 @@ using System.IO;
 
 using Dalamud.Utility;
 using Newtonsoft.Json;
+using Serilog;
 
-namespace Dalamud.Plugin.Internal.Types;
+namespace Dalamud.Plugin.Internal.Types.Manifest;
 
 /// <summary>
 /// Information about a plugin, packaged in a json file with the DLL. This variant includes additional information such as
 /// if the plugin is disabled and if it was installed from a testing URL. This is designed for use with manifests on disk.
 /// </summary>
-internal record LocalPluginManifest : PluginManifest
+internal record LocalPluginManifest : PluginManifest, ILocalPluginManifest
 {
-    /// <summary>
-    /// Flag indicating that a plugin was installed from the official repo.
-    /// </summary>
-    [JsonIgnore]
-    public const string FlagMainRepo = "OFFICIAL";
-
-    /// <summary>
-    /// Flag indicating that a plugin is a dev plugin..
-    /// </summary>
-    [JsonIgnore]
-    public const string FlagDevPlugin = "DEVPLUGIN";
-
     /// <summary>
     /// Gets or sets a value indicating whether the plugin is disabled and should not be loaded.
     /// This value supersedes the ".disabled" file functionality and should not be included in the plugin master.
     /// </summary>
+    [Obsolete("This is merely used for migrations now. Use the profile manager to check if a plugin shall be enabled.")]
     public bool Disabled { get; set; }
 
     /// <summary>
@@ -36,23 +26,20 @@ internal record LocalPluginManifest : PluginManifest
     /// </summary>
     public bool Testing { get; set; }
 
-    /// <summary>
-    /// Gets or sets a value indicating whether the plugin should be deleted during the next cleanup.
-    /// </summary>
+    /// <inheritdoc/>
     public bool ScheduledForDeletion { get; set; }
 
-    /// <summary>
-    /// Gets or sets the 3rd party repo URL that this plugin was installed from. Used to display where the plugin was
-    /// sourced from on the installed plugin view. This should not be included in the plugin master. This value is null
-    /// when installed from the main repo.
-    /// </summary>
+    /// <inheritdoc/>
     public string InstalledFromUrl { get; set; } = string.Empty;
+
+    /// <inheritdoc/>
+    public Guid WorkingPluginId { get; set; } = Guid.Empty;
 
     /// <summary>
     /// Gets a value indicating whether this manifest is associated with a plugin that was installed from a third party
     /// repo. Unless the manifest has been manually modified, this is determined by the InstalledFromUrl being null.
     /// </summary>
-    public bool IsThirdParty => !this.InstalledFromUrl.IsNullOrEmpty() && this.InstalledFromUrl != FlagMainRepo;
+    public bool IsThirdParty => !this.InstalledFromUrl.IsNullOrEmpty() && this.InstalledFromUrl != SpecialPluginSource.MainRepo;
 
     /// <summary>
     /// Gets the effective version of this plugin.
@@ -60,22 +47,31 @@ internal record LocalPluginManifest : PluginManifest
     public Version EffectiveVersion => this.Testing && this.TestingAssemblyVersion != null ? this.TestingAssemblyVersion : this.AssemblyVersion;
 
     /// <summary>
-    /// Gets a value indicating whether this plugin is eligible for testing.
-    /// </summary>
-    public bool IsAvailableForTesting => this.TestingAssemblyVersion != null && this.TestingAssemblyVersion > this.AssemblyVersion;
-
-    /// <summary>
     /// Save a plugin manifest to file.
     /// </summary>
     /// <param name="manifestFile">Path to save at.</param>
-    public void Save(FileInfo manifestFile) => Util.WriteAllTextSafe(manifestFile.FullName, JsonConvert.SerializeObject(this, Formatting.Indented));
+    /// <param name="reason">The reason the manifest was saved.</param>
+    public void Save(FileInfo manifestFile, string reason)
+    {
+        Log.Verbose("Saving manifest for '{PluginName}' because '{Reason}'", this.InternalName, reason);
+
+        try
+        {
+            Util.WriteAllTextSafe(manifestFile.FullName, JsonConvert.SerializeObject(this, Formatting.Indented));
+        }
+        catch
+        {
+            Log.Error("Could not write out manifest for '{PluginName}' because '{Reason}'", this.InternalName, reason);
+            throw;
+        }
+    }
 
     /// <summary>
     /// Loads a plugin manifest from file.
     /// </summary>
     /// <param name="manifestFile">Path to the manifest.</param>
     /// <returns>A <see cref="PluginManifest"/> object.</returns>
-    public static LocalPluginManifest Load(FileInfo manifestFile) => JsonConvert.DeserializeObject<LocalPluginManifest>(File.ReadAllText(manifestFile.FullName))!;
+    public static LocalPluginManifest? Load(FileInfo manifestFile) => JsonConvert.DeserializeObject<LocalPluginManifest>(File.ReadAllText(manifestFile.FullName));
 
     /// <summary>
     /// A standardized way to get the plugin DLL name that should accompany a manifest file. May not exist.

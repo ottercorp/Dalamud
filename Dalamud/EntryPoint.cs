@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 
 using Dalamud.Configuration.Internal;
 using Dalamud.Logging.Internal;
+using Dalamud.Logging.Retention;
 using Dalamud.Plugin.Internal;
 using Dalamud.Support;
 using Dalamud.Utility;
@@ -68,7 +69,7 @@ public sealed class EntryPoint
     {
         try
         {
-            return Marshal.StringToHGlobalUni(Environment.StackTrace);
+            return Marshal.StringToHGlobalUni(new StackTrace(1).ToString());
         }
         catch (Exception e)
         {
@@ -87,28 +88,19 @@ public sealed class EntryPoint
     {
         var logFileName = logName.IsNullOrEmpty() ? "dalamud" : $"dalamud-{logName}";
 
-#if DEBUG
-        var logPath = Path.Combine(baseDirectory, $"{logFileName}.log");
-        var oldPath = Path.Combine(baseDirectory, $"{logFileName}.old.log");
-        var oldPathOld = Path.Combine(baseDirectory, $"{logFileName}.log.old");
-#else
-        var logPath = Path.Combine(baseDirectory, "..", "..", "..", $"{logFileName}.log");
-        var oldPath = Path.Combine(baseDirectory, "..", "..", "..", $"{logFileName}.old.log");
-        var oldPathOld = Path.Combine(baseDirectory, "..", "..", "..", $"{logFileName}.log.old");
-#endif
+        var logPath = new FileInfo(Path.Combine(baseDirectory, $"{logFileName}.log"));
+        var oldPath = new FileInfo(Path.Combine(baseDirectory, $"{logFileName}.old.log"));
+
         Log.CloseAndFlush();
 
-        var oldFileOld = new FileInfo(oldPathOld);
-        if (oldFileOld.Exists)
-        {
-            var oldFile = new FileInfo(oldPath);
-            if (oldFile.Exists)
-                oldFileOld.Delete();
-            else
-                oldFileOld.MoveTo(oldPath);
-        }
+        RetentionBehaviour behaviour;
+#if DEBUG
+        behaviour = new DebugRetentionBehaviour();
+#else
+        behaviour = new ReleaseRetentionBehaviour();
+#endif
 
-        CullLogFile(logPath, 1 * 1024 * 1024, oldPath, 10 * 1024 * 1024);
+        behaviour.Apply(logPath, oldPath);
 
         var config = new LoggerConfiguration()
                      .WriteTo.Sink(SerilogEventSink.Instance)
@@ -116,12 +108,12 @@ public sealed class EntryPoint
 
         if (logSynchronously)
         {
-            config = config.WriteTo.File(logPath, fileSizeLimitBytes: null);
+            config = config.WriteTo.File(logPath.FullName, fileSizeLimitBytes: null);
         }
         else
         {
             config = config.WriteTo.Async(a => a.File(
-                                              logPath,
+                                              logPath.FullName,
                                               fileSizeLimitBytes: null,
                                               buffered: false,
                                               flushToDiskInterval: TimeSpan.FromSeconds(1)));
@@ -141,7 +133,7 @@ public sealed class EntryPoint
     private static void RunThread(DalamudStartInfo info, IntPtr mainThreadContinueEvent)
     {
         // Setup logger
-        InitLogging(info.WorkingDirectory!, info.BootShowConsole, true, info.LogName);
+        InitLogging(info.LogPath!, info.BootShowConsole, true, info.LogName);
         SerilogEventSink.Instance.LogLine += SerilogOnLogLine;
 
         // Load configuration first to get some early persistent state, like log level
@@ -149,12 +141,14 @@ public sealed class EntryPoint
 
         // Set the appropriate logging level from the configuration
         if (!configuration.LogSynchronously)
-            InitLogging(info.WorkingDirectory!, info.BootShowConsole, configuration.LogSynchronously, info.LogName);
+            InitLogging(info.LogPath!, info.BootShowConsole, configuration.LogSynchronously, info.LogName);
         LogLevelSwitch.MinimumLevel = configuration.LogLevel;
 
         // Log any unhandled exception.
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+        var unloadFailed = false;
 
         try
         {
@@ -189,7 +183,15 @@ public sealed class EntryPoint
 
             dalamud.WaitForUnload();
 
-            ServiceManager.UnloadAllServices();
+            try
+            {
+                ServiceManager.UnloadAllServices();
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "Could not unload services.");
+                unloadFailed = true;
+            }
         }
         catch (Exception ex)
         {
@@ -204,6 +206,11 @@ public sealed class EntryPoint
             Log.CloseAndFlush();
             SerilogEventSink.Instance.LogLine -= SerilogOnLogLine;
         }
+
+        // If we didn't unload services correctly, we need to kill the process.
+        // We will never signal to Framework.
+        if (unloadFailed)
+            Environment.Exit(-1);
     }
 
     private static void SerilogOnLogLine(object? sender, (string Line, LogEvent LogEvent) ev)
@@ -241,86 +248,6 @@ public sealed class EntryPoint
         }
     }
 
-    /// <summary>
-    /// Trim existing log file to a specified length, and optionally move the excess data to another file.
-    /// </summary>
-    /// <param name="logPath">Target log file to trim.</param>
-    /// <param name="logMaxSize">Maximum size of target log file.</param>
-    /// <param name="oldPath">.old file to move excess data to.</param>
-    /// <param name="oldMaxSize">Maximum size of .old file.</param>
-    private static void CullLogFile(string logPath, int logMaxSize, string oldPath, int oldMaxSize)
-    {
-        var logFile = new FileInfo(logPath);
-        var oldFile = new FileInfo(oldPath);
-        var targetFiles = new[]
-        {
-            (logFile, logMaxSize),
-            (oldFile, oldMaxSize),
-        };
-        var buffer = new byte[4096];
-
-        try
-        {
-            if (!logFile.Exists)
-                logFile.Create().Close();
-
-            // 1. Move excess data from logFile to oldFile
-            if (logFile.Length > logMaxSize)
-            {
-                using var reader = logFile.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var writer = oldFile.Open(FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
-
-                var amountToMove = (int)Math.Min(logFile.Length - logMaxSize, oldMaxSize);
-                reader.Seek(-(logMaxSize + amountToMove), SeekOrigin.End);
-
-                for (var i = 0; i < amountToMove; i += buffer.Length)
-                    writer.Write(buffer, 0, reader.Read(buffer, 0, Math.Min(buffer.Length, amountToMove - i)));
-            }
-
-            // 2. Cull each of .log and .old files
-            foreach (var (file, maxSize) in targetFiles)
-            {
-                if (!file.Exists || file.Length <= maxSize)
-                    continue;
-
-                using var reader = file.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var writer = file.Open(FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
-
-                reader.Seek(file.Length - maxSize, SeekOrigin.Begin);
-                for (int read; (read = reader.Read(buffer, 0, buffer.Length)) > 0;)
-                    writer.Write(buffer, 0, read);
-
-                writer.SetLength(maxSize);
-            }
-        }
-        catch (Exception ex)
-        {
-            if (ex is IOException)
-            {
-                foreach (var (file, _) in targetFiles)
-                {
-                    try
-                    {
-                        if (file.Exists)
-                            file.Delete();
-                    }
-                    catch (Exception ex2)
-                    {
-                        Log.Error(ex2, "Failed to delete {file}", file.FullName);
-                    }
-                }
-            }
-
-            Log.Error(ex, "Log cull failed");
-
-            /*
-            var caption = "XIVLauncher Error";
-            var message = $"Log cull threw an exception: {ex.Message}\n{ex.StackTrace ?? string.Empty}";
-            _ = MessageBoxW(IntPtr.Zero, message, caption, MessageBoxType.IconError | MessageBoxType.Ok);
-            */
-        }
-    }
-
     private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs args)
     {
         switch (args.ExceptionObject)
@@ -336,7 +263,7 @@ public sealed class EntryPoint
                 }
 
                 var pluginInfo = string.Empty;
-                var supportText = ", please visit us on Discord for more help.";
+                var supportText = ", please visit us on Discord for more help";
                 try
                 {
                     var pm = Service<PluginManager>.GetNullable();
@@ -345,7 +272,7 @@ public sealed class EntryPoint
                     {
                         pluginInfo = $"Plugin that caused this:\n{plugin.Name}\n\nClick \"Yes\" and remove it.\n\n";
 
-                        if (plugin.Manifest.IsThirdParty)
+                        if (plugin.IsThirdParty)
                             supportText = string.Empty;
                     }
                 }

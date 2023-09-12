@@ -141,7 +141,6 @@ internal static class Service<T> where T : IServiceType
                      .OfType<InherentDependencyAttribute>()
                      .Select(x => x.GetType().GetGenericArguments().First()));
 
-
         // HACK: PluginManager needs to depend on ALL plugin exposed services
         if (typeof(T) == typeof(PluginManager))
         {
@@ -152,6 +151,10 @@ internal static class Service<T> where T : IServiceType
 
                 var attr = serviceType.GetCustomAttribute<PluginInterfaceAttribute>(true);
                 if (attr == null)
+                    continue;
+
+                // Scoped plugin services lifetime is tied to their scopes. They go away when LocalPlugin goes away.
+                if (serviceType.GetServiceKind() == ServiceManager.ServiceKind.ScopedService)
                     continue;
 
                 ServiceManager.Log.Verbose("PluginManager MUST depend on {Type}", serviceType.FullName!);
