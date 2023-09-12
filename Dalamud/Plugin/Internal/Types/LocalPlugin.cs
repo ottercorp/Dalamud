@@ -167,8 +167,8 @@ internal class LocalPlugin : IDisposable
         }
 
         var pluginManager = Service<PluginManager>.Get();
-        this.IsBanned = pluginManager.IsManifestBanned(this.Manifest); // && !this.IsDev;
-        this.BanReason = pluginManager.GetBanReason(this.Manifest);
+        this.IsBanned = pluginManager.IsManifestBanned(this.manifest); // && !this.IsDev;
+        this.BanReason = pluginManager.GetBanReason(this.manifest);
 
         if (needsSaveDueToLegacyFiles)
             this.SaveManifest("legacy");
@@ -385,7 +385,7 @@ internal class LocalPlugin : IDisposable
             }
 
             // if (pluginManager.IsManifestBanned(this.Manifest) && !this.IsDev)
-            if (pluginManager.IsManifestBanned(this.Manifest))
+            if (pluginManager.IsManifestBanned(this.manifest))
                     throw new BannedPluginException($"Unable to load {this.Name}, banned");
 
             if (this.manifest.ApplicableVersion < startInfo.GameVersion)

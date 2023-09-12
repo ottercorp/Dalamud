@@ -1980,7 +1980,7 @@ internal class PluginInstallerWindow : Window, IDisposable
                 this.DrawSendFeedbackButton(manifest, false, true);
             }
 
-            this.DrawVisitRepoUrlButton(manifest.RepoUrl);
+            this.DrawVisitRepoUrlButton(manifest.RepoUrl,true);
 
             ImGuiHelpers.ScaledDummy(5);
 

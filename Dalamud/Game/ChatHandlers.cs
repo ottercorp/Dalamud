@@ -119,7 +119,7 @@ public class ChatHandlers : IServiceType
     private readonly DalamudConfiguration configuration = Service<DalamudConfiguration>.Get();
 
     private bool hasSeenLoadingMsg;
-    private bool hasAutoUpdatedPlugins;
+    private bool startedAutoUpdatingPlugins;
     private bool hasSendMeasurement;
 
     [ServiceManager.ServiceConstructor]
