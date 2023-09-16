@@ -19,7 +19,6 @@ internal unsafe class UiDebug
 {
     private const int UnitListCount = 18;
 
-    private readonly GetAtkStageSingleton getAtkStageSingleton;
     private readonly bool[] selectedInList = new bool[UnitListCount];
     private readonly string[] listNames = new string[UnitListCount]
     {
@@ -52,12 +51,7 @@ internal unsafe class UiDebug
     /// </summary>
     public UiDebug()
     {
-        var sigScanner = Service<SigScanner>.Get();
-        var getSingletonAddr = sigScanner.ScanText("E8 ?? ?? ?? ?? 41 B8 01 00 00 00 48 8D 15 ?? ?? ?? ?? 48 8B 48 20 E8 ?? ?? ?? ?? 48 8B CF");
-        this.getAtkStageSingleton = Marshal.GetDelegateForFunctionPointer<GetAtkStageSingleton>(getSingletonAddr);
     }
-
-    private delegate AtkStage* GetAtkStageSingleton();
 
     /// <summary>
     /// Renders this window.
@@ -169,7 +163,7 @@ internal unsafe class UiDebug
     private void PrintSimpleNode(AtkResNode* node, string treePrefix)
     {
         var popped = false;
-        var isVisible = (node->Flags & 0x10) == 0x10;
+        var isVisible = node->NodeFlags.HasFlag(NodeFlags.Visible);
 
         if (isVisible)
             ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0, 255, 0, 255));
@@ -300,7 +294,7 @@ internal unsafe class UiDebug
         var compNode = (AtkComponentNode*)node;
 
         var popped = false;
-        var isVisible = (node->Flags & 0x10) == 0x10;
+        var isVisible = node->NodeFlags.HasFlag(NodeFlags.Visible);
 
         var componentInfo = compNode->Component->UldManager;
 
@@ -400,7 +394,7 @@ internal unsafe class UiDebug
         ImGui.SameLine();
         if (ImGui.SmallButton($"T:Visible##{(ulong)node:X}"))
         {
-            node->Flags ^= 0x10;
+            node->NodeFlags ^= NodeFlags.Visible;
         }
 
         ImGui.SameLine();
@@ -445,7 +439,7 @@ internal unsafe class UiDebug
     {
         var foundSelected = false;
         var noResults = true;
-        var stage = this.getAtkStageSingleton();
+        var stage = AtkStage.GetSingleton();
 
         var unitManagers = &stage->RaptureAtkUnitManager->AtkUnitManager.DepthLayerOneList;
 
@@ -577,7 +571,7 @@ internal unsafe class UiDebug
         if (node == null) return false;
         while (node != null)
         {
-            if ((node->Flags & (short)NodeFlags.Visible) != (short)NodeFlags.Visible) return false;
+            if (!node->NodeFlags.HasFlag(NodeFlags.Visible)) return false;
             node = node->ParentNode;
         }
 

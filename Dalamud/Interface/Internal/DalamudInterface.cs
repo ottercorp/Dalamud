@@ -16,6 +16,7 @@ using Dalamud.Interface.Animation.EasingFunctions;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Internal.ManagedAsserts;
 using Dalamud.Interface.Internal.Windows;
+using Dalamud.Interface.Internal.Windows.Data;
 using Dalamud.Interface.Internal.Windows.PluginInstaller;
 using Dalamud.Interface.Internal.Windows.SelfTest;
 using Dalamud.Interface.Internal.Windows.Settings;
@@ -526,13 +527,14 @@ internal class DalamudInterface : IDisposable, IServiceType
         }
         catch (Exception ex)
         {
-            PluginLog.Error(ex, "Error during OnDraw");
+            Log.Error(ex, "Error during OnDraw");
         }
     }
 
     private void DrawCreditsDarkeningAnimation()
     {
-        using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowRounding, 0f);
+        using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowRounding | ImGuiStyleVar.WindowBorderSize, 0f);
+        using var color = ImRaii.PushColor(ImGuiCol.WindowBg, new Vector4(0, 0, 0, 0));
 
         ImGui.SetNextWindowPos(new Vector2(0, 0));
         ImGui.SetNextWindowSize(ImGuiHelpers.MainViewport.Size);
@@ -651,7 +653,7 @@ internal class DalamudInterface : IDisposable, IServiceType
                         configuration.QueueSave();
 
                         EntryPoint.InitLogging(
-                            startInfo.WorkingDirectory!,
+                            startInfo.LogPath!,
                             startInfo.BootShowConsole,
                             configuration.LogSynchronously,
                             startInfo.LogName);
@@ -731,12 +733,7 @@ internal class DalamudInterface : IDisposable, IServiceType
 
                     if (ImGui.MenuItem("Restart game"))
                     {
-                        [DllImport("kernel32.dll")]
-                        [return: MarshalAs(UnmanagedType.Bool)]
-                        static extern void RaiseException(uint dwExceptionCode, uint dwExceptionFlags, uint nNumberOfArguments, IntPtr lpArguments);
-
-                        RaiseException(0x12345678, 0, 0, IntPtr.Zero);
-                        Process.GetCurrentProcess().Kill();
+                        Dalamud.RestartGame();
                     }
 
                     if (ImGui.MenuItem("Kill game"))
@@ -816,6 +813,11 @@ internal class DalamudInterface : IDisposable, IServiceType
                         ImGui.SetWindowFocus(null);
                     }
 
+                    if (ImGui.MenuItem("Clear stacks"))
+                    {
+                        Service<InterfaceManager>.Get().ClearStacks();
+                    }
+
                     if (ImGui.MenuItem("Dump style"))
                     {
                         var info = string.Empty;
@@ -891,7 +893,7 @@ internal class DalamudInterface : IDisposable, IServiceType
                         foreach (var plugin in pluginManager.InstalledPlugins)
                         {
                             // TODO: some more here, state maybe?
-                            PluginLog.Information($"{plugin.Name}");
+                            Log.Information($"{plugin.Name}");
                         }
                     }
 
@@ -914,7 +916,7 @@ internal class DalamudInterface : IDisposable, IServiceType
 
                     ImGui.Separator();
                     ImGui.MenuItem("API Level:" + PluginManager.DalamudApiLevel, false);
-                    ImGui.MenuItem("Loaded plugins:" + pluginManager.InstalledPlugins.Count, false);
+                    ImGui.MenuItem("Loaded plugins:" + pluginManager.InstalledPlugins.Count(), false);
                     ImGui.EndMenu();
                 }
 

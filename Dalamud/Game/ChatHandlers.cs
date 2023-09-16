@@ -119,7 +119,7 @@ public class ChatHandlers : IServiceType
     private readonly DalamudConfiguration configuration = Service<DalamudConfiguration>.Get();
 
     private bool hasSeenLoadingMsg;
-    private bool hasAutoUpdatedPlugins;
+    private bool startedAutoUpdatingPlugins;
     private bool hasSendMeasurement;
 
     [ServiceManager.ServiceConstructor]
@@ -138,6 +138,11 @@ public class ChatHandlers : IServiceType
     /// Gets the last URL seen in chat.
     /// </summary>
     public string? LastLink { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether or not auto-updates have already completed this session.
+    /// </summary>
+    public bool IsAutoUpdateComplete { get; private set; }
 
     /// <summary>
     /// Convert a TextPayload to SeString and wrap in italics payloads.
@@ -195,7 +200,7 @@ public class ChatHandlers : IServiceType
         if (clientState.LocalPlayer != null && clientState.TerritoryType == 0 && !this.hasSeenLoadingMsg)
             this.PrintWelcomeMessage();
 
-        if (!this.hasAutoUpdatedPlugins)
+        if (!this.startedAutoUpdatingPlugins)
             this.AutoUpdatePlugins();
 
         if (clientState.LocalPlayer != null && !this.hasSendMeasurement)
@@ -261,7 +266,8 @@ public class ChatHandlers : IServiceType
 
         var assemblyVersion = Assembly.GetAssembly(typeof(ChatHandlers)).GetName().Version.ToString();
 
-        if (this.configuration.PrintDalamudWelcomeMsg) {
+        if (this.configuration.PrintDalamudWelcomeMsg)
+        {
             chatGui.Print(string.Format(Loc.Localize("DalamudWelcome", "Dalamud vD{0} loaded."), assemblyVersion)
                           + string.Format(Loc.Localize("PluginsWelcome", " {0} plugin(s) loaded."), pluginManager.InstalledPlugins.Count(x => x.IsLoaded)));
         }
@@ -324,23 +330,26 @@ public class ChatHandlers : IServiceType
         if (chatGui == null || pluginManager == null || notifications == null)
             return;
 
-        if (!pluginManager.ReposReady || pluginManager.InstalledPlugins.Count == 0 || pluginManager.AvailablePlugins.Count == 0)
+        if (!pluginManager.ReposReady || !pluginManager.InstalledPlugins.Any() || !pluginManager.AvailablePlugins.Any())
         {
             // Plugins aren't ready yet.
+            // TODO: We should retry. This sucks, because it means we won't ever get here again until another notice.
             return;
         }
 
-        this.hasAutoUpdatedPlugins = true;
+        this.startedAutoUpdatingPlugins = true;
 
-        Task.Run(() => pluginManager.UpdatePluginsAsync(true, !this.configuration.AutoUpdatePlugins)).ContinueWith(task =>
+        Task.Run(() => pluginManager.UpdatePluginsAsync(true, !this.configuration.AutoUpdatePlugins, true)).ContinueWith(task =>
         {
+            this.IsAutoUpdateComplete = true;
+
             if (task.IsFaulted)
             {
                 Log.Error(task.Exception, Loc.Localize("DalamudPluginUpdateCheckFail", "Could not check for plugin updates."));
                 return;
             }
 
-            var updatedPlugins = task.Result;
+            var updatedPlugins = task.Result.ToList();
             if (updatedPlugins.Any())
             {
                 if (this.configuration.AutoUpdatePlugins)

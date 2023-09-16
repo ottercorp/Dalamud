@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+
 using Dalamud.Networking.Http;
 using Dalamud.Plugin.Internal;
 using Dalamud.Utility;
+using Serilog;
 
 namespace Dalamud.Interface.Internal.Windows.PluginInstaller;
 
@@ -43,30 +45,35 @@ internal class DalamudChangelogManager
         this.Changelogs = null;
 
         var dalamudChangelogs = await client.GetFromJsonAsync<List<DalamudChangelog>>(DalamudChangelogUrl);
-        var changelogs = dalamudChangelogs.Select(x => new DalamudChangelogEntry(x)).Cast<IChangelogEntry>();
+        var changelogs = dalamudChangelogs.Select(x => new DalamudChangelogEntry(x)).Cast<IChangelogEntry>().ToList();
 
         foreach (var plugin in this.manager.InstalledPlugins)
         {
-            if (!plugin.Manifest.IsThirdParty)
+            if (!plugin.IsThirdParty && !plugin.IsDev)
             {
-                if (!plugin.Manifest.IsDip17Plugin)
-                    continue;
-
-                var pluginChangelogs = await client.GetFromJsonAsync<PluginHistory>(string.Format(
+                try
+                {
+                    var pluginChangelogs = await client.GetFromJsonAsync<PluginHistory>(string.Format(
                                                PluginChangelogUrl,
                                                plugin.Manifest.InternalName,
                                                plugin.Manifest.Dip17Channel));
 
-                changelogs = changelogs.Concat(pluginChangelogs.Versions
-                                                               .Where(x => x.Dip17Track == plugin.Manifest.Dip17Channel)
-                                                               .Select(x => new PluginChangelogEntry(plugin, x)));
+                    changelogs.AddRange(pluginChangelogs.Versions
+                                                                   .Where(x => x.Dip17Track ==
+                                                                               plugin.Manifest.Dip17Channel)
+                                                                   .Select(x => new PluginChangelogEntry(plugin, x)));
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Failed to load changelog for {PluginName}", plugin.Manifest.Name);
+                }
             }
             else
             {
                 if (plugin.Manifest.Changelog.IsNullOrWhitespace())
                     continue;
 
-                changelogs = changelogs.Append(new PluginChangelogEntry(plugin));
+                changelogs.Add(new PluginChangelogEntry(plugin));
             }
         }
 
