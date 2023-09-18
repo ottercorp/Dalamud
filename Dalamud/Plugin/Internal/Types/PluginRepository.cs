@@ -40,7 +40,7 @@ internal class PluginRepository
 
     private static readonly HttpClient HttpClient = new(CacheHandler)
     {
-        Timeout = TimeSpan.FromSeconds(20),
+        Timeout = TimeSpan.FromSeconds(5),
         DefaultRequestHeaders =
         {
             CacheControl = new CacheControlHeaderValue

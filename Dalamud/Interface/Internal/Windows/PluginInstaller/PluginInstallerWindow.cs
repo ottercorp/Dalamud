@@ -56,6 +56,7 @@ internal class PluginInstallerWindow : Window, IDisposable
     private DalamudChangelogManager? dalamudChangelogManager;
     private Task? dalamudChangelogRefreshTask;
     private CancellationTokenSource? dalamudChangelogRefreshTaskCts;
+    private DateTime lastRefreshTime = DateTime.MinValue;
 
     #region Image Tester State
 
@@ -613,6 +614,25 @@ internal class PluginInstallerWindow : Window, IDisposable
             if (ImGui.Button(Locs.FooterButton_ScanDevPlugins))
             {
                 pluginManager.ScanDevPlugins();
+            }
+        }
+
+        //刷新缓存
+        {
+            ImGui.SameLine();
+            var cooldownFinished = this.lastRefreshTime.AddMinutes(1D).CompareTo(DateTime.Now) < 0;
+
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.CloudDownloadAlt))
+            {
+                if (cooldownFinished)
+                {
+                    _ = pluginManager.ReloadPluginMastersAsync(true, true);
+                    this.lastRefreshTime = DateTime.Now;
+                }
+            }
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip(cooldownFinished ? "更新插件列表缓存" : "少女折寿中...");
             }
         }
 
