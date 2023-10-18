@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -120,6 +120,7 @@ internal class TextureManager : IDisposable, IServiceType, ITextureSubstitutionP
             ClientLanguage.English => "en/",
             ClientLanguage.German => "de/",
             ClientLanguage.French => "fr/",
+            ClientLanguage.ChineseSimplified => "chs/",
             _ => throw new ArgumentOutOfRangeException(nameof(language), $"Unknown Language: {language}"),
         };
         
