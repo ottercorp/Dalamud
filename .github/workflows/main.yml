@@ -75,7 +75,7 @@ jobs:
         $hash = .\CreateHashList.ps1 .\scratch 
 
         Write-Host "Create 7z package"
-        7z a .\canary.7z .\scratch\* -t7z -mx=9      
+        7z a .\canary.7z .\scratch\* -t7z -mf=BCJ2 -mx=9      
 
         Compress-Archive -Force .\scratch\* .\canary.zip  # Recreate the release zip
         
