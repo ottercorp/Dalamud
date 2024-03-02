@@ -28,7 +28,7 @@ internal class PluginRepository
     /// <summary>
     /// The URL of the official main repository.
     /// </summary>
-    public const string MainRepoUrl = "https://aonyx.ffxiv.wang/Plugin/PluginMaster?apiLevel=8";
+    public const string MainRepoUrl = "https://aonyx.ffxiv.wang/Plugin/PluginMaster?apiLevel=9";
 
     private const int HttpRequestTimeoutSeconds = 20;
 
