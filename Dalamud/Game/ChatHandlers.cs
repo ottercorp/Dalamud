@@ -1,8 +1,8 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 using CheapLoc;
@@ -14,22 +14,19 @@ using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Interface.Internal;
 using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Interface.Internal.Windows;
-using Dalamud.IoC;
-using Dalamud.IoC.Internal;
+using Dalamud.Interface.Internal.Windows.PluginInstaller;
+using Dalamud.Logging.Internal;
 using Dalamud.Plugin.Internal;
 using Dalamud.Support;
 using Dalamud.Utility;
-using Serilog;
 
 namespace Dalamud.Game;
 
 /// <summary>
 /// Chat events and public helper functions.
 /// </summary>
-[PluginInterface]
-[InterfaceVersion("1.0")]
 [ServiceManager.BlockingEarlyLoadedService]
-public class ChatHandlers : IServiceType
+internal class ChatHandlers : IServiceType
 {
     // private static readonly Dictionary<string, string> UnicodeToDiscordEmojiDict = new()
     // {
@@ -64,6 +61,8 @@ public class ChatHandlers : IServiceType
     //     { XivChatType.NoviceNetwork, Color.SaddleBrown },
     //     { XivChatType.Echo, Color.Gray },
     // };
+
+    private static readonly ModuleLog Log = new("CHATHANDLER");
 
     private readonly Regex rmtRegex = new(
             @"没打开的[\dwW,]+收|登录领取.*福袋",
@@ -116,11 +115,15 @@ public class ChatHandlers : IServiceType
     private readonly DalamudLinkPayload openInstallerWindowLink;
 
     [ServiceManager.ServiceDependency]
+    private readonly Dalamud dalamud = Service<Dalamud>.Get();
+    
+    [ServiceManager.ServiceDependency]
     private readonly DalamudConfiguration configuration = Service<DalamudConfiguration>.Get();
 
     private bool hasSeenLoadingMsg;
     private bool startedAutoUpdatingPlugins;
     private bool hasSendMeasurement;
+    private CancellationTokenSource deferredAutoUpdateCts = new();
 
     [ServiceManager.ServiceConstructor]
     private ChatHandlers(ChatGui chatGui)
@@ -130,7 +133,7 @@ public class ChatHandlers : IServiceType
 
         this.openInstallerWindowLink = chatGui.AddChatLinkHandler("Dalamud", 1001, (i, m) =>
         {
-            Service<DalamudInterface>.GetNullable()?.OpenPluginInstaller();
+            Service<DalamudInterface>.GetNullable()?.OpenPluginInstallerTo(PluginInstallerWindow.PluginInstallerOpenKind.InstalledPlugins);
         });
     }
 
@@ -143,22 +146,6 @@ public class ChatHandlers : IServiceType
     /// Gets a value indicating whether or not auto-updates have already completed this session.
     /// </summary>
     public bool IsAutoUpdateComplete { get; private set; }
-
-    /// <summary>
-    /// Convert a TextPayload to SeString and wrap in italics payloads.
-    /// </summary>
-    /// <param name="text">Text to convert.</param>
-    /// <returns>SeString payload of italicized text.</returns>
-    public static SeString MakeItalics(string text)
-        => MakeItalics(new TextPayload(text));
-
-    /// <summary>
-    /// Convert a TextPayload to SeString and wrap in italics payloads.
-    /// </summary>
-    /// <param name="text">Text to convert.</param>
-    /// <returns>SeString payload of italicized text.</returns>
-    public static SeString MakeItalics(TextPayload text)
-        => new(EmphasisItalicPayload.ItalicsOn, text, EmphasisItalicPayload.ItalicsOff);
 
     private void OnCheckMessageHandled(XivChatType type, uint senderid, ref SeString sender, ref SeString message, ref bool isHandled)
     {
@@ -188,13 +175,18 @@ public class ChatHandlers : IServiceType
 
     private void OnChatMessage(XivChatType type, uint senderId, ref SeString sender, ref SeString message, ref bool isHandled)
     {
-        var startInfo = Service<DalamudStartInfo>.Get();
         var clientState = Service<ClientState.ClientState>.GetNullable();
         if (clientState == null)
             return;
 
-        if (type == XivChatType.Notice && !this.hasSeenLoadingMsg)
-            this.PrintWelcomeMessage();
+        if (type == XivChatType.Notice)
+        {
+            if (!this.hasSeenLoadingMsg)
+                this.PrintWelcomeMessage();
+            
+            if (!this.startedAutoUpdatingPlugins)
+                this.AutoUpdatePluginsWithRetry();
+        }
 
         // For injections while logged in
         if (clientState.LocalPlayer != null && clientState.TerritoryType == 0 && !this.hasSeenLoadingMsg)
@@ -218,7 +210,7 @@ public class ChatHandlers : IServiceType
 
         if (type == XivChatType.RetainerSale)
         {
-            foreach (var regex in this.retainerSaleRegexes[startInfo.Language])
+            foreach (var regex in this.retainerSaleRegexes[(ClientLanguage)this.dalamud.StartInfo.Language])
             {
                 var matchInfo = regex.Match(message.TextValue);
 
@@ -276,22 +268,21 @@ public class ChatHandlers : IServiceType
         {
             foreach (var plugin in pluginManager.InstalledPlugins.OrderBy(plugin => plugin.Name).Where(x => x.IsLoaded))
             {
-                chatGui.Print(string.Format(Loc.Localize("DalamudPluginLoaded", "    》 {0} v{1} loaded."), plugin.Name, plugin.Manifest.AssemblyVersion));
+                chatGui.Print(string.Format(Loc.Localize("DalamudPluginLoaded", "    》 {0} v{1} loaded."), plugin.Name, plugin.EffectiveVersion));
             }
         }
 
         if (string.IsNullOrEmpty(this.configuration.LastVersion) || !assemblyVersion.StartsWith(this.configuration.LastVersion))
         {
-            chatGui.PrintChat(new XivChatEntry
+            chatGui.Print(new XivChatEntry
             {
                 Message = Loc.Localize("DalamudUpdated", "Dalamud has been updated successfully! Please check the discord for a full changelog."),
                 Type = XivChatType.Notice,
             });
 
-            if (string.IsNullOrEmpty(this.configuration.LastChangelogMajorMinor) || (!ChangelogWindow.WarrantsChangelogForMajorMinor.StartsWith(this.configuration.LastChangelogMajorMinor) && assemblyVersion.StartsWith(ChangelogWindow.WarrantsChangelogForMajorMinor)))
+            if (ChangelogWindow.WarrantsChangelog())
             {
                 dalamudInterface.OpenChangelogWindow();
-                this.configuration.LastChangelogMajorMinor = ChangelogWindow.WarrantsChangelogForMajorMinor;
             }
 
             this.configuration.LastVersion = assemblyVersion;
@@ -321,24 +312,42 @@ public class ChatHandlers : IServiceType
 
     }
 
-    private void AutoUpdatePlugins()
+    private void AutoUpdatePluginsWithRetry()
+    {
+        var firstAttempt = this.AutoUpdatePlugins();
+        if (!firstAttempt)
+        {
+            Task.Run(() =>
+            {
+                Task.Delay(30_000, this.deferredAutoUpdateCts.Token);
+                this.AutoUpdatePlugins();
+            });
+        }
+    }
+
+    private bool AutoUpdatePlugins()
     {
         var chatGui = Service<ChatGui>.GetNullable();
         var pluginManager = Service<PluginManager>.GetNullable();
         var notifications = Service<NotificationManager>.GetNullable();
 
         if (chatGui == null || pluginManager == null || notifications == null)
-            return;
+        {
+            Log.Warning("Aborting auto-update because a required service was not loaded.");
+            return false;
+        }
 
         if (!pluginManager.ReposReady || !pluginManager.InstalledPlugins.Any() || !pluginManager.AvailablePlugins.Any())
         {
             // Plugins aren't ready yet.
             // TODO: We should retry. This sucks, because it means we won't ever get here again until another notice.
-            return;
+            Log.Warning("Aborting auto-update because plugins weren't loaded or ready.");
+            return false;
         }
 
         this.startedAutoUpdatingPlugins = true;
 
+        Log.Debug("Beginning plugin auto-update process...");
         Task.Run(() => pluginManager.UpdatePluginsAsync(true, !this.configuration.AutoUpdatePlugins, true)).ContinueWith(task =>
         {
             this.IsAutoUpdateComplete = true;
@@ -359,7 +368,7 @@ public class ChatHandlers : IServiceType
                 }
                 else
                 {
-                    chatGui.PrintChat(new XivChatEntry
+                    chatGui.Print(new XivChatEntry
                     {
                         Message = new SeString(new List<Payload>()
                         {
@@ -377,5 +386,7 @@ public class ChatHandlers : IServiceType
                 }
             }
         });
+
+        return true;
     }
 }

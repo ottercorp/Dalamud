@@ -27,7 +27,7 @@ void ConsoleTeardown()
 
 std::optional<CoreCLR> g_clr;
 
-int InitializeClrAndGetEntryPoint(
+HRESULT InitializeClrAndGetEntryPoint(
     void* calling_module,
     bool enable_etw,
     std::wstring runtimeconfig_path,
@@ -77,7 +77,7 @@ int InitializeClrAndGetEntryPoint(
         if (result != 0)
         {
             logging::E("Unable to get RoamingAppData path (err={})", result);
-            return result;
+            return HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND);
         }
 
         std::filesystem::path fs_app_data(_appdata);
@@ -97,7 +97,7 @@ int InitializeClrAndGetEntryPoint(
     if (!std::filesystem::exists(dotnet_path))
     {
         logging::E("Error: Unable to find .NET runtime path");
-        return 1;
+        return HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND);
     }
 
     get_hostfxr_parameters init_parameters
@@ -142,12 +142,12 @@ int InitializeClrAndGetEntryPoint(
         entrypoint_delegate_type_name.c_str(),
         nullptr, entrypoint_fn)) != 0)
     {
-        logging::E("Failed to load module (err={})", result);
+        logging::E("Failed to load module (err=0x{:X})", static_cast<uint32_t>(result));
         return result;
     }
     logging::I("Done!");
 
     // =========================================================================== //
 
-    return 0;
+    return S_OK;
 }

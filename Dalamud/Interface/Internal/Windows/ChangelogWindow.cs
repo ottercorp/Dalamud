@@ -1,10 +1,21 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 
+using Dalamud.Configuration.Internal;
+using Dalamud.Interface.Animation.EasingFunctions;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Components;
+using Dalamud.Interface.GameFonts;
+using Dalamud.Interface.ManagedFontAtlas;
+using Dalamud.Interface.ManagedFontAtlas.Internals;
+using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin.Internal;
+using Dalamud.Storage.Assets;
 using Dalamud.Utility;
 using ImGuiNET;
 using ImGuiScene;
@@ -17,179 +28,359 @@ namespace Dalamud.Interface.Internal.Windows;
 /// </summary>
 internal sealed class ChangelogWindow : Window, IDisposable
 {
-    /// <summary>
-    /// Whether the latest update warrants a changelog window.
-    /// </summary>
-    public const string WarrantsChangelogForMajorMinor = "7.5.1.3";
-
-    private const string ChangeLog =
-        @"• 重置了代理设置,取消了F**KGFW设置,如有必要请重新设置代理,重启游戏后生效
+    private const string WarrantsChangelogForMajorMinor = "9.0.";
     
-如果你有任何问题或者需要帮助，请查看FAQ，或者到QQ频道求助!";
+    private const string ChangeLog =
+        @"• Updated Dalamud for compatibility with Patch 6.5
+• A lot of behind-the-scenes changes to make Dalamud and plugins more stable and reliable
+• Added plugin collections, allowing you to create lists of plugins that can be enabled or disabled together
+• Plugins can now add tooltips and interaction to the server info bar
+• The Dalamud/plugin installer UI has been refreshed
+";
 
-    private const string UpdatePluginsInfo =
-            @"• 由于此更新，您的所有插件可能会被禁用。 这是正常的。
-• 打开插件安装程序，然后单击“更新插件”。更新的插件应该更新然后重新启用自己。
-    => 请记住，并非所有插件都已针对新版本进行了更新。
-    => 如果某些插件在“已安装插件”选项卡中显示为红色叉号，则它们可能尚不可用。";
+    private readonly TitleScreenMenuWindow tsmWindow;
 
-    private readonly string assemblyVersion = Util.AssemblyVersion;
+    private readonly DisposeSafety.ScopedFinalizer scopedFinalizer = new();
+    private readonly IFontAtlas privateAtlas;
+    private readonly Lazy<IFontHandle> bannerFont;
+    private readonly Lazy<IDalamudTextureWrap> apiBumpExplainerTexture;
+    private readonly Lazy<IDalamudTextureWrap> logoTexture;
+    
+    private readonly InOutCubic windowFade = new(TimeSpan.FromSeconds(2.5f))
+    {
+        Point1 = Vector2.Zero,
+        Point2 = new Vector2(2f),
+    };
+    
+    private readonly InOutCubic bodyFade = new(TimeSpan.FromSeconds(1f))
+    {
+        Point1 = Vector2.Zero,
+        Point2 = Vector2.One,
+    };
+    
+    private State state = State.WindowFadeIn;
 
-    private readonly TextureWrap logoTexture;
+    private bool needFadeRestart = false;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ChangelogWindow"/> class.
     /// </summary>
-    public ChangelogWindow()
-        : base("有啥新功能？？", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoResize)
+    /// <param name="tsmWindow">TSM window.</param>
+    /// <param name="fontAtlasFactory">An instance of <see cref="FontAtlasFactory"/>.</param>
+    /// <param name="assets">An instance of <see cref="DalamudAssetManager"/>.</param>
+    public ChangelogWindow(
+        TitleScreenMenuWindow tsmWindow,
+        FontAtlasFactory fontAtlasFactory,
+        DalamudAssetManager assets)
+        : base("What's new in Dalamud?##ChangelogWindow", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse, true)
     {
+        this.tsmWindow = tsmWindow;
         this.Namespace = "DalamudChangelogWindow";
+        this.privateAtlas = this.scopedFinalizer.Add(
+            fontAtlasFactory.CreateFontAtlas(this.Namespace, FontAtlasAutoRebuildMode.Async));
+        this.bannerFont = new(
+            () => this.scopedFinalizer.Add(
+                this.privateAtlas.NewGameFontHandle(new(GameFontFamilyAndSize.MiedingerMid18))));
 
-        this.Size = new Vector2(885, 463);
-        this.SizeCondition = ImGuiCond.Appearing;
+        this.apiBumpExplainerTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.ChangelogApiBumpIcon));
+        this.logoTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.Logo));
 
-        var interfaceManager = Service<InterfaceManager>.Get();
-        var dalamud = Service<Dalamud>.Get();
+        // If we are going to show a changelog, make sure we have the font ready, otherwise it will hitch
+        if (WarrantsChangelog())
+            _ = this.bannerFont.Value;
+    }
 
-        this.logoTexture =
-            interfaceManager.LoadImage(Path.Combine(dalamud.AssetDirectory.FullName, "UIRes", "logo.png"))!;
+    private enum State
+    {
+        WindowFadeIn,
+        ExplainerIntro,
+        ExplainerApiBump,
+        Links,
+    }
+    
+    /// <summary>
+    /// Check if a changelog should be shown.
+    /// </summary>
+    /// <returns>True if a changelog should be shown.</returns>
+    public static bool WarrantsChangelog()
+    {
+        var configuration = Service<DalamudConfiguration>.Get();
+        var pm = Service<PluginManager>.GetNullable();
+        var pmWantsChangelog = pm?.InstalledPlugins.Any() ?? true;
+        return (string.IsNullOrEmpty(configuration.LastChangelogMajorMinor) ||
+                (!WarrantsChangelogForMajorMinor.StartsWith(configuration.LastChangelogMajorMinor) &&
+                 Util.AssemblyVersion.StartsWith(WarrantsChangelogForMajorMinor))) && pmWantsChangelog;
+    }
+
+    /// <inheritdoc/>
+    public override void OnOpen()
+    {
+        Service<DalamudInterface>.Get().SetCreditsDarkeningAnimation(true);
+        this.tsmWindow.AllowDrawing = false;
+
+        _ = this.bannerFont;
+        
+        this.state = State.WindowFadeIn;
+        this.windowFade.Reset();
+        this.bodyFade.Reset();
+        this.needFadeRestart = true;
+        
+        base.OnOpen();
+    }
+
+    /// <inheritdoc/>
+    public override void OnClose()
+    {
+        base.OnClose();
+        
+        this.tsmWindow.AllowDrawing = true;
+        Service<DalamudInterface>.Get().SetCreditsDarkeningAnimation(false);
+    }
+
+    /// <inheritdoc/>
+    public override void PreDraw()
+    {
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 0);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 10f);
+        
+        base.PreDraw();
+
+        if (this.needFadeRestart)
+        {
+            this.windowFade.Restart();
+            this.needFadeRestart = false;
+        }
+        
+        this.windowFade.Update();
+        ImGui.SetNextWindowBgAlpha(Math.Clamp(this.windowFade.EasedPoint.X, 0, 0.9f));
+        
+        this.Size = new Vector2(900, 400);
+        this.SizeCondition = ImGuiCond.Always;
+        
+        // Center the window on the main viewport
+        var viewportSize = ImGuiHelpers.MainViewport.Size;
+        var windowSize = this.Size!.Value * ImGuiHelpers.GlobalScale;
+        ImGui.SetNextWindowPos(new Vector2(viewportSize.X / 2 - windowSize.X / 2, viewportSize.Y / 2 - windowSize.Y / 2));
+    }
+
+    /// <inheritdoc/>
+    public override void PostDraw()
+    {
+        ImGui.PopStyleVar(3);
+        base.PostDraw();
     }
 
     /// <inheritdoc/>
     public override void Draw()
     {
-        ImGui.Text($"卫月框架更新到了版本 D{this.assemblyVersion}。");
-
-        ImGuiHelpers.ScaledDummy(10);
-
-        ImGui.Text("包含了以下更新:");
-
-        ImGui.SameLine();
-        ImGuiHelpers.ScaledDummy(0);
-        var imgCursor = ImGui.GetCursorPos();
-
-        ImGui.TextWrapped(ChangeLog);
-
-        ImGuiHelpers.ScaledDummy(5);
-
-        ImGui.TextColored(ImGuiColors.DalamudRed, " !!! 注意 !!!");
-
-        ImGui.TextWrapped(UpdatePluginsInfo);
-
-        ImGuiHelpers.ScaledDummy(10);
-
-        // ImGui.Text("感谢使用我们的工具！");
-
-        // ImGuiHelpers.ScaledDummy(10);
-
-        ImGui.PushFont(UiBuilder.IconFont);
-
-        if (ImGui.Button(FontAwesomeIcon.Download.ToIconString()))
+        void Dismiss()
         {
-            Service<DalamudInterface>.Get().OpenPluginInstaller();
+            var configuration = Service<DalamudConfiguration>.Get();
+            configuration.LastChangelogMajorMinor = WarrantsChangelogForMajorMinor;
+            configuration.QueueSave();
         }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.PopFont();
-            ImGui.SetTooltip("打开插件安装器");
-            ImGui.PushFont(UiBuilder.IconFont);
-        }
-
+        
+        var windowSize = ImGui.GetWindowSize();
+        
+        var dummySize = 10 * ImGuiHelpers.GlobalScale;
+        ImGui.Dummy(new Vector2(dummySize));
         ImGui.SameLine();
-
-        if (ImGui.Button(FontAwesomeIcon.LaughBeam.ToIconString()))
+        
+        var logoContainerSize = new Vector2(windowSize.X * 0.2f - dummySize, windowSize.Y);
+        using (var child = ImRaii.Child("###logoContainer", logoContainerSize, false))
         {
-            try
+            if (!child)
+                return;
+
+            var logoSize = new Vector2(logoContainerSize.X);
+            
+            // Center the logo in the container
+            ImGui.SetCursorPos(new Vector2(logoContainerSize.X / 2 - logoSize.X / 2, logoContainerSize.Y / 2 - logoSize.Y / 2));
+            
+            using (ImRaii.PushStyle(ImGuiStyleVar.Alpha, Math.Clamp(this.windowFade.EasedPoint.X - 0.5f, 0f, 1f)))
+                ImGui.Image(this.logoTexture.Value.ImGuiHandle, logoSize);
+        }
+        
+        ImGui.SameLine();
+        ImGui.Dummy(new Vector2(dummySize));
+        ImGui.SameLine();
+        
+        using (var child = ImRaii.Child("###textContainer", new Vector2((windowSize.X * 0.8f) - dummySize * 4, windowSize.Y), false))
+        {
+            if (!child)
+                return;
+            
+            ImGuiHelpers.ScaledDummy(20);
+            
+            using (ImRaii.PushStyle(ImGuiStyleVar.Alpha, Math.Clamp(this.windowFade.EasedPoint.X - 1f, 0f, 1f)))
             {
-                Process.Start(new ProcessStartInfo()
+                using var font = this.bannerFont.Value.Push();
+
+                switch (this.state)
                 {
-                    FileName = "https://discord.gg/3NMcUV5",
-                    UseShellExecute = true,
-                });
+                    case State.WindowFadeIn:
+                    case State.ExplainerIntro:
+                        ImGuiHelpers.CenteredText("New And Improved");
+                        break;
+                    
+                    case State.ExplainerApiBump:
+                        ImGuiHelpers.CenteredText("Plugin Updates");
+                        break;
+                    
+                    case State.Links:
+                        ImGuiHelpers.CenteredText("Enjoy!");
+                        break;
+                }
             }
-            catch (Exception ex)
+            
+            ImGuiHelpers.ScaledDummy(8);
+
+            if (this.state == State.WindowFadeIn && this.windowFade.EasedPoint.X > 1.5f)
             {
-                Log.Error(ex, "Could not open discord url");
+                this.state = State.ExplainerIntro;
+                this.bodyFade.Restart();
             }
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.PopFont();
-            ImGui.SetTooltip("加入我们的 Discord 服务器（国际服）");
-            ImGui.PushFont(UiBuilder.IconFont);
-        }
-
-        ImGui.SameLine();
-
-        if (ImGui.Button(FontAwesomeIcon.LaughSquint.ToIconString()))
-        {
-            try
+            
+            this.bodyFade.Update();
+            using (ImRaii.PushStyle(ImGuiStyleVar.Alpha, Math.Clamp(this.bodyFade.EasedPoint.X, 0, 1f)))
             {
-                Process.Start(new ProcessStartInfo()
+                void DrawNextButton(State nextState)
                 {
-                    FileName = "https://qun.qq.com/qqweb/qunpro/share?_wv=3&_wwv=128&appChannel=share&inviteCode=CZtWN&businessType=9&from=181074&biz=ka&shareSource=5",
-                    UseShellExecute = true,
-                });
+                    // Draw big, centered next button at the bottom of the window
+                    var buttonHeight = 30 * ImGuiHelpers.GlobalScale;
+                    var buttonText = "Next";
+                    var buttonWidth = ImGui.CalcTextSize(buttonText).X + 40 * ImGuiHelpers.GlobalScale;
+                    ImGui.SetCursorPosY(windowSize.Y - buttonHeight - (20 * ImGuiHelpers.GlobalScale));
+                    ImGuiHelpers.CenterCursorFor((int)buttonWidth);
+                
+                    if (ImGui.Button(buttonText, new Vector2(buttonWidth, buttonHeight)))
+                    {
+                        this.state = nextState;
+                        this.bodyFade.Restart();
+                    }
+                }
+                
+                switch (this.state)
+                {
+                    case State.WindowFadeIn:
+                    case State.ExplainerIntro:
+                        ImGui.TextWrapped($"Welcome to Dalamud v{Util.AssemblyVersion}!");
+                        ImGuiHelpers.ScaledDummy(5);
+                        ImGui.TextWrapped(ChangeLog);
+                        ImGuiHelpers.ScaledDummy(5);
+                        ImGui.TextWrapped("This changelog is a quick overview of the most important changes in this version.");
+                        ImGui.TextWrapped("Please click next to see a quick guide to updating your plugins.");
+                        
+                        DrawNextButton(State.ExplainerApiBump);
+                        break;
+                    
+                    case State.ExplainerApiBump:
+                        ImGui.TextWrapped("Take care! Due to changes in this patch, all of your plugins need to be updated and were disabled automatically.");
+                        ImGui.TextWrapped("This is normal and required for major game updates.");
+                        ImGuiHelpers.ScaledDummy(5);
+                        ImGui.TextWrapped("To update your plugins, open the plugin installer and click 'update plugins'. Updated plugins should update and then re-enable themselves.");
+                        ImGuiHelpers.ScaledDummy(5);
+                        ImGui.TextWrapped("Please keep in mind that not all of your plugins may already be updated for the new version.");
+                        ImGui.TextWrapped("If some plugins are displayed with a red cross in the 'Installed Plugins' tab, they may not yet be available.");
+                        
+                        ImGuiHelpers.ScaledDummy(15);
+
+                        ImGuiHelpers.CenterCursorFor(this.apiBumpExplainerTexture.Value.Width);
+                        ImGui.Image(
+                            this.apiBumpExplainerTexture.Value.ImGuiHandle,
+                            this.apiBumpExplainerTexture.Value.Size);
+                        
+                        DrawNextButton(State.Links);
+                        break;
+                    
+                    case State.Links:
+                        ImGui.TextWrapped("If you note any issues or need help, please check the FAQ, and reach out on our Discord if you need help.");
+                        ImGui.TextWrapped("Enjoy your time with the game and Dalamud!");
+                        
+                        ImGuiHelpers.ScaledDummy(45);
+                        
+                        bool CenteredIconButton(FontAwesomeIcon icon, string text)
+                        {
+                            var buttonWidth = ImGuiComponents.GetIconButtonWithTextWidth(icon, text);
+                            ImGuiHelpers.CenterCursorFor((int)buttonWidth);
+                            return ImGuiComponents.IconButtonWithText(icon, text);
+                        }
+                        
+                        if (CenteredIconButton(FontAwesomeIcon.Download, "Open Plugin Installer"))
+                        {
+                            Service<DalamudInterface>.Get().OpenPluginInstaller();
+                            this.IsOpen = false;
+                            Dismiss();
+                        }
+                        
+                        ImGuiHelpers.ScaledDummy(5);
+                        
+                        ImGuiHelpers.CenterCursorFor(
+                            (int)(ImGuiComponents.GetIconButtonWithTextWidth(FontAwesomeIcon.Globe, "See the FAQ") +
+                            ImGuiComponents.GetIconButtonWithTextWidth(FontAwesomeIcon.LaughBeam, "Join our Discord server") +
+                            (5 * ImGuiHelpers.GlobalScale) + 
+                            (ImGui.GetStyle().ItemSpacing.X * 4)));
+                        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Globe, "See the FAQ"))
+                        {
+                            Util.OpenLink("https://goatcorp.github.io/faq/");
+                        }
+                        
+                        ImGui.SameLine();
+                        ImGuiHelpers.ScaledDummy(5);
+                        ImGui.SameLine();
+                        
+                        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.LaughBeam, "Join our Discord server"))
+                        {
+                            Util.OpenLink("https://discord.gg/3NMcUV5");
+                        }
+                        
+                        ImGuiHelpers.ScaledDummy(5);
+                        
+                        if (CenteredIconButton(FontAwesomeIcon.Heart, "Support what we care about"))
+                        {
+                            Util.OpenLink("https://goatcorp.github.io/faq/support");
+                        }
+                        
+                        var buttonHeight = 30 * ImGuiHelpers.GlobalScale;
+                        var buttonText = "Close";
+                        var buttonWidth = ImGui.CalcTextSize(buttonText).X + 40 * ImGuiHelpers.GlobalScale;
+                        ImGui.SetCursorPosY(windowSize.Y - buttonHeight - (20 * ImGuiHelpers.GlobalScale));
+                        ImGuiHelpers.CenterCursorFor((int)buttonWidth);
+                
+                        if (ImGui.Button(buttonText, new Vector2(buttonWidth, buttonHeight)))
+                        {
+                            this.IsOpen = false;
+                            Dismiss();
+                        }
+                        
+                        break;
+                }
             }
-            catch (Exception ex)
+            
+            // Draw close button in the top right corner
+            ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 100f);
+            var btnAlpha = Math.Clamp(this.windowFade.EasedPoint.X - 0.5f, 0f, 1f);
+            ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed.WithAlpha(btnAlpha).Desaturate(0.3f));
+            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudWhite.WithAlpha(btnAlpha));
+            
+            var childSize = ImGui.GetWindowSize();
+            var closeButtonSize = 15 * ImGuiHelpers.GlobalScale;
+            ImGui.SetCursorPos(new Vector2(childSize.X - closeButtonSize - 5, 10 * ImGuiHelpers.GlobalScale));
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Times))
             {
-                Log.Error(ex, "Could not open QQ url");
+                Dismiss();
+                this.IsOpen = false;
+            }
+
+            ImGui.PopStyleColor(2);
+            ImGui.PopStyleVar();
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("I don't care about this");
             }
         }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.PopFont();
-            ImGui.SetTooltip("加入我们的 QQ 频道");
-            ImGui.PushFont(UiBuilder.IconFont);
-        }
-
-        ImGui.SameLine();
-
-        if (ImGui.Button(FontAwesomeIcon.Globe.ToIconString()))
-        {
-            Util.OpenLink("https://ottercorp.github.io/faq/");
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.PopFont();
-            ImGui.SetTooltip("查看 FAQ");
-            ImGui.PushFont(UiBuilder.IconFont);
-        }
-
-        ImGui.SameLine();
-
-        if (ImGui.Button(FontAwesomeIcon.Heart.ToIconString()))
-        {
-            Util.OpenLink("https://ottercorp.github.io/faq/support");
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.PopFont();
-            ImGui.SetTooltip("支持我们");
-            ImGui.PushFont(UiBuilder.IconFont);
-        }
-
-        ImGui.PopFont();
-
-        ImGui.SameLine();
-        ImGuiHelpers.ScaledDummy(20, 0);
-        ImGui.SameLine();
-
-        if (ImGui.Button("关闭"))
-        {
-            this.IsOpen = false;
-        }
-
-        imgCursor.X += 750;
-        imgCursor.Y -= 30;
-        ImGui.SetCursorPos(imgCursor);
-
-        ImGui.Image(this.logoTexture.ImGuiHandle, new Vector2(100));
     }
 
     /// <summary>
@@ -197,6 +388,5 @@ internal sealed class ChangelogWindow : Window, IDisposable
     /// </summary>
     public void Dispose()
     {
-        this.logoTexture.Dispose();
     }
 }

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Abstractions;
 using Microsoft.Extensions.Caching.InMemory;
@@ -14,6 +15,7 @@ using Dalamud.Logging.Internal;
 using Dalamud.Networking.Http;
 using Dalamud.Plugin.Internal.Types.Manifest;
 using Dalamud.Utility;
+
 using Newtonsoft.Json;
 
 namespace Dalamud.Plugin.Internal.Types;
@@ -28,8 +30,12 @@ internal class PluginRepository
     /// </summary>
     public const string MainRepoUrl = "https://aonyx.ffxiv.wang/Plugin/PluginMaster?apiLevel=8";
 
-    private static readonly ModuleLog Log = new("PLUGINR");
+    private const int HttpRequestTimeoutSeconds = 20;
 
+    private static readonly ModuleLog Log = new("PLUGINR");
+    
+    private readonly HttpClient httpClient;
+    
     private static readonly InMemoryCacheHandler CacheHandler = new(
         new SocketsHttpHandler
         {
@@ -53,19 +59,38 @@ internal class PluginRepository
     /// <summary>
     /// Initializes a new instance of the <see cref="PluginRepository"/> class.
     /// </summary>
+    /// <param name="happyHttpClient">An instance of <see cref="HappyHttpClient"/>.</param>
     /// <param name="pluginMasterUrl">The plugin master URL.</param>
     /// <param name="isEnabled">Whether the plugin repo is enabled.</param>
-    public PluginRepository(string pluginMasterUrl, bool isEnabled)
+    public PluginRepository(HappyHttpClient happyHttpClient, string pluginMasterUrl, bool isEnabled)
     {
+        this.httpClient = new(new SocketsHttpHandler
+        {
+            AutomaticDecompression = DecompressionMethods.All,
+            ConnectCallback = happyHttpClient.SharedHappyEyeballsCallback.ConnectCallback,
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(20),
+            DefaultRequestHeaders =
+            {
+                Accept =
+                {
+                    new MediaTypeWithQualityHeaderValue("application/json"),
+                },
+                CacheControl = new CacheControlHeaderValue
+                {
+                    NoCache = true,
+                },
+                UserAgent =
+                {
+                    new ProductInfoHeaderValue("Dalamud", Util.AssemblyVersion),
+                },
+            },
+        };
         this.PluginMasterUrl = pluginMasterUrl;
         this.IsThirdParty = pluginMasterUrl != MainRepoUrl;
         this.IsEnabled = isEnabled;
     }
-
-    /// <summary>
-    /// Gets a new instance of the <see cref="PluginRepository"/> class for the main repo.
-    /// </summary>
-    public static PluginRepository MainRepo => new(MainRepoUrl, true);
 
     /// <summary>
     /// Gets the pluginmaster.json URL.
@@ -93,6 +118,14 @@ internal class PluginRepository
     public PluginRepositoryState State { get; private set; }
 
     /// <summary>
+    /// Gets a new instance of the <see cref="PluginRepository"/> class for the main repo.
+    /// </summary>
+    /// <param name="happyHttpClient">An instance of <see cref="HappyHttpClient"/>.</param>
+    /// <returns>The new instance of main repository.</returns>
+    public static PluginRepository CreateMainRepo(HappyHttpClient happyHttpClient) =>
+        new(happyHttpClient, MainRepoUrl, true);
+
+    /// <summary>
     /// Reload the plugin master asynchronously in a task.
     /// </summary>
     /// <param name="skipCache">Skip MemoryCache.</param>
@@ -112,7 +145,9 @@ internal class PluginRepository
                 Log.Information($"Cache Clear: {this.PluginMasterUrl}");
             }
 
-            using var response = await HttpClient.GetAsync(this.PluginMasterUrl);
+            // using var response = await HttpClient.GetAsync(this.PluginMasterUrl);
+            using var response = await this.GetPluginMaster(this.PluginMasterUrl);
+
             response.EnsureSuccessStatusCode();
 
             var data = await response.Content.ReadAsStringAsync();
@@ -161,6 +196,15 @@ internal class PluginRepository
             }
 
             this.PluginMaster = pluginMaster.Where(this.IsValidManifest).ToList().AsReadOnly();
+            
+            // API9 HACK: Force IsHide to false, we should remove that
+            if (!this.IsThirdParty)
+            {
+                foreach (var manifest in this.PluginMaster)
+                {
+                    manifest.IsHide = false;
+                }
+            }
 
             Log.Information($"Successfully fetched repo: {this.PluginMasterUrl}");
             this.State = PluginRepositoryState.Success;
@@ -197,5 +241,18 @@ internal class PluginRepository
         }
 
         return true;
+    }
+
+    private async Task<HttpResponseMessage> GetPluginMaster(string url, int timeout = HttpRequestTimeoutSeconds)
+    {
+        var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
+
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
+
+        using var requestCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeout));
+       
+        return await httpClient.SendAsync(request, requestCts.Token);
     }
 }

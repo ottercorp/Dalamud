@@ -1,7 +1,6 @@
-using System;
-
 using Dalamud.IoC;
 using Dalamud.IoC.Internal;
+using Dalamud.Plugin.Services;
 using Serilog;
 
 namespace Dalamud.Game.ClientState.Conditions;
@@ -9,16 +8,18 @@ namespace Dalamud.Game.ClientState.Conditions;
 /// <summary>
 /// Provides access to conditions (generally player state). You can check whether a player is in combat, mounted, etc.
 /// </summary>
-[PluginInterface]
 [InterfaceVersion("1.0")]
 [ServiceManager.BlockingEarlyLoadedService]
-public sealed partial class Condition : IServiceType
+internal sealed partial class Condition : IServiceType, ICondition
 {
     /// <summary>
-    /// The current max number of conditions. You can get this just by looking at the condition sheet and how many rows it has.
+    /// Gets the current max number of conditions. You can get this just by looking at the condition sheet and how many rows it has.
     /// </summary>
-    public const int MaxConditionEntries = 104;
+    internal const int MaxConditionEntries = 104;
 
+    [ServiceManager.ServiceDependency]
+    private readonly Framework framework = Service<Framework>.Get();
+    
     private readonly bool[] cache = new bool[MaxConditionEntries];
 
     [ServiceManager.ServiceConstructor]
@@ -26,30 +27,24 @@ public sealed partial class Condition : IServiceType
     {
         var resolver = clientState.AddressResolver;
         this.Address = resolver.ConditionFlags;
+
+        // Initialization
+        for (var i = 0; i < MaxConditionEntries; i++)
+            this.cache[i] = this[i];
+
+        this.framework.Update += this.FrameworkUpdate;
     }
+    
+    /// <inheritdoc/>
+    public event ICondition.ConditionChangeDelegate? ConditionChange;
 
-    /// <summary>
-    /// A delegate type used with the <see cref="ConditionChange"/> event.
-    /// </summary>
-    /// <param name="flag">The changed condition.</param>
-    /// <param name="value">The value the condition is set to.</param>
-    public delegate void ConditionChangeDelegate(ConditionFlag flag, bool value);
+    /// <inheritdoc/>
+    public int MaxEntries => MaxConditionEntries;
 
-    /// <summary>
-    /// Event that gets fired when a condition is set.
-    /// Should only get fired for actual changes, so the previous value will always be !value.
-    /// </summary>
-    public event ConditionChangeDelegate? ConditionChange;
-
-    /// <summary>
-    /// Gets the condition array base pointer.
-    /// </summary>
+    /// <inheritdoc/>
     public IntPtr Address { get; private set; }
 
-    /// <summary>
-    /// Check the value of a specific condition/state flag.
-    /// </summary>
-    /// <param name="flag">The condition flag to check.</param>
+    /// <inheritdoc/>
     public unsafe bool this[int flag]
     {
         get
@@ -61,14 +56,11 @@ public sealed partial class Condition : IServiceType
         }
     }
 
-    /// <inheritdoc cref="this[int]"/>
-    public unsafe bool this[ConditionFlag flag]
+    /// <inheritdoc/>
+    public bool this[ConditionFlag flag]
         => this[(int)flag];
 
-    /// <summary>
-    /// Check if any condition flags are set.
-    /// </summary>
-    /// <returns>Whether any single flag is set.</returns>
+    /// <inheritdoc/>
     public bool Any()
     {
         for (var i = 0; i < MaxConditionEntries; i++)
@@ -81,18 +73,23 @@ public sealed partial class Condition : IServiceType
 
         return false;
     }
-
-    [ServiceManager.CallWhenServicesReady]
-    private void ContinueConstruction(Framework framework)
+    
+    /// <inheritdoc/>
+    public bool Any(params ConditionFlag[] flags)
     {
-        // Initialization
-        for (var i = 0; i < MaxConditionEntries; i++)
-            this.cache[i] = this[i];
+        foreach (var flag in flags)
+        {
+            // this[i] performs range checking, so no need to check here
+            if (this[flag]) 
+            {
+                return true;
+            }
+        }
 
-        framework.Update += this.FrameworkUpdate;
+        return false;
     }
 
-    private void FrameworkUpdate(Framework framework)
+    private void FrameworkUpdate(IFramework unused)
     {
         for (var i = 0; i < MaxConditionEntries; i++)
         {
@@ -118,7 +115,7 @@ public sealed partial class Condition : IServiceType
 /// <summary>
 /// Provides access to conditions (generally player state). You can check whether a player is in combat, mounted, etc.
 /// </summary>
-public sealed partial class Condition : IDisposable
+internal sealed partial class Condition : IDisposable
 {
     private bool isDisposed;
 
@@ -146,9 +143,60 @@ public sealed partial class Condition : IDisposable
 
         if (disposing)
         {
-            Service<Framework>.Get().Update -= this.FrameworkUpdate;
+            this.framework.Update -= this.FrameworkUpdate;
         }
 
         this.isDisposed = true;
     }
+}
+
+/// <summary>
+/// Plugin-scoped version of a Condition service.
+/// </summary>
+[PluginInterface]
+[InterfaceVersion("1.0")]
+[ServiceManager.ScopedService]
+#pragma warning disable SA1015
+[ResolveVia<ICondition>]
+#pragma warning restore SA1015
+internal class ConditionPluginScoped : IDisposable, IServiceType, ICondition
+{
+    [ServiceManager.ServiceDependency]
+    private readonly Condition conditionService = Service<Condition>.Get();
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ConditionPluginScoped"/> class.
+    /// </summary>
+    internal ConditionPluginScoped()
+    {
+        this.conditionService.ConditionChange += this.ConditionChangedForward;
+    }
+    
+    /// <inheritdoc/>
+    public event ICondition.ConditionChangeDelegate? ConditionChange;
+
+    /// <inheritdoc/>
+    public int MaxEntries => this.conditionService.MaxEntries;
+
+    /// <inheritdoc/>
+    public IntPtr Address => this.conditionService.Address;
+
+    /// <inheritdoc/>
+    public bool this[int flag] => this.conditionService[flag];
+    
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        this.conditionService.ConditionChange -= this.ConditionChangedForward;
+
+        this.ConditionChange = null;
+    }
+
+    /// <inheritdoc/>
+    public bool Any() => this.conditionService.Any();
+
+    /// <inheritdoc/>
+    public bool Any(params ConditionFlag[] flags) => this.conditionService.Any(flags);
+
+    private void ConditionChangedForward(ConditionFlag flag, bool value) => this.ConditionChange?.Invoke(flag, value);
 }

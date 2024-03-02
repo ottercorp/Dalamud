@@ -1,5 +1,7 @@
-using System;
 using System.Reflection;
+
+using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 
 using Serilog;
 using Serilog.Events;
@@ -9,6 +11,12 @@ namespace Dalamud.Logging;
 /// <summary>
 /// Class offering various static methods to allow for logging in plugins.
 /// </summary>
+/// <remarks>
+/// PluginLog has been obsoleted and replaced by the <see cref="IPluginLog"/> service. Developers are encouraged to
+/// move over as soon as reasonably possible for performance reasons.
+/// </remarks>
+[Obsolete("Static PluginLog will be removed in API 10. Developers should use IPluginLog.")]
+[Api10ToDo(Api10ToDoAttribute.DeleteCompatBehavior)]
 public static class PluginLog
 {
     #region "Log" prefixed Serilog style methods

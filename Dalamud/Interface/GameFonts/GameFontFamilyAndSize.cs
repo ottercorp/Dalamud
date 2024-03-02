@@ -3,7 +3,7 @@ namespace Dalamud.Interface.GameFonts;
 /// <summary>
 /// Enum of available game fonts in specific sizes.
 /// </summary>
-public enum GameFontFamilyAndSize : int
+public enum GameFontFamilyAndSize
 {
     /// <summary>
     /// Placeholder meaning unused.
@@ -15,6 +15,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/AXIS_96.fdt", "common/font/font{0}.tex", -1)]
     Axis96,
 
     /// <summary>
@@ -22,6 +23,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/AXIS_12.fdt", "common/font/font{0}.tex", -1)]
     Axis12,
 
     /// <summary>
@@ -29,6 +31,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/AXIS_14.fdt", "common/font/font{0}.tex", -1)]
     Axis14,
 
     /// <summary>
@@ -36,6 +39,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/AXIS_18.fdt", "common/font/font{0}.tex", -1)]
     Axis18,
 
     /// <summary>
@@ -43,8 +47,17 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/AXIS_36.fdt", "common/font/font{0}.tex", -4)]
     Axis36,
 
+    /// <summary>
+    /// Jupiter (16pt)
+    ///
+    /// Serif font. Contains mostly ASCII range. Used in game for job names.
+    /// </summary>
+    [GameFontFamilyAndSize("common/font/Jupiter_16.fdt", "common/font/font{0}.tex", -1)]
+    Jupiter16,
+    
         /// <summary>
         /// CHNAXIS (120pt)
         ///
@@ -78,6 +91,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Serif font. Contains mostly ASCII range. Used in game for job names.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/Jupiter_20.fdt", "common/font/font{0}.tex", -1)]
     Jupiter20,
 
     /// <summary>
@@ -85,6 +99,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Serif font. Contains mostly ASCII range. Used in game for job names.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/Jupiter_23.fdt", "common/font/font{0}.tex", -1)]
     Jupiter23,
 
     /// <summary>
@@ -92,6 +107,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Serif font. Contains mostly numbers. Used in game for flying texts.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/Jupiter_45.fdt", "common/font/font{0}.tex", -2)]
     Jupiter45,
 
     /// <summary>
@@ -99,6 +115,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Serif font. Contains mostly ASCII range. Used in game for job names.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/Jupiter_46.fdt", "common/font/font{0}.tex", -2)]
     Jupiter46,
 
     /// <summary>
@@ -106,6 +123,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Serif font. Contains mostly numbers. Used in game for flying texts.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/Jupiter_90.fdt", "common/font/font{0}.tex", -4)]
     Jupiter90,
 
     /// <summary>
@@ -113,6 +131,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally wide. Contains mostly numbers. Used in game for HP/MP/IL stuff.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/Meidinger_16.fdt", "common/font/font{0}.tex", -1)]
     Meidinger16,
 
     /// <summary>
@@ -120,6 +139,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally wide. Contains mostly numbers. Used in game for HP/MP/IL stuff.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/Meidinger_20.fdt", "common/font/font{0}.tex", -1)]
     Meidinger20,
 
     /// <summary>
@@ -127,6 +147,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally wide. Contains mostly numbers. Used in game for HP/MP/IL stuff.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/Meidinger_40.fdt", "common/font/font{0}.tex", -4)]
     Meidinger40,
 
     /// <summary>
@@ -134,6 +155,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally wide. Contains mostly ASCII range.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/MiedingerMid_10.fdt", "common/font/font{0}.tex", -1)]
     MiedingerMid10,
 
     /// <summary>
@@ -141,6 +163,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally wide. Contains mostly ASCII range.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/MiedingerMid_12.fdt", "common/font/font{0}.tex", -1)]
     MiedingerMid12,
 
     /// <summary>
@@ -148,6 +171,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally wide. Contains mostly ASCII range.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/MiedingerMid_14.fdt", "common/font/font{0}.tex", -1)]
     MiedingerMid14,
 
     /// <summary>
@@ -155,6 +179,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally wide. Contains mostly ASCII range.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/MiedingerMid_18.fdt", "common/font/font{0}.tex", -1)]
     MiedingerMid18,
 
     /// <summary>
@@ -162,6 +187,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally wide. Contains mostly ASCII range.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/MiedingerMid_36.fdt", "common/font/font{0}.tex", -2)]
     MiedingerMid36,
 
     /// <summary>
@@ -169,6 +195,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally narrow. Contains mostly ASCII range. Used for addon titles.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/TrumpGothic_184.fdt", "common/font/font{0}.tex", -1)]
     TrumpGothic184,
 
     /// <summary>
@@ -176,6 +203,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally narrow. Contains mostly ASCII range. Used for addon titles.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/TrumpGothic_23.fdt", "common/font/font{0}.tex", -1)]
     TrumpGothic23,
 
     /// <summary>
@@ -183,6 +211,7 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally narrow. Contains mostly ASCII range. Used for addon titles.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/TrumpGothic_34.fdt", "common/font/font{0}.tex", -1)]
     TrumpGothic34,
 
     /// <summary>
@@ -190,5 +219,6 @@ public enum GameFontFamilyAndSize : int
     ///
     /// Horizontally narrow. Contains mostly ASCII range. Used for addon titles.
     /// </summary>
+    [GameFontFamilyAndSize("common/font/TrumpGothic_68.fdt", "common/font/font{0}.tex", -3)]
     TrumpGothic68,
 }
