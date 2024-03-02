@@ -28,7 +28,7 @@ internal static class EventTracking
         var clientId = $"{Hash.GetStringSha256Hash(ip)}";
         var userId = Hash.GetStringSha256Hash($"{contentId:x16}+{actorId:X8}");
         var cheatBannedHash = CheatBannedHash();
-        var os = Util.IsLinux() ? "Wine" : "Windows";
+        var os = Util.IsWine() ? "Wine" : "Windows";
         var version = $"{Util.AssemblyVersion}-{Util.GetGitHash()}";
         var pluginManager = Service<PluginManager>.GetNullable();
         var count = pluginManager is null ? -1 : pluginManager.InstalledPlugins.Count(x => x.Manifest.InstalledFromUrl is not "OFFICIAL");
@@ -52,7 +52,7 @@ internal static class EventTracking
 
     private static string CheatBannedHash()
     {
-        var cheatPluginsJson = File.ReadAllText(Path.Combine(Service<DalamudStartInfo>.Get().AssetDirectory!, "UIRes", "cheatplugin.json"));
+        var cheatPluginsJson = File.ReadAllText(Path.Combine(Service<Dalamud>.Get().AssetDirectory!.FullName, "UIRes", "cheatplugin.json"));
         var cheatPluginsHash = Hash.GetStringSha256Hash(cheatPluginsJson);
         return cheatPluginsHash;
     }

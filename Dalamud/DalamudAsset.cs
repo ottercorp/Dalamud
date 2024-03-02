@@ -1,4 +1,4 @@
-﻿using Dalamud.Storage.Assets;
+using Dalamud.Storage.Assets;
 
 namespace Dalamud;
 
@@ -148,6 +148,6 @@ public enum DalamudAsset
     /// <see cref="DalamudAssetPurpose.Font"/>: Game symbol fonts being used as webfonts at Lodestone.
     /// </summary>
     [DalamudAsset(DalamudAssetPurpose.Font, required: false)]
-    // [DalamudAssetOnlineSource("https://img.finalfantasyxiv.com/lds/pc/global/fonts/FFXIV_Lodestone_SSF.ttf")]
+    //[DalamudAssetOnlineSource("https://img.finalfantasyxiv.com/lds/pc/global/fonts/FFXIV_Lodestone_SSF.ttf")]
     LodestoneGameSymbol = 2004,
 }

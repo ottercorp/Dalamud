@@ -26,6 +26,7 @@
 #include <ShlGuid.h>
 #include <ShObjIdl.h>
 #include <shlobj_core.h>
+#include <winhttp.h>
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(linker, "/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
@@ -991,14 +992,12 @@ int main() {
 
         TASKDIALOGCONFIG config = { 0 };
 
-        /*
         const TASKDIALOG_BUTTON radios[]{
             {IdRadioRestartNormal, L"Restart normally"},
             {IdRadioRestartWithout3pPlugins, L"Restart without custom repository plugins"},
             {IdRadioRestartWithoutPlugins, L"Restart without any plugins"},
             {IdRadioRestartWithoutDalamud, L"Restart without Dalamud"},
         };
-        */
 
         const TASKDIALOG_BUTTON buttons[]{
             {IdButtonRestart, L"Restart\nRestart the game with the above-selected option."},

@@ -57,34 +57,6 @@ public enum GameFontFamilyAndSize
     /// </summary>
     [GameFontFamilyAndSize("common/font/Jupiter_16.fdt", "common/font/font{0}.tex", -1)]
     Jupiter16,
-    
-        /// <summary>
-        /// CHNAXIS (120pt)
-        ///
-        /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
-        /// </summary>
-        ChnAxis120,
-
-        /// <summary>
-        /// CHNAXIS (140pt)
-        ///
-        /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
-        /// </summary>
-        ChnAxis140,
-
-        /// <summary>
-        /// CHNAXIS (180pt)
-        ///
-        /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
-        /// </summary>
-        ChnAxis180,
-
-        /// <summary>
-        /// Jupiter (16pt)
-        ///
-        /// Serif font. Contains mostly ASCII range. Used in game for job names.
-        /// </summary>
-        Jupiter16,
 
     /// <summary>
     /// Jupiter (20pt)
@@ -221,4 +193,29 @@ public enum GameFontFamilyAndSize
     /// </summary>
     [GameFontFamilyAndSize("common/font/TrumpGothic_68.fdt", "common/font/font{0}.tex", -3)]
     TrumpGothic68,
+
+    /// <summary>
+    /// CHNAXIS (120pt)
+    ///
+    /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
+    /// </summary>
+    [GameFontFamilyAndSize("common/font/ChnAxis_12.fdt", "common/font/font{0}.tex", -1)]
+    ChnAxis120,
+
+    /// <summary>
+    /// CHNAXIS (140pt)
+    ///
+    /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
+    /// </summary>
+    [GameFontFamilyAndSize("common/font/ChnAxis_14.fdt", "common/font/font{0}.tex", -1)]
+    ChnAxis140,
+
+    /// <summary>
+    /// CHNAXIS (180pt)
+    ///
+    /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
+    /// </summary>
+    [GameFontFamilyAndSize("common/font/ChnAxis_18.fdt", "common/font/font{0}.tex", -2)]
+    ChnAxis180,
+
 }

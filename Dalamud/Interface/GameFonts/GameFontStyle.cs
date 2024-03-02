@@ -236,15 +236,15 @@ public struct GameFontStyle
                 <= ((int)((34f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.TrumpGothic34,
                 _ => GameFontFamilyAndSize.TrumpGothic68,
             },
+            GameFontFamily.ChnAxis => size switch
+            {
+                //<= ((int)((16f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.ChnAxis120,
+                //<= ((int)((20f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.ChnAxis140,
+                <= 12 + 0.001f => GameFontFamilyAndSize.ChnAxis120,
+                <= 14 + 0.001f => GameFontFamilyAndSize.ChnAxis140,
+                _ => GameFontFamilyAndSize.ChnAxis180,
+            },
             _ => GameFontFamilyAndSize.Undefined,
-            
-            //case GameFontFamily.Axis:
-            //    if (size <= 12.001)
-            //        return GameFontFamilyAndSize.ChnAxis120;
-            //    else if (size <= 14.001)
-            //        return GameFontFamilyAndSize.ChnAxis140;
-            //    else
-            //        return GameFontFamilyAndSize.ChnAxis180;
         };
 
     /// <summary>

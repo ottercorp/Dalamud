@@ -31,6 +31,7 @@ using Newtonsoft.Json;
 using TerraFX.Interop.Windows;
 
 using Windows.Win32.Storage.FileSystem;
+using Dalamud.Networking.Http;
 
 namespace Dalamud.Utility;
 

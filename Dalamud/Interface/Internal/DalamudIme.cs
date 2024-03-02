@@ -357,14 +357,14 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
         var fullwidth = (conv & 8) != 0;
         switch (lang & 0x3F)
         {
-            case LANG.LANG_KOREAN:
-                if (native)
-                    this.InputModeIcon = (char)SeIconChar.ImeKoreanHangul;
-                else if (fullwidth)
-                    this.InputModeIcon = (char)SeIconChar.ImeAlphanumeric;
-                else
-                    this.InputModeIcon = (char)SeIconChar.ImeAlphanumericHalfWidth;
-                break;
+            //case LANG.LANG_KOREAN:
+            //    if (native)
+            //        this.InputModeIcon = (char)SeIconChar.ImeKoreanHangul;
+            //    else if (fullwidth)
+            //        this.InputModeIcon = (char)SeIconChar.ImeAlphanumeric;
+            //    else
+            //        this.InputModeIcon = (char)SeIconChar.ImeAlphanumericHalfWidth;
+            //    break;
 
             case LANG.LANG_JAPANESE:
                 // wtf
