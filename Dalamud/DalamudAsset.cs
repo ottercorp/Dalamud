@@ -125,7 +125,7 @@ public enum DalamudAsset
     /// <summary>
     /// <see cref="DalamudAssetPurpose.Font"/>: Noto Sans CJK KR Regular.
     /// </summary>
-    [DalamudAsset(DalamudAssetPurpose.Font)]
+    [DalamudAsset(DalamudAssetPurpose.Font,required: false)]
     [DalamudAssetPath("UIRes", "NotoSansCJKkr-Regular.otf")]
     [DalamudAssetPath("UIRes", "NotoSansKR-Regular.otf")]
     NotoSansKrRegular = 2001,
