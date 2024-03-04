@@ -521,7 +521,7 @@ internal sealed partial class FontAtlasFactory
             if (this.data.ConfigData.Length == 0)
             {
                 this.AddDalamudAssetFont(
-                    DalamudAsset.NotoSansJpMedium,
+                    DalamudAsset.NotoSansScMedium,
                     new() { GlyphRanges = new ushort[] { ' ', ' ', '\0' }, SizePx = 1 });
             }
 
