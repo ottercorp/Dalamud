@@ -123,7 +123,9 @@ jobs:
         
         $branchName = $env:GH_BRANCH
         
-        $branchName = "canary"
+        if ($branchName -eq "master") {
+          $branchName = "stg"
+        }
         
         $newVersion = [System.IO.File]::ReadAllText("$(Get-Location)\scratch\TEMP_gitver.txt")
         $revision = [System.IO.File]::ReadAllText("$(Get-Location)\scratch\revision.txt")
