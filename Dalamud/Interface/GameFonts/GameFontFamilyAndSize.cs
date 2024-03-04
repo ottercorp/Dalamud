@@ -199,7 +199,7 @@ public enum GameFontFamilyAndSize
     ///
     /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
-    [GameFontFamilyAndSize("common/font/ChnAxis_12.fdt", "common/font/font{0}.tex", -1)]
+    [GameFontFamilyAndSize("common/font/chnaxis_120.fdt", "common/font/font{0}.tex", -1)]
     ChnAxis120,
 
     /// <summary>
@@ -207,7 +207,7 @@ public enum GameFontFamilyAndSize
     ///
     /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
-    [GameFontFamilyAndSize("common/font/ChnAxis_14.fdt", "common/font/font{0}.tex", -1)]
+    [GameFontFamilyAndSize("common/font/chnaxis_140.fdt", "common/font/font{0}.tex", -1)]
     ChnAxis140,
 
     /// <summary>
@@ -215,7 +215,7 @@ public enum GameFontFamilyAndSize
     ///
     /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
-    [GameFontFamilyAndSize("common/font/ChnAxis_18.fdt", "common/font/font{0}.tex", -2)]
+    [GameFontFamilyAndSize("common/font/chnaxis_180.fdt", "common/font/font{0}.tex", -2)]
     ChnAxis180,
 
 }
