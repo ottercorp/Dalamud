@@ -25,6 +25,7 @@
 #include <shellapi.h>
 #include <ShlGuid.h>
 #include <ShObjIdl.h>
+#include <shlobj_core.h>
 #include <winhttp.h>
 
 #pragma comment(lib, "comctl32.lib")
@@ -58,7 +59,7 @@ std::wstring u8_to_ws(const std::string& s) {
 }
 
 std::wstring get_window_string(HWND hWnd) {
-    std::wstring buf(GetWindowTextLengthW(hWnd), L'\0');
+    std::wstring buf(GetWindowTextLengthW(hWnd) + 1, L'\0');
     GetWindowTextW(hWnd, &buf[0], static_cast<int>(buf.size()));
     return buf;
 }
@@ -152,7 +153,7 @@ std::wstring describe_module(const std::filesystem::path& path) {
             WORD wLanguage;
             WORD wCodePage;
         };
-        const auto langs = std::span(reinterpret_cast<const LANGANDCODEPAGE*>(lpBuffer), size / sizeof(LANGANDCODEPAGE));
+        const auto langs = std::span(static_cast<const LANGANDCODEPAGE*>(lpBuffer), size / sizeof(LANGANDCODEPAGE));
         for (const auto& lang : langs) {
             if (!VerQueryValueW(block.data(), std::format(L"\\StringFileInfo\\{:04x}{:04x}\\FileDescription", lang.wLanguage, lang.wCodePage).c_str(), &lpBuffer, &size))
                 continue;
@@ -441,6 +442,26 @@ std::wstring escape_shell_arg(const std::wstring& arg) {
     return res;
 }
 
+void open_folder_and_select_items(HWND hwndOpener, const std::wstring& path) {
+    const auto piid = ILCreateFromPathW(path.c_str());
+    if (!piid
+        || FAILED(SHOpenFolderAndSelectItems(piid, 0, nullptr, 0))) {
+        const auto args = std::format(L"/select,{}", escape_shell_arg(path));
+        SHELLEXECUTEINFOW seiw{
+            .cbSize = sizeof seiw,
+            .hwnd = hwndOpener,
+            .lpFile = L"explorer.exe",
+            .lpParameters = args.c_str(),
+            .nShow = SW_SHOW,
+        };
+        if (!ShellExecuteExW(&seiw))
+            throw_last_error("ShellExecuteExW");
+    }
+
+    if (piid)
+        ILFree(piid);
+}
+
 void export_tspack(HWND hWndParent, const std::filesystem::path& logDir, const std::string& crashLog, const std::string& troubleshootingPackData) {
     static const char* SourceLogFiles[] = {
         "output.log",
@@ -456,8 +477,9 @@ void export_tspack(HWND hWndParent, const std::filesystem::path& logDir, const s
         { L"All files (*.*)", L"*" },
     }};
 
-    IShellItemPtr pItem;
+    std::optional<std::wstring> filePath;
     try {
+        IShellItemPtr pItem;
         SYSTEMTIME st;
         GetLocalTime(&st);
         IFileSaveDialogPtr pDialog;
@@ -474,33 +496,39 @@ void export_tspack(HWND hWndParent, const std::filesystem::path& logDir, const s
         }
 
         throw_if_failed(pDialog->GetResult(&pItem), {}, "pDialog->GetResult");
-        
-        IBindCtxPtr pBindCtx;
-        throw_if_failed(CreateBindCtx(0, &pBindCtx), {}, "CreateBindCtx");
 
-        auto options = BIND_OPTS{.cbStruct = sizeof(BIND_OPTS), .grfMode = STGM_READWRITE | STGM_SHARE_EXCLUSIVE | STGM_CREATE};
-        throw_if_failed(pBindCtx->SetBindOptions(&options), {}, "pBindCtx->SetBindOptions");
+        PWSTR pFilePath = nullptr;
+        throw_if_failed(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pFilePath), {}, "pItem->GetDisplayName");
+        pItem.Release();
+        filePath.emplace(pFilePath);
 
-        IStreamPtr pStream;
-        throw_if_failed(pItem->BindToHandler(pBindCtx, BHID_Stream, IID_PPV_ARGS(&pStream)), {}, "pItem->BindToHandler");
-
-        throw_if_failed(pStream->SetSize({}), {}, "pStream->SetSize");
+        std::fstream fileStream(*filePath, std::ios::binary | std::ios::in | std::ios::out | std::ios::trunc);
         
         mz_zip_archive zipa{};
-        zipa.m_pIO_opaque = &*pStream;
+        zipa.m_pIO_opaque = &fileStream;
         zipa.m_pRead = [](void* pOpaque, mz_uint64 file_ofs, void* pBuf, size_t n) -> size_t {
-            const auto pStream = static_cast<IStream*>(pOpaque);
-            throw_if_failed(pStream->Seek({ .QuadPart = static_cast<int64_t>(file_ofs) }, STREAM_SEEK_SET, nullptr), {}, "pStream->Seek");
-            ULONG read;
-            throw_if_failed(pStream->Read(pBuf, static_cast<ULONG>(n), &read), {}, "pStream->Read");
-            return read;
+            const auto pStream = static_cast<std::fstream*>(pOpaque);
+            if (!pStream || !pStream->is_open())
+                throw std::runtime_error("Read operation failed: Stream is not open");
+            pStream->seekg(file_ofs, std::ios::beg);
+            if (pStream->fail())
+                throw std::runtime_error("Read operation failed: Error seeking in stream");
+            pStream->read(static_cast<char*>(pBuf), n);
+            if (pStream->fail())
+                throw std::runtime_error("Read operation failed: Error reading from stream");
+            return pStream->gcount();
         };
         zipa.m_pWrite = [](void* pOpaque, mz_uint64 file_ofs, const void* pBuf, size_t n) -> size_t {
-            const auto pStream = static_cast<IStream*>(pOpaque);
-            throw_if_failed(pStream->Seek({ .QuadPart = static_cast<int64_t>(file_ofs) }, STREAM_SEEK_SET, nullptr), {}, "pStream->Seek");
-            ULONG written;
-            throw_if_failed(pStream->Write(pBuf, static_cast<ULONG>(n), &written), {}, "pStream->Write");
-            return written;
+            const auto pStream = static_cast<std::fstream*>(pOpaque);
+            if (!pStream || !pStream->is_open())
+                throw std::runtime_error("Write operation failed: Stream is not open");
+            pStream->seekp(file_ofs, std::ios::beg);
+            if (pStream->fail())
+                throw std::runtime_error("Write operation failed: Error seeking in stream");
+            pStream->write(static_cast<const char*>(pBuf), n);
+            if (pStream->fail())
+                throw std::runtime_error("Write operation failed: Error writing to stream");
+            return n;
         };
         const auto mz_throw_if_failed = [&zipa](mz_bool res, const std::string& clue) {
             if (!res)
@@ -510,13 +538,14 @@ void export_tspack(HWND hWndParent, const std::filesystem::path& logDir, const s
         mz_throw_if_failed(mz_zip_writer_init_v2(&zipa, 0, 0), "mz_zip_writer_init_v2");
         mz_throw_if_failed(mz_zip_writer_add_mem(&zipa, "trouble.json", troubleshootingPackData.data(), troubleshootingPackData.size(), MZ_ZIP_FLAG_WRITE_HEADER_SET_SIZE | MZ_BEST_COMPRESSION), "mz_zip_writer_add_mem: trouble.json");
         mz_throw_if_failed(mz_zip_writer_add_mem(&zipa, "crash.log", crashLog.data(), crashLog.size(), MZ_ZIP_FLAG_WRITE_HEADER_SET_SIZE | MZ_BEST_COMPRESSION), "mz_zip_writer_add_mem: crash.log");
+        std::string logExportLog;
 
         struct HandleAndBaseOffset {
             HANDLE h;
             int64_t off;
         };
         const auto fnHandleReader = [](void* pOpaque, mz_uint64 file_ofs, void* pBuf, size_t n) -> size_t {
-            const auto& info = *reinterpret_cast<const HandleAndBaseOffset*>(pOpaque);
+            const auto& info = *static_cast<const HandleAndBaseOffset*>(pOpaque);
             if (!SetFilePointerEx(info.h, { .QuadPart = static_cast<int64_t>(info.off + file_ofs) }, nullptr, SEEK_SET))
                 throw_last_error("fnHandleReader: SetFilePointerEx");
             if (DWORD read; !ReadFile(info.h, pBuf, static_cast<DWORD>(n), &read, nullptr))
@@ -526,8 +555,12 @@ void export_tspack(HWND hWndParent, const std::filesystem::path& logDir, const s
         };
         for (const auto& pcszLogFileName : SourceLogFiles) {
             const auto logFilePath = logDir / pcszLogFileName;
-            if (!exists(logFilePath))
+            if (!exists(logFilePath)) {
+                logExportLog += std::format("File does not exist: {}\n", ws_to_u8(logFilePath.wstring()));
                 continue;
+            } else {
+                logExportLog += std::format("Including: {}\n", ws_to_u8(logFilePath.wstring()));
+            }
 
             const auto hLogFile = CreateFileW(logFilePath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
             if (hLogFile == INVALID_HANDLE_VALUE)
@@ -545,7 +578,14 @@ void export_tspack(HWND hWndParent, const std::filesystem::path& logDir, const s
             }
 
             auto handleInfo = HandleAndBaseOffset{.h = hLogFile, .off = baseOffset.QuadPart};
-            const auto modt = std::chrono::system_clock::to_time_t(std::chrono::clock_cast<std::chrono::system_clock>(last_write_time(logFilePath))); 
+            WIN32_FILE_ATTRIBUTE_DATA fileInfo = { 0 };
+            time_t modt = time(nullptr);
+            if (GetFileAttributesExW(logFilePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+                ULARGE_INTEGER ull = { 0 };
+                ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
+                ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
+                modt = ull.QuadPart / 10000000ULL - 11644473600ULL;
+            }
             mz_throw_if_failed(mz_zip_writer_add_read_buf_callback(
                 &zipa,
                 pcszLogFileName,
@@ -559,39 +599,26 @@ void export_tspack(HWND hWndParent, const std::filesystem::path& logDir, const s
                 ), std::format("mz_zip_writer_add_read_buf_callback({})", ws_to_u8(logFilePath.wstring())));
         }
 
+        mz_throw_if_failed(mz_zip_writer_add_mem(&zipa, "logexport.log", logExportLog.data(), logExportLog.size(), MZ_ZIP_FLAG_WRITE_HEADER_SET_SIZE | MZ_BEST_COMPRESSION), "mz_zip_writer_add_mem: logexport.log");
         mz_throw_if_failed(mz_zip_writer_finalize_archive(&zipa), "mz_zip_writer_finalize_archive");
         mz_throw_if_failed(mz_zip_writer_end(&zipa), "mz_zip_writer_end");
 
     } catch (const std::exception& e) {
         MessageBoxW(hWndParent, std::format(L"Failed to save file: {}", u8_to_ws(e.what())).c_str(), get_window_string(hWndParent).c_str(), MB_OK | MB_ICONERROR);
-
-        if (pItem) {
+        if (filePath) {
             try {
-                IFileOperationPtr pFileOps;
-                throw_if_failed(pFileOps.CreateInstance(__uuidof(FileOperation), nullptr, CLSCTX_ALL));
-                throw_if_failed(pFileOps->SetOperationFlags(FOF_NO_UI));
-                throw_if_failed(pFileOps->DeleteItem(pItem, nullptr));
-                throw_if_failed(pFileOps->PerformOperations());
-            } catch (const std::exception& e2) {
+                std::filesystem::remove(*filePath);
+            } catch (const std::filesystem::filesystem_error& e2) {
                 std::wcerr << std::format(L"Failed to remove temporary file: {}", u8_to_ws(e2.what())) << std::endl;
             }
-            pItem.Release();
         }
+        return;
     }
 
-    if (pItem) {
-        PWSTR pwszFileName;
-        if (FAILED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pwszFileName))) {
-            if (FAILED(pItem->GetDisplayName(SIGDN_DESKTOPABSOLUTEEDITING, &pwszFileName))) {
-                MessageBoxW(hWndParent, L"The file has been saved to the specified path.", get_window_string(hWndParent).c_str(), MB_OK | MB_ICONINFORMATION);
-            } else {
-                std::unique_ptr<std::remove_pointer<PWSTR>::type, decltype(CoTaskMemFree)*> pszFileNamePtr(pwszFileName, CoTaskMemFree);
-                MessageBoxW(hWndParent, std::format(L"The file has been saved to: {}", pwszFileName).c_str(), get_window_string(hWndParent).c_str(), MB_OK | MB_ICONINFORMATION);
-            }
-        } else {
-            std::unique_ptr<std::remove_pointer<PWSTR>::type, decltype(CoTaskMemFree)*> pszFileNamePtr(pwszFileName, CoTaskMemFree);
-            ShellExecuteW(hWndParent, nullptr, L"explorer.exe", escape_shell_arg(std::format(L"/select,{}", pwszFileName)).c_str(), nullptr, SW_SHOW);
-        }
+    if (filePath) {
+        // Not sure why, but without the wait, the selected file momentarily disappears and reappears
+        Sleep(1000);
+        open_folder_and_select_items(hWndParent, *filePath);
     }
 }
 
@@ -602,6 +629,7 @@ enum {
     IdRadioRestartWithoutDalamud,
 
     IdButtonRestart = 201,
+    IdButtonSaveTsPack = 202,
     IdButtonHelp = IDHELP,
     IdButtonExit = IDCANCEL,
 };
@@ -612,7 +640,8 @@ void restart_game_using_injector(int nRadioButton, const std::vector<std::wstrin
     pathStr.resize(GetModuleFileNameExW(GetCurrentProcess(), GetModuleHandleW(nullptr), &pathStr[0], PATHCCH_MAX_CCH));
 
     std::vector<std::wstring> args;
-    args.emplace_back((std::filesystem::path(pathStr).parent_path() / L"Dalamud.Injector.exe").wstring());
+    std::wstring injectorPath = (std::filesystem::path(pathStr).parent_path() / L"Dalamud.Injector.exe").wstring();
+    args.emplace_back(L'\"' + injectorPath + L'\"');
     args.emplace_back(L"launch");
     switch (nRadioButton) {
         case IdRadioRestartWithout3pPlugins:
@@ -625,12 +654,11 @@ void restart_game_using_injector(int nRadioButton, const std::vector<std::wstrin
             args.emplace_back(L"--without-dalamud");
         break;
     }
-    args.emplace_back(L"--");
     args.insert(args.end(), launcherArgs.begin(), launcherArgs.end());
 
     std::wstring argstr;
     for (const auto& arg : args) {
-        argstr.append(escape_shell_arg(arg));
+        argstr.append(arg);
         argstr.push_back(L' ');
     }
     argstr.pop_back();
@@ -644,7 +672,7 @@ void restart_game_using_injector(int nRadioButton, const std::vector<std::wstrin
     si.wShowWindow = SW_SHOW;
 #endif
     PROCESS_INFORMATION pi{};
-    if (CreateProcessW(args[0].c_str(), &argstr[0], nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
+    if (CreateProcessW(injectorPath.c_str(), &argstr[0], nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
     } else {
@@ -663,6 +691,9 @@ int main() {
     std::filesystem::path assetDir, logDir;
     std::optional<std::vector<std::wstring>> launcherArgs;
     auto fullDump = false;
+
+    // IFileSaveDialog only works on STA
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     
     std::vector<std::wstring> args;
     if (int argc = 0; const auto argv = CommandLineToArgvW(GetCommandLineW(), &argc)) {
@@ -709,6 +740,42 @@ int main() {
         return InvalidParameter;
     }
 
+    if (logDir.filename().wstring().ends_with(L".log")) {
+        std::wcout << L"logDir seems to be pointing to a file; stripping the last path component.\n" << std::endl;
+        std::wcout << L"Previous: " << logDir.wstring() << std::endl;
+        logDir = logDir.parent_path();
+        std::wcout << L"Stripped: " << logDir.wstring() << std::endl;
+    }
+
+    // Only keep the last 3 minidumps
+    if (!logDir.empty())
+    {
+        std::vector<std::pair<std::filesystem::path, std::filesystem::file_time_type>> minidumps;
+        for (const auto& entry : std::filesystem::directory_iterator(logDir)) {
+            if (entry.path().filename().wstring().ends_with(L".dmp")) {
+                minidumps.emplace_back(entry.path(), std::filesystem::last_write_time(entry));
+            }
+        }
+
+        if (minidumps.size() > 3)
+        {
+            std::sort(minidumps.begin(), minidumps.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+            for (size_t i = 0; i < minidumps.size() - 3; i++) {
+                if (std::filesystem::exists(minidumps[i].first))
+                {
+                    std::wcout << std::format(L"Removing old minidump: {}", minidumps[i].first.wstring()) << std::endl;
+                    std::filesystem::remove(minidumps[i].first);
+                }
+
+                // Also remove corresponding .log, if it exists
+                if (const auto logPath = minidumps[i].first.replace_extension(L".log"); std::filesystem::exists(logPath)) {
+                    std::wcout << std::format(L"Removing corresponding log: {}", logPath.wstring()) << std::endl;
+                    std::filesystem::remove(logPath);
+                }
+            }
+        }
+    }
+
     while (true) {
         std::cout << "Waiting for crash...\n";
 
@@ -738,6 +805,36 @@ int main() {
         }
 
         std::cout << "Crash triggered" << std::endl;
+
+        std::cout << "Creating progress window" << std::endl;
+        IProgressDialog* pProgressDialog = NULL;
+        if (SUCCEEDED(CoCreateInstance(CLSID_ProgressDialog, NULL, CLSCTX_ALL, IID_IProgressDialog, (void**)&pProgressDialog)) && pProgressDialog) {
+            pProgressDialog->SetTitle(L"Dalamud Crash Handler");
+            pProgressDialog->SetLine(1, L"The game has crashed!", FALSE, NULL);
+            pProgressDialog->SetLine(2, L"Dalamud is collecting further information...", FALSE, NULL);
+            pProgressDialog->SetLine(3, L"Refreshing Game Module List", FALSE, NULL);
+            pProgressDialog->StartProgressDialog(NULL, NULL, PROGDLG_MARQUEEPROGRESS | PROGDLG_NOCANCEL | PROGDLG_NOMINIMIZE, NULL);
+            IOleWindow* pOleWindow;
+            HRESULT hr = pProgressDialog->QueryInterface(IID_IOleWindow, (LPVOID*)&pOleWindow);
+            if (SUCCEEDED(hr))
+            {
+                HWND hwndProgressDialog = NULL;
+                hr = pOleWindow->GetWindow(&hwndProgressDialog);
+                if (SUCCEEDED(hr))
+                {
+                    SetWindowPos(hwndProgressDialog, HWND_TOPMOST, 0, 0, 0, 0, 
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                    SetForegroundWindow(hwndProgressDialog);
+                }
+                
+                pOleWindow->Release();
+            }
+        
+        }
+        else {
+            std::cerr << "Failed to create progress window" << std::endl;
+            pProgressDialog = NULL;
+        }
 
         auto shutup_mutex = CreateMutex(NULL, false, L"DALAMUD_CRASHES_NO_MORE");
         bool shutup = false;
@@ -777,6 +874,9 @@ int main() {
             std::wcerr << std::format(L"SymInitialize error: 0x{:x}", GetLastError()) << std::endl;
         }
 
+        if (pProgressDialog) 
+            pProgressDialog->SetLine(3, L"Reading troubleshooting data", FALSE, NULL);
+
         std::wstring stackTrace(exinfo.dwStackTraceLength, L'\0');
         if (exinfo.dwStackTraceLength) {
             if (DWORD read; !ReadFile(hPipeRead, &stackTrace[0], 2 * exinfo.dwStackTraceLength, &read, nullptr)) {
@@ -791,10 +891,12 @@ int main() {
             }
         }
 
+        if (pProgressDialog)
+            pProgressDialog->SetLine(3, fullDump ? L"Creating full dump" : L"Creating minidump", FALSE, NULL);
+
         SYSTEMTIME st;
         GetLocalTime(&st);
         const auto dalamudLogPath = logDir.empty() ? std::filesystem::path() : logDir / L"Dalamud.log";
-        const auto dalamudBootLogPath = logDir.empty() ? std::filesystem::path() : logDir / L"Dalamud.boot.log";
         const auto dumpPath = logDir.empty() ? std::filesystem::path() : logDir / std::format(L"dalamud_appcrash_{:04}{:02}{:02}_{:02}{:02}{:02}_{:03}_{}.dmp", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, dwProcessId);
         const auto logPath = logDir.empty() ? std::filesystem::path() : logDir / std::format(L"dalamud_appcrash_{:04}{:02}{:02}_{:02}{:02}{:02}_{:03}_{}.log", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, dwProcessId);
         std::wstring dumpError;
@@ -840,8 +942,11 @@ int main() {
             log << std::format(L"Dump at: {}", dumpPath.wstring()) << std::endl;
         else
             log << std::format(L"Dump error: {}", dumpError) << std::endl;
-        log << L"Time: " << std::chrono::zoned_time{ std::chrono::current_zone(), std::chrono::system_clock::now() } << std::endl;
+        log << L"System Time: " << std::chrono::system_clock::now() << std::endl;
         log << L"\n" << stackTrace << std::endl;
+
+        if (pProgressDialog)
+            pProgressDialog->SetLine(3, L"Refreshing Module List", FALSE, NULL);
 
         SymRefreshModuleList(GetCurrentProcess());
         print_exception_info(exinfo.hThreadHandle, exinfo.ExceptionPointers, exinfo.ContextRecord, log);
@@ -887,24 +992,22 @@ int main() {
 
         TASKDIALOGCONFIG config = { 0 };
 
-        /*
         const TASKDIALOG_BUTTON radios[]{
-            {IdRadioRestartNormal, L"Restart"},
-            {IdRadioRestartWithout3pPlugins, L"Restart without 3rd party plugins"},
+            {IdRadioRestartNormal, L"Restart normally"},
+            {IdRadioRestartWithout3pPlugins, L"Restart without custom repository plugins"},
             {IdRadioRestartWithoutPlugins, L"Restart without any plugins"},
             {IdRadioRestartWithoutDalamud, L"Restart without Dalamud"},
         };
-        */
 
         const TASKDIALOG_BUTTON buttons[]{
-            /*
-            {IdButtonRestart, L"Restart\nRestart the game, optionally without plugins or Dalamud."},*/
-            {IdButtonExit, L"\x9000\x51FA\n\x9000\x51FA\x6E38\x620F\x3002"},
+            {IdButtonRestart, L"Restart\nRestart the game with the above-selected option."},
+            {IdButtonSaveTsPack, L"Save Troubleshooting Info\nSave a .tspack file containing information about this crash for analysis."},
+            {IdButtonExit, L"Exit\nExit the game."},
         };
 
         config.cbSize = sizeof(config);
         config.hInstance = GetModuleHandleW(nullptr);
-        config.dwFlags = TDF_ENABLE_HYPERLINKS | TDF_CAN_BE_MINIMIZED | TDF_ALLOW_DIALOG_CANCELLATION | TDF_USE_COMMAND_LINKS;
+        config.dwFlags = TDF_ENABLE_HYPERLINKS | TDF_CAN_BE_MINIMIZED | TDF_ALLOW_DIALOG_CANCELLATION | TDF_USE_COMMAND_LINKS | TDF_NO_DEFAULT_RADIO_BUTTON;
         config.pszMainIcon = MAKEINTRESOURCE(IDI_ICON1);
         config.pszMainInstruction = L"\x51FA\x73B0\x81F4\x547D\x9519\x8BEF";
         config.pszContent = (L""
@@ -921,10 +1024,9 @@ int main() {
         config.pszExpandedControlText = L"Hide stack trace";
         config.pszCollapsedControlText = L"Stack trace for plugin developers";
         config.pszExpandedInformation = window_log_str.c_str();
-        config.pszWindowTitle = L"Dalamud Error";
-        // config.pRadioButtons = radios;
-        // config.cRadioButtons = ARRAYSIZE(radios);
-        config.nDefaultRadioButton = IdRadioRestartNormal;
+        config.pszWindowTitle = L"Dalamud Crash Handler";
+        config.pRadioButtons = radios;
+        config.cRadioButtons = ARRAYSIZE(radios);
         config.cxWidth = 300;
 
 #if _DEBUG
@@ -946,6 +1048,7 @@ int main() {
                 case TDN_CREATED:
                 {
                     SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                    SendMessage(hwnd, TDM_ENABLE_BUTTON, IdButtonRestart, 0);
                     return S_OK;
                 }
                 case TDN_HYPERLINK_CLICKED:
@@ -954,7 +1057,7 @@ int main() {
                     if (link == L"help") {
                         ShellExecuteW(hwnd, nullptr, L"https://ottercorp.github.io/faq?utm_source=vectored", nullptr, nullptr, SW_SHOW);
                     } else if (link == L"logdir") {
-                        ShellExecuteW(hwnd, nullptr, L"explorer.exe", escape_shell_arg(std::format(L"/select,{}", logPath.wstring())).c_str(), nullptr, SW_SHOW);
+                        open_folder_and_select_items(hwnd, logPath.wstring());
                     } else if (link == L"logfile") {
                         ShellExecuteW(hwnd, nullptr, logPath.c_str(), nullptr, nullptr, SW_SHOW);
                     } else if (link == L"exporttspack") {
@@ -967,6 +1070,18 @@ int main() {
                     }
                     return S_OK;
                 }
+                case TDN_RADIO_BUTTON_CLICKED:
+                    SendMessage(hwnd, TDM_ENABLE_BUTTON, IdButtonRestart, 1);
+                    return S_OK;
+                case TDN_BUTTON_CLICKED:
+                    const auto button = static_cast<int>(wParam);
+                    if (button == IdButtonSaveTsPack)
+                    {
+                        export_tspack(hwnd, logDir, ws_to_u8(log.str()), troubleshootingPackData);
+                        return S_FALSE; // keep the dialog open
+                    }
+
+                    return S_OK;
             }
 
             return S_OK;
@@ -976,10 +1091,11 @@ int main() {
             return (*reinterpret_cast<decltype(callback)*>(dwRefData))(hwnd, uNotification, wParam, lParam);
         };
         config.lpCallbackData = reinterpret_cast<LONG_PTR>(&callback);
-
-        if (submitThread.joinable()) {
-            submitThread.join();
-            submitThread = {};
+        
+        if (pProgressDialog) {
+            pProgressDialog->StopProgressDialog();
+            pProgressDialog->Release();
+            pProgressDialog = NULL;
         }
 
         if (shutup) {
@@ -989,7 +1105,7 @@ int main() {
 
         int nButtonPressed = 0, nRadioButton = 0;
         if (FAILED(TaskDialogIndirect(&config, &nButtonPressed, &nRadioButton, nullptr))) {
-            ResumeThread(exinfo.hThreadHandle);
+            SetEvent(exinfo.hEventHandle);
         } else {
             switch (nButtonPressed) {
                 case IdButtonRestart:
@@ -1000,7 +1116,7 @@ int main() {
                 }
                 default:
                     if (attemptResume)
-                        ResumeThread(exinfo.hThreadHandle);
+                        SetEvent(exinfo.hEventHandle);
                     else
                         TerminateProcess(g_hProcess, exinfo.ExceptionRecord.ExceptionCode);
             }
