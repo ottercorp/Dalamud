@@ -34,11 +34,11 @@ internal sealed class ChangelogWindow : Window, IDisposable
     private const string WarrantsChangelogForMajorMinor = "9.0.";
     
     private const string ChangeLog =
-        @"• Updated Dalamud for compatibility with Patch 6.5
-• A lot of behind-the-scenes changes to make Dalamud and plugins more stable and reliable
-• Added plugin collections, allowing you to create lists of plugins that can be enabled or disabled together
-• Plugins can now add tooltips and interaction to the server info bar
-• The Dalamud/plugin installer UI has been refreshed
+        @"• 更新了Dalamud，以便与Patch 6.5兼容
+• 进行了许多更改，使Dalamud和插件更加稳定可靠
+• 添加了插件集合功能，允许您创建可以一起启用或禁用的插件列表
+• 插件现在可以向服务器信息栏添加工具提示和交互功能
+• 更新了Dalamud/插件安装程序的用户界面
 ";
 
     private readonly TitleScreenMenuWindow tsmWindow;
@@ -275,8 +275,8 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         ImGuiHelpers.ScaledDummy(5);
                         ImGui.TextWrapped(ChangeLog);
                         ImGuiHelpers.ScaledDummy(5);
-                        ImGui.TextWrapped("This changelog is a quick overview of the most important changes in this version.");
-                        ImGui.TextWrapped("Please click next to see a quick guide to updating your plugins.");
+                        ImGui.TextWrapped("这个更新日志是对本版本中最重要的更改的快速概述");
+                        ImGui.TextWrapped("请点击Next以查看更新插件的快速指南。");
 
                         ImGui.Image(
                             this.fontTipsTexture.Value.ImGuiHandle,
@@ -299,13 +299,13 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         break;
                     
                     case State.ExplainerApiBump:
-                        ImGui.TextWrapped("Take care! Due to changes in this patch, all of your plugins need to be updated and were disabled automatically.");
-                        ImGui.TextWrapped("This is normal and required for major game updates.");
+                        ImGui.TextWrapped("注意了！由于此补丁的更改，所有插件都需要更新，并已自动禁用");
+                        ImGui.TextWrapped("这是正常情况，也是进行重大游戏更新所必需的。");
                         ImGuiHelpers.ScaledDummy(5);
-                        ImGui.TextWrapped("To update your plugins, open the plugin installer and click 'update plugins'. Updated plugins should update and then re-enable themselves.");
+                        ImGui.TextWrapped("要更新插件，请打开插件安装程序，然后点击“更新插件”。更新后的插件应会自动更新并重新启用。");
                         ImGuiHelpers.ScaledDummy(5);
-                        ImGui.TextWrapped("Please keep in mind that not all of your plugins may already be updated for the new version.");
-                        ImGui.TextWrapped("If some plugins are displayed with a red cross in the 'Installed Plugins' tab, they may not yet be available.");
+                        ImGui.TextWrapped("请记住，并非您所有的插件都可能已经针对新版本进行了更新。");
+                        ImGui.TextWrapped("如果在“已安装插件”选项卡中显示某些插件带有红色叉号，那么它们可能还不可用。");
                         
                         ImGuiHelpers.ScaledDummy(15);
 
@@ -318,7 +318,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         break;
                     
                     case State.Links:
-                        ImGui.TextWrapped("If you note any issues or need help, please check the FAQ, and reach out on our Discord if you need help.");
+                        ImGui.TextWrapped("如果您注意到任何问题或需要帮助，请查看常见问题解答，并在需要帮助的情况下在我们的QQ频道上联系我们。");
                         ImGui.TextWrapped("Enjoy your time with the game and Dalamud!");
                         
                         ImGuiHelpers.ScaledDummy(45);
@@ -341,7 +341,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         
                         ImGuiHelpers.CenterCursorFor(
                             (int)(ImGuiComponents.GetIconButtonWithTextWidth(FontAwesomeIcon.Globe, "See the FAQ") +
-                            ImGuiComponents.GetIconButtonWithTextWidth(FontAwesomeIcon.LaughBeam, "Join our Discord server") +
+                            ImGuiComponents.GetIconButtonWithTextWidth(FontAwesomeIcon.LaughBeam, "加入我们的QQ频道") +
                             (5 * ImGuiHelpers.GlobalScale) + 
                             (ImGui.GetStyle().ItemSpacing.X * 4)));
                         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Globe, "See the FAQ"))
@@ -353,9 +353,9 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         ImGuiHelpers.ScaledDummy(5);
                         ImGui.SameLine();
                         
-                        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.LaughBeam, "Join our Discord server"))
+                        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.LaughBeam, "加入我们的QQ频道"))
                         {
-                            Util.OpenLink("https://discord.gg/3NMcUV5");
+                            Util.OpenLink("https://pd.qq.com/s/9ehyfcha3");
                         }
                         
                         ImGuiHelpers.ScaledDummy(5);

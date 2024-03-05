@@ -1,4 +1,4 @@
-﻿// #define VeryVerboseLog
+// #define VeryVerboseLog
 
 using System.Collections.Generic;
 using System.Diagnostics;
