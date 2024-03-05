@@ -101,7 +101,7 @@ internal class PluginInstallerWindow : Window, IDisposable
     private bool feedbackModalOnNextFrameDontClear = false;
     private string feedbackModalBody = string.Empty;
     private string feedbackModalContact = string.Empty;
-    private bool feedbackModalIncludeException = false;
+    private bool feedbackModalIncludeException = true;
     private IPluginManifest? feedbackPlugin = null;
     private bool feedbackIsTesting = false;
 
@@ -991,7 +991,10 @@ internal class PluginInstallerWindow : Window, IDisposable
 
             ImGui.Spacing();
 
+            ImGui.BeginDisabled();
             ImGui.Checkbox(Locs.FeedbackModal_IncludeLastError, ref this.feedbackModalIncludeException);
+            ImGui.EndDisabled();
+            
             ImGui.TextColored(ImGuiColors.DalamudGrey, Locs.FeedbackModal_IncludeLastErrorHint);
 
             ImGui.Spacing();
@@ -1068,7 +1071,7 @@ internal class PluginInstallerWindow : Window, IDisposable
             {
                 this.feedbackModalBody = string.Empty;
                 this.feedbackModalContact = Service<DalamudConfiguration>.Get().LastFeedbackContactDetails;
-                this.feedbackModalIncludeException = false;
+                this.feedbackModalIncludeException = true;
             }
             else
             {
