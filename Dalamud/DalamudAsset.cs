@@ -114,6 +114,10 @@ public enum DalamudAsset
     [DalamudAssetPath("UIRes", "tsmShade.png")]
     TitleScreenMenuShade = 1013,
 
+    [DalamudAsset(DalamudAssetPurpose.TextureFromPng)]
+    [DalamudAssetPath("UIRes", "missingFont.png")]
+    MissingFontTips = 1014,
+
     /// <summary>
     /// <see cref="DalamudAssetPurpose.Font"/>: Noto Sans CJK SC Medium.
     /// </summary>

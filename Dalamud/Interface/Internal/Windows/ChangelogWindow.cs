@@ -4,10 +4,13 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 
+using CheapLoc;
+
 using Dalamud.Configuration.Internal;
 using Dalamud.Interface.Animation.EasingFunctions;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
+using Dalamud.Interface.FontIdentifier;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ManagedFontAtlas;
 using Dalamud.Interface.ManagedFontAtlas.Internals;
@@ -45,7 +48,8 @@ internal sealed class ChangelogWindow : Window, IDisposable
     private readonly Lazy<IFontHandle> bannerFont;
     private readonly Lazy<IDalamudTextureWrap> apiBumpExplainerTexture;
     private readonly Lazy<IDalamudTextureWrap> logoTexture;
-    
+    private readonly Lazy<IDalamudTextureWrap> fontTipsTexture;
+
     private readonly InOutCubic windowFade = new(TimeSpan.FromSeconds(2.5f))
     {
         Point1 = Vector2.Zero,
@@ -84,6 +88,8 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
         this.apiBumpExplainerTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.ChangelogApiBumpIcon));
         this.logoTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.Logo));
+
+        this.fontTipsTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.MissingFontTips));
 
         // If we are going to show a changelog, make sure we have the font ready, otherwise it will hitch
         if (WarrantsChangelog())
@@ -271,7 +277,24 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         ImGuiHelpers.ScaledDummy(5);
                         ImGui.TextWrapped("This changelog is a quick overview of the most important changes in this version.");
                         ImGui.TextWrapped("Please click next to see a quick guide to updating your plugins.");
-                        
+
+                        ImGui.Image(
+                            this.fontTipsTexture.Value.ImGuiHandle,
+                            this.fontTipsTexture.Value.Size);
+
+                        var interfaceManager = Service<InterfaceManager>.Get();
+                        using (interfaceManager.MonoFontHandle?.Push())
+                        {
+                            if (ImGui.Button(Loc.Localize("DalamudSettingResetDefaultFont", "Reset Default Font")))
+                            {
+                                var faf = Service<FontAtlasFactory>.Get();
+                                faf.DefaultFontSpecOverride =
+                                        new SingleFontSpec { FontId = new GameFontAndFamilyId(GameFontFamily.Axis) };
+                                interfaceManager.RebuildFonts();
+                            }
+                        }
+
+                        ImGuiHelpers.ScaledDummy(10);
                         DrawNextButton(State.ExplainerApiBump);
                         break;
                     
