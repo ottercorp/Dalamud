@@ -197,11 +197,11 @@ public struct GameFontStyle
             GameFontFamily.Undefined => GameFontFamilyAndSize.Undefined,
             GameFontFamily.Axis => size switch
             {
-                <= ((int)((9.6f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis96,
-                <= ((int)((12f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis12,
-                <= ((int)((14f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis14,
-                <= ((int)((18f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis18,
-                _ => GameFontFamilyAndSize.Axis36,
+                //<= ((int)((9.6f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis96,
+                <= ((int)((12f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.ChnAxis120,
+                <= ((int)((14f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.ChnAxis140,
+                <= ((int)((18f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.ChnAxis180,
+                _ => GameFontFamilyAndSize.ChnAxis180,
             },
             GameFontFamily.Jupiter => size switch
             {
@@ -235,14 +235,6 @@ public struct GameFontStyle
                 <= ((int)((23f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.TrumpGothic23,
                 <= ((int)((34f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.TrumpGothic34,
                 _ => GameFontFamilyAndSize.TrumpGothic68,
-            },
-            GameFontFamily.ChnAxis => size switch
-            {
-                //<= ((int)((16f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.ChnAxis120,
-                //<= ((int)((20f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.ChnAxis140,
-                <= 12 + 0.001f => GameFontFamilyAndSize.ChnAxis120,
-                <= 14 + 0.001f => GameFontFamilyAndSize.ChnAxis140,
-                _ => GameFontFamilyAndSize.ChnAxis180,
             },
             _ => GameFontFamilyAndSize.Undefined,
         };
