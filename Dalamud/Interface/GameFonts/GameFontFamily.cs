@@ -40,8 +40,4 @@ public enum GameFontFamily
     /// </summary>
     TrumpGothic,
 
-    /// <summary>
-    /// Sans-serif Chinese characters in addition to Latin characters.
-    /// </summary>
-    ChnAxis,
 }

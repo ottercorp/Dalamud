@@ -10,20 +10,20 @@ public enum GameFontFamilyAndSize
     /// </summary>
     Undefined,
 
-    /// <summary>
-    /// AXIS (9.6pt)
-    ///
-    /// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
-    /// </summary>
-    [GameFontFamilyAndSize("common/font/AXIS_96.fdt", "common/font/font{0}.tex", -1)]
-    Axis96,
+    ///// <summary>
+    ///// AXIS (9.6pt)
+    /////
+    ///// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
+    ///// </summary>
+    //[GameFontFamilyAndSize("common/font/AXIS_96.fdt", "common/font/font{0}.tex", -1)]
+    //Axis96,
 
     /// <summary>
     /// AXIS (12pt)
     ///
     /// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
-    [GameFontFamilyAndSize("common/font/AXIS_12.fdt", "common/font/font{0}.tex", -1)]
+    [GameFontFamilyAndSize("common/font/chnaxis_120.fdt", "common/font/font_chn_{0}.tex", -1)]
     Axis12,
 
     /// <summary>
@@ -31,7 +31,7 @@ public enum GameFontFamilyAndSize
     ///
     /// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
-    [GameFontFamilyAndSize("common/font/AXIS_14.fdt", "common/font/font{0}.tex", -1)]
+    [GameFontFamilyAndSize("common/font/chnaxis_140.fdt", "common/font/font_chn_{0}.tex", -1)]
     Axis14,
 
     /// <summary>
@@ -39,7 +39,7 @@ public enum GameFontFamilyAndSize
     ///
     /// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
-    [GameFontFamilyAndSize("common/font/AXIS_18.fdt", "common/font/font{0}.tex", -1)]
+    [GameFontFamilyAndSize("common/font/chnaxis_180.fdt", "common/font/font_chn_{0}.tex", -2)]
     Axis18,
 
     /// <summary>
@@ -47,7 +47,7 @@ public enum GameFontFamilyAndSize
     ///
     /// Contains Japanese characters in addition to Latin characters. Used in game for the whole UI.
     /// </summary>
-    [GameFontFamilyAndSize("common/font/AXIS_36.fdt", "common/font/font{0}.tex", -4)]
+    [GameFontFamilyAndSize("common/font/chnaxis_360.fdt", "common/font/font_chn_{0}.tex", -4)]
     Axis36,
 
     /// <summary>
@@ -194,28 +194,28 @@ public enum GameFontFamilyAndSize
     [GameFontFamilyAndSize("common/font/TrumpGothic_68.fdt", "common/font/font{0}.tex", -3)]
     TrumpGothic68,
 
-    /// <summary>
-    /// CHNAXIS (120pt)
-    ///
-    /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
-    /// </summary>
-    [GameFontFamilyAndSize("common/font/chnaxis_120.fdt", "common/font/font{0}.tex", -1)]
-    ChnAxis120,
+    ///// <summary>
+    ///// CHNAXIS (120pt)
+    /////
+    ///// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
+    ///// </summary>
+    //[GameFontFamilyAndSize("common/font/chnaxis_120.fdt", "common/font/font{0}.tex", -1)]
+    //ChnAxis120,
 
-    /// <summary>
-    /// CHNAXIS (140pt)
-    ///
-    /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
-    /// </summary>
-    [GameFontFamilyAndSize("common/font/chnaxis_140.fdt", "common/font/font{0}.tex", -1)]
-    ChnAxis140,
+    ///// <summary>
+    ///// CHNAXIS (140pt)
+    /////
+    ///// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
+    ///// </summary>
+    //[GameFontFamilyAndSize("common/font/chnaxis_140.fdt", "common/font/font{0}.tex", -1)]
+    //ChnAxis140,
 
-    /// <summary>
-    /// CHNAXIS (180pt)
-    ///
-    /// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
-    /// </summary>
-    [GameFontFamilyAndSize("common/font/chnaxis_180.fdt", "common/font/font{0}.tex", -2)]
-    ChnAxis180,
+    ///// <summary>
+    ///// CHNAXIS (180pt)
+    /////
+    ///// Contains Chinese characters in addition to Latin characters. Used in game for the whole UI.
+    ///// </summary>
+    //[GameFontFamilyAndSize("common/font/chnaxis_180.fdt", "common/font/font{0}.tex", -2)]
+    //ChnAxis180,
 
 }
