@@ -291,6 +291,9 @@ internal sealed class ChangelogWindow : Window, IDisposable
                                 faf.DefaultFontSpecOverride =
                                         new SingleFontSpec { FontId = new GameFontAndFamilyId(GameFontFamily.Axis) };
                                 interfaceManager.RebuildFonts();
+
+                                Service<DalamudConfiguration>.Get().DefaultFontSpec = faf.DefaultFontSpecOverride;
+                                Service<DalamudConfiguration>.Get().QueueSave();
                             }
                         }
 

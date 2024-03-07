@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -231,6 +231,8 @@ public class SettingsTabLook : SettingsTab
                     this.defaultFontSpec =
                         new SingleFontSpec { FontId = new GameFontAndFamilyId(GameFontFamily.Axis) };
                 interfaceManager.RebuildFonts();
+                this.Save();
+
             }
         }
 
