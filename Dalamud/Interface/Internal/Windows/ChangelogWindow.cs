@@ -31,14 +31,14 @@ namespace Dalamud.Interface.Internal.Windows;
 /// </summary>
 internal sealed class ChangelogWindow : Window, IDisposable
 {
-    private const string WarrantsChangelogForMajorMinor = "9.0.";
+    private const string WarrantsChangelogForMajorMinor = "9.0.0.";
     
     private const string ChangeLog =
         @"• 更新了Dalamud，以便与Patch 6.5兼容
-• 进行了许多更改，使Dalamud和插件更加稳定可靠
-• 添加了插件集合功能，允许您创建可以一起启用或禁用的插件列表
-• 插件现在可以向服务器信息栏添加工具提示和交互功能
-• 更新了Dalamud/插件安装程序的用户界面
+• 尝试修正中文输入卡顿问题(测试)
+• 现在卫月UI会随着游戏UI隐藏正常隐藏了
+• 重置字体设置后会立刻保存了
+• 修改了默认使用的字体，如果还是出现字体问题请往下看
 ";
 
     private readonly TitleScreenMenuWindow tsmWindow;
