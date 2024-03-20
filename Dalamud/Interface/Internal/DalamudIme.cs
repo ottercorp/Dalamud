@@ -1,3 +1,5 @@
+// #define IMEDEBUG
+
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -18,7 +20,9 @@ using Dalamud.Interface.Utility;
 
 using ImGuiNET;
 
+#if IMEDEBUG
 using Serilog;
+#endif
 
 using TerraFX.Interop.Windows;
 
@@ -30,7 +34,7 @@ namespace Dalamud.Interface.Internal;
 /// This class handles CJK IME.
 /// </summary>
 [ServiceManager.EarlyLoadedService]
-internal sealed unsafe class DalamudIme : IDisposable, IServiceType
+internal sealed unsafe class DalamudIme : IInternalDisposableService
 {
     private const int CImGuiStbTextCreateUndoOffset = 0xB57A0;
     private const int CImGuiStbTextUndoOffset = 0xB59C0;
@@ -105,6 +109,9 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
 
     /// <summary>Undo range for modifying the buffer while composition is in progress.</summary>
     private (int Start, int End, int Cursor)? temporaryUndoSelection;
+
+    private bool updateInputLanguage = true;
+    private bool updateImeStatusAgain;
 
     [SuppressMessage("StyleCop.CSharp.SpacingRules", "SA1003:Symbols should be spaced correctly", Justification = ".")]
     static DalamudIme()
@@ -193,7 +200,7 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
         this.candidateStrings.Count != 0 || this.ShowPartialConversion || this.inputModeIcon != default;
 
     /// <inheritdoc/>
-    public void Dispose()
+    void IInternalDisposableService.DisposeService()
     {
         this.interfaceManager.Draw -= this.Draw;
         this.ReleaseUnmanagedResources();
@@ -253,19 +260,90 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
     private void WndProcHookManagerOnPreWndProc(WndProcEventArgs args)
     {
         if (!ImGuiHelpers.IsImGuiInitialized)
+        {
+            this.updateInputLanguage = true;
             return;
+        }
 
         // Are we not the target of text input?
         if (!ImGui.GetIO().WantTextInput)
+        {
+            this.updateInputLanguage = true;
             return;
+        }
 
         var hImc = ImmGetContext(args.Hwnd);
         if (hImc == nint.Zero)
+        {
+            this.updateInputLanguage = true;
             return;
+        }
 
         try
         {
             var invalidTarget = TextState->Id == 0 || (TextState->Flags & ImGuiInputTextFlags.ReadOnly) != 0;
+
+#if IMEDEBUG
+            switch (args.Message)
+            {
+                case WM.WM_IME_NOTIFY:
+                    Log.Verbose($"{nameof(WM.WM_IME_NOTIFY)}({ImeDebug.ImnName((int)args.WParam)}, 0x{args.LParam:X})");
+                    break;
+                case WM.WM_IME_CONTROL:
+                    Log.Verbose(
+                        $"{nameof(WM.WM_IME_CONTROL)}({ImeDebug.ImcName((int)args.WParam)}, 0x{args.LParam:X})");
+                    break;
+                case WM.WM_IME_REQUEST:
+                    Log.Verbose(
+                        $"{nameof(WM.WM_IME_REQUEST)}({ImeDebug.ImrName((int)args.WParam)}, 0x{args.LParam:X})");
+                    break;
+                case WM.WM_IME_SELECT:
+                    Log.Verbose($"{nameof(WM.WM_IME_SELECT)}({(int)args.WParam != 0}, 0x{args.LParam:X})");
+                    break;
+                case WM.WM_IME_STARTCOMPOSITION:
+                    Log.Verbose($"{nameof(WM.WM_IME_STARTCOMPOSITION)}()");
+                    break;
+                case WM.WM_IME_COMPOSITION:
+                    Log.Verbose(
+                        $"{nameof(WM.WM_IME_COMPOSITION)}({(char)args.WParam}, {ImeDebug.GcsName((int)args.LParam)})");
+                    break;
+                case WM.WM_IME_COMPOSITIONFULL:
+                    Log.Verbose($"{nameof(WM.WM_IME_COMPOSITIONFULL)}()");
+                    break;
+                case WM.WM_IME_ENDCOMPOSITION:
+                    Log.Verbose($"{nameof(WM.WM_IME_ENDCOMPOSITION)}()");
+                    break;
+                case WM.WM_IME_CHAR:
+                    Log.Verbose($"{nameof(WM.WM_IME_CHAR)}({(char)args.WParam}, 0x{args.LParam:X})");
+                    break;
+                case WM.WM_IME_KEYDOWN:
+                    Log.Verbose($"{nameof(WM.WM_IME_KEYDOWN)}({(char)args.WParam}, 0x{args.LParam:X})");
+                    break;
+                case WM.WM_IME_KEYUP:
+                    Log.Verbose($"{nameof(WM.WM_IME_KEYUP)}({(char)args.WParam}, 0x{args.LParam:X})");
+                    break;
+                case WM.WM_IME_SETCONTEXT:
+                    Log.Verbose($"{nameof(WM.WM_IME_SETCONTEXT)}({(int)args.WParam != 0}, 0x{args.LParam:X})");
+                    break;
+            }
+#endif
+            if (this.updateInputLanguage
+                || (args.Message == WM.WM_IME_NOTIFY
+                    && (int)args.WParam
+                    is IMN.IMN_SETCONVERSIONMODE
+                    or IMN.IMN_OPENSTATUSWINDOW
+                    or IMN.IMN_CLOSESTATUSWINDOW))
+            {
+                this.UpdateInputLanguage(hImc);
+                this.updateInputLanguage = false;
+            }
+
+            if (this.updateImeStatusAgain)
+            {
+                this.ReplaceCompositionString(hImc, false);
+                this.UpdateCandidates(hImc);
+                this.updateImeStatusAgain = false;
+            }
 
             switch (args.Message)
             {
@@ -273,10 +351,12 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
                     when (nint)args.WParam is IMN.IMN_OPENCANDIDATE or IMN.IMN_CLOSECANDIDATE
                          or IMN.IMN_CHANGECANDIDATE:
                     this.UpdateCandidates(hImc);
+                    this.updateImeStatusAgain = true;
                     args.SuppressWithValue(0);
                     break;
 
                 case WM.WM_IME_STARTCOMPOSITION:
+                    this.updateImeStatusAgain = true;
                     args.SuppressWithValue(0);
                     break;
 
@@ -284,24 +364,24 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
                     if (invalidTarget)
                         ImmNotifyIME(hImc, NI.NI_COMPOSITIONSTR, CPS_CANCEL, 0);
                     else
-                        this.ReplaceCompositionString(hImc, (uint)args.LParam);
+                        this.ReplaceCompositionString(hImc, ((int)args.LParam & GCS.GCS_RESULTSTR) != 0);
 
-                    // Log.Verbose($"{nameof(WM.WM_IME_COMPOSITION)}({(nint)args.LParam:X}): {this.compositionString}");
+                    this.updateImeStatusAgain = true;
                     args.SuppressWithValue(0);
                     break;
 
                 case WM.WM_IME_ENDCOMPOSITION:
-                    // Log.Verbose($"{nameof(WM.WM_IME_ENDCOMPOSITION)}({(nint)args.WParam:X}, {(nint)args.LParam:X}): {this.compositionString}");
+                    this.ClearState(hImc, false);
+                    this.updateImeStatusAgain = true;
                     args.SuppressWithValue(0);
                     break;
 
+                case WM.WM_IME_CHAR:
+                case WM.WM_IME_KEYDOWN:
+                case WM.WM_IME_KEYUP:
                 case WM.WM_IME_CONTROL:
-                    // Log.Verbose($"{nameof(WM.WM_IME_CONTROL)}({(nint)args.WParam:X}, {(nint)args.LParam:X}): {this.compositionString}");
-                    args.SuppressWithValue(0);
-                    break;
-
                 case WM.WM_IME_REQUEST:
-                    // Log.Verbose($"{nameof(WM.WM_IME_REQUEST)}({(nint)args.WParam:X}, {(nint)args.LParam:X}): {this.compositionString}");
+                    this.updateImeStatusAgain = true;
                     args.SuppressWithValue(0);
                     break;
 
@@ -309,12 +389,14 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
                     // Hide candidate and composition windows.
                     args.LParam = (LPARAM)((nint)args.LParam & ~(ISC_SHOWUICOMPOSITIONWINDOW | 0xF));
 
-                    // Log.Verbose($"{nameof(WM.WM_IME_SETCONTEXT)}({(nint)args.WParam:X}, {(nint)args.LParam:X}): {this.compositionString}");
+                    this.updateImeStatusAgain = true;
                     args.SuppressWithDefault();
                     break;
 
                 case WM.WM_IME_NOTIFY:
-                    // Log.Verbose($"{nameof(WM.WM_IME_NOTIFY)}({(nint)args.WParam:X}): {this.compositionString}");
+                case WM.WM_IME_COMPOSITIONFULL:
+                case WM.WM_IME_SELECT:
+                    this.updateImeStatusAgain = true;
                     break;
 
                 case WM.WM_KEYDOWN when (int)args.WParam is
@@ -335,7 +417,11 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
                     }
 
                     this.UpdateCandidates(hImc);
+                    break;
 
+                case WM.WM_KEYDOWN when (int)args.WParam is VK.VK_ESCAPE && this.candidateStrings.Count != 0:
+                    this.ClearState(hImc);
+                    args.SuppressWithDefault();
                     break;
 
                 case WM.WM_LBUTTONDOWN:
@@ -344,15 +430,7 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
                 case WM.WM_XBUTTONDOWN:
                     ImmNotifyIME(hImc, NI.NI_COMPOSITIONSTR, CPS_COMPLETE, 0);
                     break;
-                
-                // default:
-                //     Log.Verbose($"{(WmNames.TryGetValue((int)args.Message, out var v) ? v : args.Message.ToString())}({(nint)args.WParam:X}, {(nint)args.LParam:X})");
-                //     break;
             }
-
-            this.UpdateInputLanguage(hImc);
-            if (this.inputModeIcon == (char)SeIconChar.ImeKoreanHangul)
-                this.UpdateCandidates(hImc);
         }
         finally
         {
@@ -366,8 +444,6 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
         ImmGetConversionStatus(hImc, &conv, &sent);
         var lang = GetKeyboardLayout(0);
         var open = ImmGetOpenStatus(hImc) != false;
-
-        // Log.Verbose($"{nameof(this.UpdateInputLanguage)}: conv={conv:X} sent={sent:X} open={open} lang={lang:X}");
 
         var native = (conv & 1) != 0;
         var katakana = (conv & 2) != 0;
@@ -411,12 +487,15 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
         }
     }
 
-    private void ReplaceCompositionString(HIMC hImc, uint comp)
+    private void ReplaceCompositionString(HIMC hImc, bool finalCommit)
     {
-        var finalCommit = (comp & GCS.GCS_RESULTSTR) != 0;
         var newString = finalCommit
                             ? ImmGetCompositionString(hImc, GCS.GCS_RESULTSTR)
                             : ImmGetCompositionString(hImc, GCS.GCS_COMPSTR);
+
+#if IMEDEBUG
+        Log.Verbose($"{nameof(this.ReplaceCompositionString)}({newString})");
+#endif
 
         this.ReflectCharacterEncounters(newString);
 
@@ -436,16 +515,16 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
 
         if (finalCommit)
         {
-            this.ClearState(hImc);
-            return;
+            this.ClearState(hImc, false);
+            newString = string.Empty;
         }
 
         this.compositionString = newString;
         this.compositionCursorOffset = ImmGetCompositionStringW(hImc, GCS.GCS_CURSORPOS, null, 0);
 
-        if ((comp & GCS.GCS_COMPATTR) != 0)
+        var attrLength = ImmGetCompositionStringW(hImc, GCS.GCS_COMPATTR, null, 0);
+        if (attrLength > 0)
         {
-            var attrLength = ImmGetCompositionStringW(hImc, GCS.GCS_COMPATTR, null, 0);
             var attrPtr = stackalloc byte[attrLength];
             var attr = new Span<byte>(attrPtr, Math.Min(this.compositionString.Length, attrLength));
             _ = ImmGetCompositionStringW(hImc, GCS.GCS_COMPATTR, attrPtr, (uint)attrLength);
@@ -471,17 +550,21 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
         this.UpdateCandidates(hImc);
     }
 
-    private void ClearState(HIMC hImc)
+    private void ClearState(HIMC hImc, bool invokeCancel = true)
     {
         this.compositionString = string.Empty;
         this.partialConversionFrom = this.partialConversionTo = 0;
         this.compositionCursorOffset = 0;
         this.temporaryUndoSelection = null;
         TextState->Stb.SelectStart = TextState->Stb.Cursor = TextState->Stb.SelectEnd;
-        ImmNotifyIME(hImc, NI.NI_COMPOSITIONSTR, CPS_CANCEL, 0);
-        this.UpdateCandidates(default);
+        this.candidateStrings.Clear();
+        this.immCandNative = default;
+        if (invokeCancel)
+            ImmNotifyIME(hImc, NI.NI_COMPOSITIONSTR, CPS_CANCEL, 0);
 
-        // Log.Information($"{nameof(this.ClearState)}");
+#if IMEDEBUG
+        Log.Information($"{nameof(this.ClearState)}({invokeCancel})");
+#endif
     }
 
     private void UpdateCandidates(HIMC hImc)
@@ -932,4 +1015,71 @@ internal sealed unsafe class DalamudIme : IDisposable, IServiceType
             return true;
         }
     }
+
+#if IMEDEBUG
+    private static class ImeDebug
+    {
+        private static readonly (int Value, string Name)[] GcsFields =
+        {
+            (GCS.GCS_COMPREADSTR, nameof(GCS.GCS_COMPREADSTR)),
+            (GCS.GCS_COMPREADATTR, nameof(GCS.GCS_COMPREADATTR)),
+            (GCS.GCS_COMPREADCLAUSE, nameof(GCS.GCS_COMPREADCLAUSE)),
+            (GCS.GCS_COMPSTR, nameof(GCS.GCS_COMPSTR)),
+            (GCS.GCS_COMPATTR, nameof(GCS.GCS_COMPATTR)),
+            (GCS.GCS_COMPCLAUSE, nameof(GCS.GCS_COMPCLAUSE)),
+            (GCS.GCS_CURSORPOS, nameof(GCS.GCS_CURSORPOS)),
+            (GCS.GCS_DELTASTART, nameof(GCS.GCS_DELTASTART)),
+            (GCS.GCS_RESULTREADSTR, nameof(GCS.GCS_RESULTREADSTR)),
+            (GCS.GCS_RESULTREADCLAUSE, nameof(GCS.GCS_RESULTREADCLAUSE)),
+            (GCS.GCS_RESULTSTR, nameof(GCS.GCS_RESULTSTR)),
+            (GCS.GCS_RESULTCLAUSE, nameof(GCS.GCS_RESULTCLAUSE)),
+        };
+
+        private static readonly IReadOnlyDictionary<int, string> ImnFields =
+            typeof(IMN)
+                .GetFields(BindingFlags.Static | BindingFlags.Public)
+                .Where(x => x.IsLiteral)
+                .ToDictionary(x => (int)x.GetRawConstantValue()!, x => x.Name);
+
+        public static string GcsName(int val)
+        {
+            var sb = new StringBuilder();
+            foreach (var (value, name) in GcsFields)
+            {
+                if ((val & value) != 0)
+                {
+                    if (sb.Length != 0)
+                        sb.Append(" | ");
+                    sb.Append(name);
+                    val &= ~value;
+                }
+            }
+
+            if (val != 0)
+            {
+                if (sb.Length != 0)
+                    sb.Append(" | ");
+                sb.Append($"0x{val:X}");
+            }
+
+            return sb.ToString();
+        }
+
+        public static string ImcName(int val) => ImnFields.TryGetValue(val, out var name) ? name : $"0x{val:X}";
+
+        public static string ImnName(int val) => ImnFields.TryGetValue(val, out var name) ? name : $"0x{val:X}";
+
+        public static string ImrName(int val) => val switch
+        {
+            IMR_CANDIDATEWINDOW => nameof(IMR_CANDIDATEWINDOW),
+            IMR_COMPOSITIONFONT => nameof(IMR_COMPOSITIONFONT),
+            IMR_COMPOSITIONWINDOW => nameof(IMR_COMPOSITIONWINDOW),
+            IMR_CONFIRMRECONVERTSTRING => nameof(IMR_CONFIRMRECONVERTSTRING),
+            IMR_DOCUMENTFEED => nameof(IMR_DOCUMENTFEED),
+            IMR_QUERYCHARPOSITION => nameof(IMR_QUERYCHARPOSITION),
+            IMR_RECONVERTSTRING => nameof(IMR_RECONVERTSTRING),
+            _ => $"0x{val:X}",
+        };
+    }
+#endif
 }

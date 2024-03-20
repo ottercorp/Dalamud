@@ -240,7 +240,7 @@ internal class LocalPlugin : IDisposable
             this.instance = null;
         }
 
-        this.DalamudInterface?.ExplicitDispose();
+        this.DalamudInterface?.DisposeInternal();
         this.DalamudInterface = null;
 
         this.ServiceScope?.Dispose();
@@ -405,7 +405,8 @@ internal class LocalPlugin : IDisposable
             }
 
             // Update the location for the Location and CodeBase patches
-            PluginManager.PluginLocations[this.pluginType.Assembly.FullName] = new PluginPatchData(this.DllFile);
+            // NET8 CHORE
+            // PluginManager.PluginLocations[this.pluginType.Assembly.FullName] = new PluginPatchData(this.DllFile);
 
             this.DalamudInterface =
                 new DalamudPluginInterface(this, reason);
@@ -427,7 +428,7 @@ internal class LocalPlugin : IDisposable
             if (this.instance == null)
             {
                 this.State = PluginState.LoadError;
-                this.DalamudInterface.ExplicitDispose();
+                this.DalamudInterface.DisposeInternal();
                 Log.Error(
                     $"Error while loading {this.Name}, failed to bind and call the plugin constructor");
                 return;
@@ -500,7 +501,7 @@ internal class LocalPlugin : IDisposable
 
             this.instance = null;
 
-            this.DalamudInterface?.ExplicitDispose();
+            this.DalamudInterface?.DisposeInternal();
             this.DalamudInterface = null;
 
             this.ServiceScope?.Dispose();

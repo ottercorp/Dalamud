@@ -27,7 +27,7 @@ namespace Dalamud.Configuration.Internal;
 #pragma warning disable SA1015
 [InherentDependency<ReliableFileStorage>] // We must still have this when unloading
 #pragma warning restore SA1015
-internal sealed class DalamudConfiguration : IServiceType, IDisposable
+internal sealed class DalamudConfiguration : IInternalDisposableService
 {
 
     private static readonly JsonSerializerSettings SerializerSettings = new()
@@ -533,7 +533,7 @@ internal sealed class DalamudConfiguration : IServiceType, IDisposable
     }
     
     /// <inheritdoc/>
-    public void Dispose()
+    void IInternalDisposableService.DisposeService()
     {
         // Make sure that we save, if a save is queued while we are shutting down
         this.Update();
