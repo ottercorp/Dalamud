@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 using Dalamud.Game.Text;
 using Dalamud.Interface.FontIdentifier;
@@ -390,6 +392,11 @@ internal sealed class DalamudConfiguration : IInternalDisposableService
     public bool ShowTsm { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets a value indicating whether to reduce motions (animations).
+    /// </summary>
+    public bool? ReduceMotions { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether or not market board data should be uploaded.
     /// </summary>
     public bool IsMbCollect { get; set; } = true;
@@ -513,6 +520,16 @@ internal sealed class DalamudConfiguration : IInternalDisposableService
         var splitedValue = deserialized.ProxyHost.Split("://");
         if (splitedValue.Length >= 2)
             deserialized.ProxyHost = splitedValue[1];
+            
+        try
+        {
+            deserialized.SetDefaults();
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "Failed to set defaults for DalamudConfiguration");
+        }
+        
         return deserialized;
     }
 
@@ -553,6 +570,31 @@ internal sealed class DalamudConfiguration : IInternalDisposableService
         }
     }
 
+    private void SetDefaults()
+    {
+        // "Reduced motion"
+        if (!this.ReduceMotions.HasValue)
+        {
+            // https://source.chromium.org/chromium/chromium/src/+/main:ui/gfx/animation/animation_win.cc;l=29?q=ReducedMotion&ss=chromium
+            var winAnimEnabled = 0;
+            var success = NativeFunctions.SystemParametersInfo(
+                (uint)NativeFunctions.AccessibilityParameter.SPI_GETCLIENTAREAANIMATION,
+                0,
+                ref winAnimEnabled,
+                0);
+
+            if (!success)
+            {
+                Log.Warning("Failed to get Windows animation setting, assuming reduced motion is off (GetLastError: {GetLastError:X})", Marshal.GetLastPInvokeError());
+                this.ReduceMotions = false;
+            }
+            else
+            {
+                this.ReduceMotions = winAnimEnabled == 0;
+            }
+        }
+    }
+    
     private void Save()
     {
         ThreadSafety.AssertMainThread();
