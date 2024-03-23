@@ -220,7 +220,7 @@ internal sealed unsafe class DalamudIme : IInternalDisposableService
                 if (HanRange.Any(x => x.FirstCodePoint <= chr && chr < x.FirstCodePoint + x.Length))
                 {
                     if (Service<FontAtlasFactory>.Get()
-                                                 ?.GetFdtReader(GameFontFamilyAndSize.Axis12)
+                                                 ?.GetFdtReader(GameFontFamilyAndSize.AxisIME)
                                                  .FindGlyph(chr) is null)
                     {
                         this.EncounteredHan = true;

@@ -106,6 +106,7 @@ public struct GameFontStyle
         GameFontFamilyAndSize.TrumpGothic23 => GameFontFamily.TrumpGothic,
         GameFontFamilyAndSize.TrumpGothic34 => GameFontFamily.TrumpGothic,
         GameFontFamilyAndSize.TrumpGothic68 => GameFontFamily.TrumpGothic,
+        GameFontFamilyAndSize.AxisIME => GameFontFamily.Axis,
         _ => throw new InvalidOperationException(),
     };
 
@@ -152,6 +153,7 @@ public struct GameFontStyle
         GameFontFamilyAndSize.TrumpGothic23 => 23,
         GameFontFamilyAndSize.TrumpGothic34 => 34,
         GameFontFamilyAndSize.TrumpGothic68 => 68,
+        GameFontFamilyAndSize.AxisIME => 12,
         _ => throw new InvalidOperationException(),
     };
 
@@ -191,7 +193,7 @@ public struct GameFontStyle
             GameFontFamily.Undefined => GameFontFamilyAndSize.Undefined,
             GameFontFamily.Axis => size switch
             {
-                <= ((int)((9.6f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis96,
+                //<= ((int)((9.6f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis96,
                 <= ((int)((12f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis12,
                 <= ((int)((14f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis14,
                 <= ((int)((18f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis18,
