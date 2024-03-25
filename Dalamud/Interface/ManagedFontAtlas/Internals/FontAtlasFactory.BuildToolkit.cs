@@ -437,21 +437,21 @@ internal sealed partial class FontAtlasFactory
         public void AttachExtraGlyphsForDalamudLanguage(in SafeFontConfig fontConfig)
         {
             var dalamudConfiguration = Service<DalamudConfiguration>.Get();
-            if (dalamudConfiguration.EffectiveLanguage == "ko"
-                || Service<DalamudIme>.GetNullable()?.EncounteredHangul is true)
-            {
-                this.AddDalamudAssetFont(
-                    DalamudAsset.NotoSansKrRegular,
-                    fontConfig with
-                    {
-                        GlyphRanges = ImGuiHelpers.CreateImGuiRangesFrom(
-                            UnicodeRanges.HangulJamo,
-                            UnicodeRanges.HangulCompatibilityJamo,
-                            UnicodeRanges.HangulSyllables,
-                            UnicodeRanges.HangulJamoExtendedA,
-                            UnicodeRanges.HangulJamoExtendedB),
-                    });
-            }
+            // if (dalamudConfiguration.EffectiveLanguage == "ko"
+            //     || Service<DalamudIme>.GetNullable()?.EncounteredHangul is true)
+            // {
+            //     this.AddDalamudAssetFont(
+            //         DalamudAsset.NotoSansKrRegular,
+            //         fontConfig with
+            //         {
+            //             GlyphRanges = ImGuiHelpers.CreateImGuiRangesFrom(
+            //                 UnicodeRanges.HangulJamo,
+            //                 UnicodeRanges.HangulCompatibilityJamo,
+            //                 UnicodeRanges.HangulSyllables,
+            //                 UnicodeRanges.HangulJamoExtendedA,
+            //                 UnicodeRanges.HangulJamoExtendedB),
+            //         });
+            // }
 
             var windowsDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
             var fontPathChs = Path.Combine(windowsDir, "Fonts", "msyh.ttc");
