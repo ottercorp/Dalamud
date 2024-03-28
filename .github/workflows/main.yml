@@ -16,6 +16,9 @@ jobs:
           fetch-depth: 0
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v1.0.2
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.100'
       - name: Define VERSION
         run: |
           $env:COMMIT = $env:GITHUB_SHA.Substring(0, 7)
@@ -125,6 +128,10 @@ jobs:
         
         if ($branchName -eq "master") {
           $branchName = "stg"
+        }
+        else
+        {
+          $branchName = "canary"
         }
         
         $newVersion = [System.IO.File]::ReadAllText("$(Get-Location)\scratch\TEMP_gitver.txt")

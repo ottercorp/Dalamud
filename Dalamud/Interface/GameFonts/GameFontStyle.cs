@@ -83,7 +83,7 @@ public struct GameFontStyle
     public readonly GameFontFamily Family => this.FamilyAndSize switch
     {
         GameFontFamilyAndSize.Undefined => GameFontFamily.Undefined,
-        //GameFontFamilyAndSize.Axis96 => GameFontFamily.Axis,
+        GameFontFamilyAndSize.Axis96 => GameFontFamily.Axis,
         GameFontFamilyAndSize.Axis12 => GameFontFamily.Axis,
         GameFontFamilyAndSize.Axis14 => GameFontFamily.Axis,
         GameFontFamilyAndSize.Axis18 => GameFontFamily.Axis,
@@ -106,6 +106,7 @@ public struct GameFontStyle
         GameFontFamilyAndSize.TrumpGothic23 => GameFontFamily.TrumpGothic,
         GameFontFamilyAndSize.TrumpGothic34 => GameFontFamily.TrumpGothic,
         GameFontFamilyAndSize.TrumpGothic68 => GameFontFamily.TrumpGothic,
+        GameFontFamilyAndSize.AxisIME => GameFontFamily.Axis,
         _ => throw new InvalidOperationException(),
     };
 
@@ -129,7 +130,7 @@ public struct GameFontStyle
     public readonly float BaseSizePt => this.FamilyAndSize switch
     {
         GameFontFamilyAndSize.Undefined => 0,
-        //GameFontFamilyAndSize.Axis96 => 9.6f,
+        GameFontFamilyAndSize.Axis96 => 9.6f,
         GameFontFamilyAndSize.Axis12 => 12,
         GameFontFamilyAndSize.Axis14 => 14,
         GameFontFamilyAndSize.Axis18 => 18,
@@ -152,6 +153,7 @@ public struct GameFontStyle
         GameFontFamilyAndSize.TrumpGothic23 => 23,
         GameFontFamilyAndSize.TrumpGothic34 => 34,
         GameFontFamilyAndSize.TrumpGothic68 => 68,
+        GameFontFamilyAndSize.AxisIME => 12,
         _ => throw new InvalidOperationException(),
     };
 
@@ -230,14 +232,6 @@ public struct GameFontStyle
                 <= ((int)((34f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.TrumpGothic34,
                 _ => GameFontFamilyAndSize.TrumpGothic68,
             },
-            //GameFontFamily.ChnAxis => size switch
-            //{
-            //    //<= ((int)((16f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.ChnAxis120,
-            //    //<= ((int)((20f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.ChnAxis140,
-            //    <= 12 + 0.001f => GameFontFamilyAndSize.ChnAxis120,
-            //    <= 14 + 0.001f => GameFontFamilyAndSize.ChnAxis140,
-            //    _ => GameFontFamilyAndSize.ChnAxis180,
-            //},
             _ => GameFontFamilyAndSize.Undefined,
         };
 
