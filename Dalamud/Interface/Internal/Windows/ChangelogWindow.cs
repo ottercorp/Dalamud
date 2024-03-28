@@ -31,14 +31,15 @@ namespace Dalamud.Interface.Internal.Windows;
 /// </summary>
 internal sealed class ChangelogWindow : Window, IDisposable
 {
-    private const string WarrantsChangelogForMajorMinor = "9.0.0.";
+    private const string WarrantsChangelogForMajorMinor = "9.1.0.";
     
     private const string ChangeLog =
         @"• 更新了Dalamud，以便与Patch 6.5兼容
-• 尝试修正中文输入卡顿问题(测试)
-• 现在卫月UI会随着游戏UI隐藏正常隐藏了
+• 尝试修正中文输入卡顿问题(再次)
+• 输入韩文不会直接爆炸了
 • 重置字体设置后会立刻保存了
-• 修改了默认使用的字体，如果还是出现字体问题请往下看
+• 更新了一些翻译
+• .Net版本更新至.Net8了
 ";
 
     private readonly TitleScreenMenuWindow tsmWindow;
