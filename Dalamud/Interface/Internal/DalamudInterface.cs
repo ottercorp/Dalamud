@@ -957,7 +957,7 @@ internal class DalamudInterface : IInternalDisposableService
 
                     if (ImGui.MenuItem("Export localizable"))
                     {
-                        localization.ExportLocalizable();
+                        localization.ExportLocalizable(true);
                     }
 
                     if (ImGui.BeginMenu("Load language..."))
