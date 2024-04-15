@@ -1,10 +1,10 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Dalamud.Plugin.Internal;
-using Dalamud.Plugin.Internal.Types;
 using Dalamud.Utility;
 using Dalamud.Networking.Http;
 using Newtonsoft.Json;
@@ -33,8 +33,8 @@ internal static class EventTracking
         var pluginManager = Service<PluginManager>.GetNullable();
         var count = pluginManager is null ? -1 : pluginManager.InstalledPlugins.Count(x => x.Manifest.InstalledFromUrl is not "OFFICIAL");
         var installedPlugins = pluginManager is null
-                                   ? string.Empty
-                                   : string.Join(",", pluginManager.InstalledPlugins.Select(x => x.InternalName));
+                                   ? []
+                                   : pluginManager.InstalledPlugins.Select(x => x.InternalName).ToList();
 
         var data = new Analytics()
         {
@@ -85,6 +85,6 @@ internal static class EventTracking
         public string? PluginCount { get; set; }
 
         [JsonProperty("plugin_list")]
-        public string? PluginList { get; set; }
+        public List<string>? PluginList { get; set; }
     }
 }
