@@ -32,6 +32,9 @@ internal static class EventTracking
         var version = $"{Util.AssemblyVersion}-{Util.GetGitHash()}";
         var pluginManager = Service<PluginManager>.GetNullable();
         var count = pluginManager is null ? -1 : pluginManager.InstalledPlugins.Count(x => x.Manifest.InstalledFromUrl is not "OFFICIAL");
+        var installedPlugins = pluginManager is null
+                                   ? string.Empty
+                                   : string.Join(",", pluginManager.InstalledPlugins.Select(x => x.InternalName));
 
         var data = new Analytics()
         {
@@ -42,6 +45,7 @@ internal static class EventTracking
             OS = os,
             DalamudVersion = version,
             PluginCount = count.ToString(),
+            PluginList = installedPlugins,
         };
 
         var postContent = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -79,5 +83,8 @@ internal static class EventTracking
 
         [JsonProperty("plugin_count")]
         public string? PluginCount { get; set; }
+
+        [JsonProperty("plugin_list")]
+        public string? PluginList { get; set; }
     }
 }
