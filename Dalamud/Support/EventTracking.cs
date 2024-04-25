@@ -8,6 +8,7 @@ using Dalamud.Plugin.Internal;
 using Dalamud.Utility;
 using Dalamud.Networking.Http;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Dalamud.Support;
 
@@ -22,9 +23,9 @@ internal static class EventTracking
     public static async Task SendMeasurement(ulong contentId, uint actorId, uint homeWorldId)
     {
         var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
-        var taobaoIpJs = await httpClient.GetStringAsync("https://www.taobao.com/help/getip.php");
-        var ipSplits = taobaoIpJs.Split('"');
-        var ip = ipSplits[1];
+        var bilibiliIP = await httpClient.GetStringAsync("https://api.bilibili.com/x/web-interface/zone");
+        var json = JObject.Parse(bilibiliIP);
+        var ip = json["data"]?["addr"]?.ToString() ?? "IP获取失败";
         var clientId = $"{Hash.GetStringSha256Hash(ip)}";
         var userId = Hash.GetStringSha256Hash($"{contentId:x16}+{actorId:X8}");
         var cheatBannedHash = CheatBannedHash();
