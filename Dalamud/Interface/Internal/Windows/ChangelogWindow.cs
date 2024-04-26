@@ -40,6 +40,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 • 重置字体设置后会立刻保存了
 • 更新了一些翻译
 • .Net版本更新至.Net8了
+• New:更新了FFCS版本和挂掉的API
 ";
 
     private readonly TitleScreenMenuWindow tsmWindow;
