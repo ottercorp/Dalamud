@@ -8,6 +8,7 @@ using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Utility;
 using Dalamud.Utility.Timing;
+
 using JetBrains.Annotations;
 
 namespace Dalamud;
@@ -116,7 +117,7 @@ internal static class Service<T> where T : IServiceType
 #endif
 
         if (!instanceTcs.Task.IsCompleted)
-            instanceTcs.Task.Wait();
+            instanceTcs.Task.Wait(ServiceManager.UnloadCancellationToken);
         return instanceTcs.Task.Result;
     }
 
