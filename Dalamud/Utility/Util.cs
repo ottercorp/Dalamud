@@ -33,6 +33,8 @@ using Windows.Win32.Storage.FileSystem;
 using Windows.Win32.System.Memory;
 using Windows.Win32.System.Ole;
 
+using Dalamud.Networking.Http;
+
 using static TerraFX.Interop.Windows.Windows;
 
 using Win32_PInvoke = Windows.Win32.PInvoke;
