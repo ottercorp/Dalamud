@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -14,6 +14,7 @@ using Dalamud.Plugin.Services;
 
 using FFXIVClientStructs.FFXIV.Client.Graphics;
 using FFXIVClientStructs.FFXIV.Client.System.Memory;
+using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Dalamud.Game.Gui.Dtr;
@@ -21,7 +22,6 @@ namespace Dalamud.Game.Gui.Dtr;
 /// <summary>
 /// Class used to interface with the server info bar.
 /// </summary>
-[InterfaceVersion("1.0")]
 [ServiceManager.EarlyLoadedService]
 internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
 {
@@ -52,6 +52,8 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
     private readonly List<DtrBarEntry> entries = new();
 
     private readonly Dictionary<uint, List<IAddonEventHandle>> eventHandles = new();
+
+    private Utf8String* emptyString;
     
     private uint runningNodeIds = BaseNodeId;
     private float entryStartPos = float.NaN;
@@ -78,7 +80,7 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
     public IReadOnlyList<IReadOnlyDtrBarEntry> Entries => this.entries;
     
     /// <inheritdoc/>
-    public DtrBarEntry Get(string title, SeString? text = null)
+    public IDtrBarEntry Get(string title, SeString? text = null)
     {
         if (this.entries.Any(x => x.Title == title) || this.newEntries.Any(x => x.Title == title))
             throw new ArgumentException("An entry with the same title already exists.");
@@ -112,10 +114,16 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
         this.addonLifecycle.UnregisterListener(this.dtrPreFinalizeListener);
 
         foreach (var entry in this.entries)
-            this.RemoveNode(entry.TextNode);
+            this.RemoveEntry(entry);
 
         this.entries.Clear();
         this.framework.Update -= this.Update;
+
+        if (this.emptyString != null)
+        {
+            this.emptyString->Dtor();
+            this.emptyString = null;
+        }
     }
 
     /// <summary>
@@ -125,10 +133,25 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
     {
         foreach (var data in this.entries.Where(d => d.ShouldBeRemoved))
         {
-            this.RemoveNode(data.TextNode);
+            this.RemoveEntry(data);
         }
 
         this.entries.RemoveAll(d => d.ShouldBeRemoved);
+    }
+
+    /// <summary>
+    /// Remove native resources for the specified entry.
+    /// </summary>
+    /// <param name="toRemove">The resources to remove.</param>
+    internal void RemoveEntry(DtrBarEntry toRemove)
+    {
+        this.RemoveNode(toRemove.TextNode);
+
+        if (toRemove.Storage != null)
+        {
+            toRemove.Storage->Dtor(true);
+            toRemove.Storage = null;
+        }
     }
 
     /// <summary>
@@ -205,7 +228,15 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
             if (data is { Dirty: true, Added: true, Text: not null, TextNode: not null })
             {
                 var node = data.TextNode;
-                node->SetText(data.Text.Encode());
+
+                if (data.Storage == null)
+                {
+                    data.Storage = Utf8String.CreateEmpty();
+                }
+
+                data.Storage->SetString(data.Text.EncodeWithNullTerminator());
+                node->SetText(data.Storage->StringPtr);
+
                 ushort w = 0, h = 0;
 
                 if (!isHide)
@@ -242,7 +273,7 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
             else
             {
                 // If we want the node hidden, shift it up, to prevent collision conflicts
-                data.TextNode->AtkResNode.SetY(-collisionNode->Height * dtr->RootNode->ScaleX);
+                data.TextNode->AtkResNode.SetYFloat(-collisionNode->Height * dtr->RootNode->ScaleX);
             }
         }
     }
@@ -274,9 +305,9 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
         foreach (var index in Enumerable.Range(0, addon->UldManager.NodeListCount))
         {
             var node = addon->UldManager.NodeList[index];
-            if (node->IsVisible)
+            if (node->IsVisible())
             {
-                var nodeId = node->NodeID;
+                var nodeId = node->NodeId;
                 var nodeType = node->Type;
 
                 if (nodeType == NodeType.Collision)
@@ -289,7 +320,7 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
                     additionalWidth += node->Width + this.configuration.DtrSpacing;
                 }
                 else if ((nodeType == NodeType.Res || (ushort)nodeType >= 1000) &&
-                         (node->ChildNode == null || node->ChildNode->IsVisible))
+                         (node->ChildNode == null || node->ChildNode->IsVisible()))
                 {
                     // Native top-level node. These are are either res nodes or button components.
                     // Both the node and its child (if it has one) must be visible for the node to be counted.
@@ -304,10 +335,10 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
         var targetX = minX - (this.configuration.DtrSwapDirection ? 0 : additionalWidth);
         var targetWidth = (ushort)(nativeWidth + additionalWidth);
 
-        if (collisionNode->Width != targetWidth || collisionNode->X != targetX)
+        if (collisionNode->Width != targetWidth || Math.Abs(collisionNode->X - targetX) > 0.0001)
         {
             collisionNode->SetWidth(targetWidth);
-            collisionNode->SetX(targetX);
+            collisionNode->SetXFloat(targetX);
         }
 
         // If we are drawing backwards, we should start from the right side of the native nodes.
@@ -330,7 +361,7 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
 
         for (var i = 0; i < dtr->UldManager.NodeListCount; i++)
         {
-            if (dtr->UldManager.NodeList[i]->NodeID > 1000)
+            if (dtr->UldManager.NodeList[i]->NodeId > 1000)
                 return true;
         }
 
@@ -357,8 +388,8 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
         var dtr = this.GetDtr();
         if (dtr == null || dtr->RootNode == null || dtr->UldManager.NodeList == null || node == null) return false;
 
-        this.eventHandles.TryAdd(node->AtkResNode.NodeID, new List<IAddonEventHandle>());
-        this.eventHandles[node->AtkResNode.NodeID].AddRange(new List<IAddonEventHandle>
+        this.eventHandles.TryAdd(node->AtkResNode.NodeId, new List<IAddonEventHandle>());
+        this.eventHandles[node->AtkResNode.NodeId].AddRange(new List<IAddonEventHandle>
         {
             this.uiEventManager.AddEvent(AddonEventManager.DalamudInternalKey, (nint)dtr, (nint)node, AddonEventType.MouseOver, this.DtrEventHandler),
             this.uiEventManager.AddEvent(AddonEventManager.DalamudInternalKey, (nint)dtr, (nint)node, AddonEventType.MouseOut, this.DtrEventHandler),
@@ -386,8 +417,8 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
         var dtr = this.GetDtr();
         if (dtr == null || dtr->RootNode == null || dtr->UldManager.NodeList == null || node == null) return;
 
-        this.eventHandles[node->AtkResNode.NodeID].ForEach(handle => this.uiEventManager.RemoveEvent(AddonEventManager.DalamudInternalKey, handle));
-        this.eventHandles[node->AtkResNode.NodeID].Clear();
+        this.eventHandles[node->AtkResNode.NodeId].ForEach(handle => this.uiEventManager.RemoveEvent(AddonEventManager.DalamudInternalKey, handle));
+        this.eventHandles[node->AtkResNode.NodeId].Clear();
 
         var tmpPrevNode = node->AtkResNode.PrevSiblingNode;
         var tmpNextNode = node->AtkResNode.NextSiblingNode;
@@ -414,7 +445,7 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
             return null;
         }
 
-        newTextNode->AtkResNode.NodeID = nodeId;
+        newTextNode->AtkResNode.NodeId = nodeId;
         newTextNode->AtkResNode.Type = NodeType.Text;
         newTextNode->AtkResNode.NodeFlags = NodeFlags.AnchorLeft | NodeFlags.AnchorTop | NodeFlags.Enabled | NodeFlags.RespondToMouse | NodeFlags.HasCollision | NodeFlags.EmitsEvents;
         newTextNode->AtkResNode.DrawFlags = 12;
@@ -428,7 +459,10 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
         newTextNode->TextFlags = (byte)TextFlags.Edge;
         newTextNode->TextFlags2 = 0;
 
-        newTextNode->SetText(" ");
+        if (this.emptyString == null)
+            this.emptyString = Utf8String.FromString(" ");
+        
+        newTextNode->SetText(this.emptyString->StringPtr);
 
         newTextNode->TextColor = new ByteColor { R = 255, G = 255, B = 255, A = 255 };
         newTextNode->EdgeColor = new ByteColor { R = 142, G = 106, B = 12, A = 255 };
@@ -459,11 +493,11 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
             switch (atkEventType)
             {
                 case AddonEventType.MouseOver:
-                    AtkStage.GetSingleton()->TooltipManager.ShowTooltip(addon->ID, node, dtrBarEntry.Tooltip.Encode());
+                    AtkStage.Instance()->TooltipManager.ShowTooltip(addon->Id, node, dtrBarEntry.Tooltip.Encode());
                     break;
                 
                 case AddonEventType.MouseOut:
-                    AtkStage.GetSingleton()->TooltipManager.HideTooltip(addon->ID);
+                    AtkStage.Instance()->TooltipManager.HideTooltip(addon->Id);
                     break;
             }
         }
@@ -492,7 +526,7 @@ internal sealed unsafe class DtrBar : IInternalDisposableService, IDtrBar
 /// Plugin-scoped version of a AddonEventManager service.
 /// </summary>
 [PluginInterface]
-[InterfaceVersion("1.0")]
+
 [ServiceManager.ScopedService]
 #pragma warning disable SA1015
 [ResolveVia<IDtrBar>]
@@ -502,7 +536,7 @@ internal class DtrBarPluginScoped : IInternalDisposableService, IDtrBar
     [ServiceManager.ServiceDependency]
     private readonly DtrBar dtrBarService = Service<DtrBar>.Get();
 
-    private readonly Dictionary<string, DtrBarEntry> pluginEntries = new();
+    private readonly Dictionary<string, IDtrBarEntry> pluginEntries = new();
     
     /// <inheritdoc/>
     public IReadOnlyList<IReadOnlyDtrBarEntry> Entries => this.dtrBarService.Entries;
@@ -519,7 +553,7 @@ internal class DtrBarPluginScoped : IInternalDisposableService, IDtrBar
     }
 
     /// <inheritdoc/>
-    public DtrBarEntry Get(string title, SeString? text = null)
+    public IDtrBarEntry Get(string title, SeString? text = null)
     {
         // If we already have a known entry for this plugin, return it.
         if (this.pluginEntries.TryGetValue(title, out var existingEntry)) return existingEntry;

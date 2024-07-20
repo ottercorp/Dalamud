@@ -1002,7 +1002,7 @@ int main() {
         const TASKDIALOG_BUTTON buttons[]{
             {IdButtonRestart, L"Restart\nRestart the game with the above-selected option."},
             {IdButtonSaveTsPack, L"Save Troubleshooting Info\nSave a .tspack file containing information about this crash for analysis."},
-            {IdButtonExit, L"Exit\nExit the game."},
+            {IdButtonExit, L"Exit\nExit without doing anything."},
         };
 
         config.cbSize = sizeof(config);
@@ -1097,11 +1097,20 @@ int main() {
             pProgressDialog->Release();
             pProgressDialog = NULL;
         }
+        
+        const auto kill_game = [&] { TerminateProcess(g_hProcess, exinfo.ExceptionRecord.ExceptionCode); };
 
         if (shutup) {
-            TerminateProcess(g_hProcess, exinfo.ExceptionRecord.ExceptionCode);
+            kill_game();
             return 0;
         }
+
+#if !_DEBUG
+        // In release mode, we can't resume the game, so just kill it. It's not safe to keep it running, as we
+        // don't know what state it's in and it may have crashed off-thread.
+        // Additionally, if the main thread crashed, Windows will show the ANR dialog, which will block our dialog.
+        kill_game();
+#endif
 
         int nButtonPressed = 0, nRadioButton = 0;
         if (FAILED(TaskDialogIndirect(&config, &nButtonPressed, &nRadioButton, nullptr))) {
@@ -1110,7 +1119,7 @@ int main() {
             switch (nButtonPressed) {
                 case IdButtonRestart:
                 {
-                    TerminateProcess(g_hProcess, exinfo.ExceptionRecord.ExceptionCode);
+                    kill_game();
                     restart_game_using_injector(nRadioButton, *launcherArgs);
                     break;
                 }
@@ -1118,7 +1127,7 @@ int main() {
                     if (attemptResume)
                         SetEvent(exinfo.hEventHandle);
                     else
-                        TerminateProcess(g_hProcess, exinfo.ExceptionRecord.ExceptionCode);
+                        kill_game();
             }
         }
     }

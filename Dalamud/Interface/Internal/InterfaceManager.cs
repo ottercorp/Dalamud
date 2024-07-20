@@ -12,7 +12,6 @@ using Dalamud.Configuration.Internal;
 using Dalamud.Game;
 using Dalamud.Game.ClientState.GamePad;
 using Dalamud.Game.ClientState.Keys;
-using Dalamud.Game.Internal.DXGI;
 using Dalamud.Hooking;
 using Dalamud.Hooking.WndProcHook;
 using Dalamud.Interface.ImGuiNotification.Internal;
@@ -33,8 +32,6 @@ using ImGuiScene;
 using PInvoke;
 
 using SharpDX;
-using SharpDX.Direct3D;
-using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 
 // general dev notes, here because it's easiest
@@ -70,7 +67,7 @@ internal class InterfaceManager : IInternalDisposableService
     private static readonly ModuleLog Log = new("INTERFACE");
     
     private readonly ConcurrentBag<IDeferredDisposable> deferredDisposeTextures = new();
-    private readonly ConcurrentBag<ILockedImFont> deferredDisposeImFontLockeds = new();
+    private readonly ConcurrentBag<IDisposable> deferredDisposeDisposables = new();
 
     [ServiceManager.ServiceDependency]
     private readonly WndProcHookManager wndProcHookManager = Service<WndProcHookManager>.Get();
@@ -78,11 +75,14 @@ internal class InterfaceManager : IInternalDisposableService
     [ServiceManager.ServiceDependency]
     private readonly Framework framework = Service<Framework>.Get();
 
-    private readonly SwapChainVtableResolver address = new();
+    private readonly ConcurrentQueue<Action> runBeforeImGuiRender = new();
+    private readonly ConcurrentQueue<Action> runAfterImGuiRender = new();
+
     private RawDX11Scene? scene;
 
     private Hook<SetCursorDelegate>? setCursorHook;
-    private Hook<PresentDelegate>? presentHook;
+    private Hook<DxgiPresentDelegate>? dxgiPresentHook;
+    private Hook<ReshadeOnPresentDelegate>? reshadeOnPresentHook;
     private Hook<ResizeBuffersDelegate>? resizeBuffersHook;
 
     private IFontAtlas? dalamudAtlas;
@@ -99,7 +99,10 @@ internal class InterfaceManager : IInternalDisposableService
     }
 
     [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
-    private delegate IntPtr PresentDelegate(IntPtr swapChain, uint syncInterval, uint presentFlags);
+    private delegate IntPtr DxgiPresentDelegate(IntPtr swapChain, uint syncInterval, uint presentFlags);
+
+    [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
+    private delegate void ReshadeOnPresentDelegate(nint swapChain, uint flags, nint presentParams);
 
     [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
     private delegate IntPtr ResizeBuffersDelegate(IntPtr swapChain, uint bufferCount, uint width, uint height, uint newFormat, uint swapChainFlags);
@@ -214,6 +217,10 @@ internal class InterfaceManager : IInternalDisposableService
     /// </summary>
     public bool IsDispatchingEvents { get; set; } = true;
 
+    /// <summary>Gets a value indicating whether the main thread is executing <see cref="PresentDetour"/>.</summary>
+    /// <remarks>This still will be <c>true</c> even when queried off the main thread.</remarks>
+    public bool IsMainThreadInPresent { get; private set; }
+
     /// <summary>
     /// Gets a value indicating the native handle of the game main window.
     /// </summary>
@@ -244,9 +251,11 @@ internal class InterfaceManager : IInternalDisposableService
     /// </summary>
     public Task FontBuildTask => WhenFontsReady().dalamudAtlas!.BuildTask;
 
-    /// <summary>
-    /// Gets the number of calls to <see cref="PresentDetour"/> so far.
-    /// </summary>
+    /// <summary>Gets the number of calls to <see cref="PresentDetour"/> so far.</summary>
+    /// <remarks>
+    /// The value increases even when Dalamud is hidden via &quot;/xlui hide&quot;.
+    /// <see cref="DalamudInterface.FrameCount"/> does not.
+    /// </remarks>
     public long CumulativePresentCalls { get; private set; }
 
     /// <summary>
@@ -289,142 +298,11 @@ internal class InterfaceManager : IInternalDisposableService
         {
             this.wndProcHookManager.PreWndProc -= this.WndProcHookManagerOnPreWndProc;
             Interlocked.Exchange(ref this.setCursorHook, null)?.Dispose();
-            Interlocked.Exchange(ref this.presentHook, null)?.Dispose();
+            Interlocked.Exchange(ref this.dxgiPresentHook, null)?.Dispose();
+            Interlocked.Exchange(ref this.reshadeOnPresentHook, null)?.Dispose();
             Interlocked.Exchange(ref this.resizeBuffersHook, null)?.Dispose();
         }
     }
-
-#nullable enable
-
-    /// <summary>
-    /// Load an image from disk.
-    /// </summary>
-    /// <param name="filePath">The filepath to load.</param>
-    /// <returns>A texture, ready to use in ImGui.</returns>
-    public IDalamudTextureWrap? LoadImage(string filePath)
-    {
-        if (this.scene == null)
-            throw new InvalidOperationException("Scene isn't ready.");
-
-        try
-        {
-            var wrap = this.scene?.LoadImage(filePath);
-            return wrap != null ? new DalamudTextureWrap(wrap) : null;
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, $"Failed to load image from {filePath}");
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Load an image from an array of bytes.
-    /// </summary>
-    /// <param name="imageData">The data to load.</param>
-    /// <returns>A texture, ready to use in ImGui.</returns>
-    public IDalamudTextureWrap? LoadImage(byte[] imageData)
-    {
-        if (this.scene == null)
-            throw new InvalidOperationException("Scene isn't ready.");
-
-        try
-        {
-            var wrap = this.scene?.LoadImage(imageData);
-            return wrap != null ? new DalamudTextureWrap(wrap) : null;
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to load image from memory");
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Load an image from an array of bytes.
-    /// </summary>
-    /// <param name="imageData">The data to load.</param>
-    /// <param name="width">The width in pixels.</param>
-    /// <param name="height">The height in pixels.</param>
-    /// <param name="numChannels">The number of channels.</param>
-    /// <returns>A texture, ready to use in ImGui.</returns>
-    public IDalamudTextureWrap? LoadImageRaw(byte[] imageData, int width, int height, int numChannels)
-    {
-        if (this.scene == null)
-            throw new InvalidOperationException("Scene isn't ready.");
-
-        try
-        {
-            var wrap = this.scene?.LoadImageRaw(imageData, width, height, numChannels);
-            return wrap != null ? new DalamudTextureWrap(wrap) : null;
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to load image from raw data");
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Check whether the current D3D11 Device supports the given DXGI format.
-    /// </summary>
-    /// <param name="dxgiFormat">DXGI format to check.</param>
-    /// <returns>Whether it is supported.</returns>
-    public bool SupportsDxgiFormat(Format dxgiFormat) => this.scene is null
-        ? throw new InvalidOperationException("Scene isn't ready.")
-        : this.scene.Device.CheckFormatSupport(dxgiFormat).HasFlag(FormatSupport.Texture2D);
-
-    /// <summary>
-    /// Load an image from a span of bytes of specified format.
-    /// </summary>
-    /// <param name="data">The data to load.</param>
-    /// <param name="pitch">The pitch(stride) in bytes.</param>
-    /// <param name="width">The width in pixels.</param>
-    /// <param name="height">The height in pixels.</param>
-    /// <param name="dxgiFormat">Format of the texture.</param>
-    /// <returns>A texture, ready to use in ImGui.</returns>
-    public DalamudTextureWrap LoadImageFromDxgiFormat(Span<byte> data, int pitch, int width, int height, Format dxgiFormat)
-    {
-        if (this.scene == null)
-            throw new InvalidOperationException("Scene isn't ready.");
-
-        ShaderResourceView resView;
-        unsafe
-        {
-            fixed (void* pData = data)
-            {
-                var texDesc = new Texture2DDescription
-                {
-                    Width = width,
-                    Height = height,
-                    MipLevels = 1,
-                    ArraySize = 1,
-                    Format = dxgiFormat,
-                    SampleDescription = new(1, 0),
-                    Usage = ResourceUsage.Immutable,
-                    BindFlags = BindFlags.ShaderResource,
-                    CpuAccessFlags = CpuAccessFlags.None,
-                    OptionFlags = ResourceOptionFlags.None,
-                };
-
-                using var texture = new Texture2D(this.Device, texDesc, new DataRectangle(new(pData), pitch));
-                resView = new(this.Device, texture, new()
-                {
-                    Format = texDesc.Format,
-                    Dimension = ShaderResourceViewDimension.Texture2D,
-                    Texture2D = { MipLevels = texDesc.MipLevels },
-                });
-            }
-        }
-
-        // no sampler for now because the ImGui implementation we copied doesn't allow for changing it
-        return new DalamudTextureWrap(new D3DTextureWrap(resView, width, height));
-    }
-
-#nullable restore
 
     /// <summary>
     /// Sets up a deferred invocation of font rebuilding, before the next render frame.
@@ -448,9 +326,97 @@ internal class InterfaceManager : IInternalDisposableService
     /// Enqueue an <see cref="ILockedImFont"/> to be disposed at the end of the frame.
     /// </summary>
     /// <param name="locked">The disposable.</param>
-    public void EnqueueDeferredDispose(in ILockedImFont locked)
+    public void EnqueueDeferredDispose(IDisposable locked)
     {
-        this.deferredDisposeImFontLockeds.Add(locked);
+        this.deferredDisposeDisposables.Add(locked);
+    }
+
+    /// <summary>Queues an action to be run before <see cref="ImGui.Render"/> call.</summary>
+    /// <param name="action">The action.</param>
+    /// <returns>A <see cref="Task"/> that resolves once <paramref name="action"/> is run.</returns>
+    public Task RunBeforeImGuiRender(Action action)
+    {
+        var tcs = new TaskCompletionSource();
+        this.runBeforeImGuiRender.Enqueue(
+            () =>
+            {
+                try
+                {
+                    action();
+                    tcs.SetResult();
+                }
+                catch (Exception e)
+                {
+                    tcs.SetException(e);
+                }
+            });
+        return tcs.Task;
+    }
+
+    /// <summary>Queues a function to be run before <see cref="ImGui.Render"/> call.</summary>
+    /// <typeparam name="T">The type of the return value.</typeparam>
+    /// <param name="func">The function.</param>
+    /// <returns>A <see cref="Task"/> that resolves once <paramref name="func"/> is run.</returns>
+    public Task<T> RunBeforeImGuiRender<T>(Func<T> func)
+    {
+        var tcs = new TaskCompletionSource<T>();
+        this.runBeforeImGuiRender.Enqueue(
+            () =>
+            {
+                try
+                {
+                    tcs.SetResult(func());
+                }
+                catch (Exception e)
+                {
+                    tcs.SetException(e);
+                }
+            });
+        return tcs.Task;
+    }
+
+    /// <summary>Queues an action to be run after <see cref="ImGui.Render"/> call.</summary>
+    /// <param name="action">The action.</param>
+    /// <returns>A <see cref="Task"/> that resolves once <paramref name="action"/> is run.</returns>
+    public Task RunAfterImGuiRender(Action action)
+    {
+        var tcs = new TaskCompletionSource();
+        this.runAfterImGuiRender.Enqueue(
+            () =>
+            {
+                try
+                {
+                    action();
+                    tcs.SetResult();
+                }
+                catch (Exception e)
+                {
+                    tcs.SetException(e);
+                }
+            });
+        return tcs.Task;
+    }
+
+    /// <summary>Queues a function to be run after <see cref="ImGui.Render"/> call.</summary>
+    /// <typeparam name="T">The type of the return value.</typeparam>
+    /// <param name="func">The function.</param>
+    /// <returns>A <see cref="Task"/> that resolves once <paramref name="func"/> is run.</returns>
+    public Task<T> RunAfterImGuiRender<T>(Func<T> func)
+    {
+        var tcs = new TaskCompletionSource<T>();
+        this.runAfterImGuiRender.Enqueue(
+            () =>
+            {
+                try
+                {
+                    tcs.SetResult(func());
+                }
+                catch (Exception e)
+                {
+                    tcs.SetException(e);
+                }
+            });
+        return tcs.Task;
     }
 
     /// <summary>
@@ -666,19 +632,16 @@ internal class InterfaceManager : IInternalDisposableService
             args.SuppressWithValue(r.Value);
     }
 
-    /*
-     * NOTE(goat): When hooking ReShade DXGISwapChain::runtime_present, this is missing the syncInterval arg.
-     *             Seems to work fine regardless, I guess, so whatever.
-     */
-    private IntPtr PresentDetour(IntPtr swapChain, uint syncInterval, uint presentFlags)
+    private void ReshadeOnPresentDetour(nint swapChain, uint flags, nint presentParams)
     {
-        this.CumulativePresentCalls++;
+        if (!SwapChainHelper.IsGameDeviceSwapChain(swapChain))
+        {
+            this.reshadeOnPresentHook!.Original(swapChain, flags, presentParams);
+            return;
+        }
 
-        Debug.Assert(this.presentHook is not null, "How did PresentDetour get called when presentHook is null?");
-        Debug.Assert(this.dalamudAtlas is not null, "dalamudAtlas should have been set already");
-
-        if (this.scene != null && swapChain != this.scene.SwapChain.NativePointer)
-            return this.presentHook!.Original(swapChain, syncInterval, presentFlags);
+        Debug.Assert(this.reshadeOnPresentHook is not null, "this.reshadeOnPresentHook is not null");
+        Debug.Assert(this.dalamudAtlas is not null, "this.dalamudAtlas is not null");
 
         if (this.scene == null)
             this.InitScene(swapChain);
@@ -694,27 +657,66 @@ internal class InterfaceManager : IInternalDisposableService
                 Util.Fatal("Failed to initialize Dalamud base fonts.\nPlease report this error.", "Dalamud");
             }
 
-            return this.presentHook!.Original(swapChain, syncInterval, presentFlags);
+            this.reshadeOnPresentHook!.Original(swapChain, flags, presentParams);
+            return;
         }
 
-        if (this.address.IsReshade)
-        {
-            var pRes = this.presentHook!.Original(swapChain, syncInterval, presentFlags);
+        this.CumulativePresentCalls++;
+        this.IsMainThreadInPresent = true;
 
-            RenderImGui(this.scene!);
-            this.CleanupPostImGuiRender();
+        while (this.runBeforeImGuiRender.TryDequeue(out var action))
+            action.InvokeSafely();
 
-            return pRes;
-        }
+        this.reshadeOnPresentHook!.Original(swapChain, flags, presentParams);
 
         RenderImGui(this.scene!);
-        this.CleanupPostImGuiRender();
-
-        return this.presentHook!.Original(swapChain, syncInterval, presentFlags);
+        this.PostImGuiRender();
+        this.IsMainThreadInPresent = false;
     }
 
-    private void CleanupPostImGuiRender()
+    private IntPtr PresentDetour(IntPtr swapChain, uint syncInterval, uint presentFlags)
     {
+        if (!SwapChainHelper.IsGameDeviceSwapChain(swapChain))
+            return this.dxgiPresentHook!.Original(swapChain, syncInterval, presentFlags);
+
+        Debug.Assert(this.dxgiPresentHook is not null, "How did PresentDetour get called when presentHook is null?");
+        Debug.Assert(this.dalamudAtlas is not null, "dalamudAtlas should have been set already");
+
+        if (this.scene == null)
+            this.InitScene(swapChain);
+
+        Debug.Assert(this.scene is not null, "InitScene did not set the scene field, but did not throw an exception.");
+
+        if (!this.dalamudAtlas!.HasBuiltAtlas)
+        {
+            if (this.dalamudAtlas.BuildTask.Exception != null)
+            {
+                // TODO: Can we do something more user-friendly here? Unload instead?
+                Log.Error(this.dalamudAtlas.BuildTask.Exception, "Failed to initialize Dalamud base fonts");
+                Util.Fatal("Failed to initialize Dalamud base fonts.\nPlease report this error.", "Dalamud");
+            }
+
+            return this.dxgiPresentHook!.Original(swapChain, syncInterval, presentFlags);
+        }
+
+        this.CumulativePresentCalls++;
+        this.IsMainThreadInPresent = true;
+
+        while (this.runBeforeImGuiRender.TryDequeue(out var action))
+            action.InvokeSafely();
+
+        RenderImGui(this.scene!);
+        this.PostImGuiRender();
+        this.IsMainThreadInPresent = false;
+
+        return this.dxgiPresentHook!.Original(swapChain, syncInterval, presentFlags);
+    }
+
+    private void PostImGuiRender()
+    {
+        while (this.runAfterImGuiRender.TryDequeue(out var action))
+            action.InvokeSafely();
+
         if (!this.deferredDisposeTextures.IsEmpty)
         {
             var count = 0;
@@ -727,19 +729,19 @@ internal class InterfaceManager : IInternalDisposableService
             Log.Verbose("[IM] Disposing {Count} textures", count);
         }
 
-        if (!this.deferredDisposeImFontLockeds.IsEmpty)
+        if (!this.deferredDisposeDisposables.IsEmpty)
         {
             // Not logging; the main purpose of this is to keep resources used for rendering the frame to be kept
             // referenced until the resources are actually done being used, and it is expected that this will be
             // frequent.
-            while (this.deferredDisposeImFontLockeds.TryTake(out var d))
+            while (this.deferredDisposeDisposables.TryTake(out var d))
                 d.Dispose();
         }
     }
 
     [ServiceManager.CallWhenServicesReady(
         "InterfaceManager accepts event registration and stuff even when the game window is not ready.")]
-    private void ContinueConstruction(
+    private unsafe void ContinueConstruction(
         TargetSigScanner sigScanner,
         FontAtlasFactory fontAtlasFactory)
     {
@@ -815,8 +817,6 @@ internal class InterfaceManager : IInternalDisposableService
         // This will wait for scene on its own. We just wait for this.dalamudAtlas.BuildTask in this.InitScene.
         _ = this.dalamudAtlas.BuildFontsAsync();
 
-        this.address.Setup(sigScanner);
-
         try
         {
             if (Service<DalamudConfiguration>.Get().WindowIsImmersive)
@@ -827,31 +827,51 @@ internal class InterfaceManager : IInternalDisposableService
             Log.Error(ex, "Could not enable immersive mode");
         }
 
-        this.setCursorHook = Hook<SetCursorDelegate>.FromImport(null, "user32.dll", "SetCursor", 0, this.SetCursorDetour);
-        this.presentHook = Hook<PresentDelegate>.FromAddress(this.address.Present, this.PresentDetour);
-        this.resizeBuffersHook = Hook<ResizeBuffersDelegate>.FromAddress(this.address.ResizeBuffers, this.ResizeBuffersDetour);
+        this.setCursorHook = Hook<SetCursorDelegate>.FromImport(
+            null,
+            "user32.dll",
+            "SetCursor",
+            0,
+            this.SetCursorDetour);
+
+        SwapChainHelper.BusyWaitForGameDeviceSwapChain();
+        SwapChainHelper.DetectReShade();
 
         Log.Verbose("===== S W A P C H A I N =====");
-        Log.Verbose($"Present address 0x{this.presentHook!.Address.ToInt64():X}");
-        Log.Verbose($"ResizeBuffers address 0x{this.resizeBuffersHook!.Address.ToInt64():X}");
+        this.resizeBuffersHook = Hook<ResizeBuffersDelegate>.FromAddress(
+            (nint)SwapChainHelper.GameDeviceSwapChainVtbl->ResizeBuffers,
+            this.ResizeBuffersDetour);
+        Log.Verbose($"ResizeBuffers address {Util.DescribeAddress(this.resizeBuffersHook!.Address)}");
+
+        if (SwapChainHelper.ReshadeOnPresent is null)
+        {
+            var addr = (nint)SwapChainHelper.GameDeviceSwapChainVtbl->Present;
+            this.dxgiPresentHook = Hook<DxgiPresentDelegate>.FromAddress(addr, this.PresentDetour);
+            Log.Verbose($"ReShade::DXGISwapChain::on_present address {Util.DescribeAddress(addr)}");
+        }
+        else
+        {
+            var addr = (nint)SwapChainHelper.ReshadeOnPresent;
+            this.reshadeOnPresentHook = Hook<ReshadeOnPresentDelegate>.FromAddress(addr, this.ReshadeOnPresentDetour);
+            Log.Verbose($"IDXGISwapChain::Present address {Util.DescribeAddress(addr)}");
+        }
 
         this.setCursorHook.Enable();
-        this.presentHook.Enable();
+        this.dxgiPresentHook?.Enable();
+        this.reshadeOnPresentHook?.Enable();
         this.resizeBuffersHook.Enable();
     }
 
     private IntPtr ResizeBuffersDetour(IntPtr swapChain, uint bufferCount, uint width, uint height, uint newFormat, uint swapChainFlags)
     {
+        if (!SwapChainHelper.IsGameDeviceSwapChain(swapChain))
+            return this.resizeBuffersHook!.Original(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
+
 #if DEBUG
         Log.Verbose($"Calling resizebuffers swap@{swapChain.ToInt64():X}{bufferCount} {width} {height} {newFormat} {swapChainFlags}");
 #endif
 
         this.ResizeBuffers?.InvokeSafely();
-
-        // We have to ensure we're working with the main swapchain,
-        // as viewports might be resizing as well
-        if (this.scene == null || swapChain != this.scene.SwapChain.NativePointer)
-            return this.resizeBuffersHook!.Original(swapChain, bufferCount, width, height, newFormat, swapChainFlags);
 
         this.scene?.OnPreResize();
 

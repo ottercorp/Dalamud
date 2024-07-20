@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 
 using Serilog;
 
@@ -15,7 +17,6 @@ namespace Dalamud.Game.ClientState.Buddy;
 /// It does not include the local player.
 /// </summary>
 [PluginInterface]
-[InterfaceVersion("1.0")]
 [ServiceManager.EarlyLoadedService]
 #pragma warning disable SA1015
 [ResolveVia<IBuddyList>]
@@ -34,7 +35,7 @@ internal sealed partial class BuddyList : IServiceType, IBuddyList
     {
         this.address = this.clientState.AddressResolver;
 
-        Log.Verbose($"Buddy list address 0x{this.address.BuddyList.ToInt64():X}");
+        Log.Verbose($"Buddy list address {Util.DescribeAddress(this.address.BuddyList)}");
     }
 
     /// <inheritdoc/>
@@ -56,7 +57,7 @@ internal sealed partial class BuddyList : IServiceType, IBuddyList
     }
 
     /// <inheritdoc/>
-    public BuddyMember? CompanionBuddy
+    public IBuddyMember? CompanionBuddy
     {
         get
         {
@@ -66,7 +67,7 @@ internal sealed partial class BuddyList : IServiceType, IBuddyList
     }
 
     /// <inheritdoc/>
-    public BuddyMember? PetBuddy
+    public IBuddyMember? PetBuddy
     {
         get
         {
@@ -85,7 +86,7 @@ internal sealed partial class BuddyList : IServiceType, IBuddyList
     private unsafe FFXIVClientStructs.FFXIV.Client.Game.UI.Buddy* BuddyListStruct => (FFXIVClientStructs.FFXIV.Client.Game.UI.Buddy*)this.BuddyListAddress;
 
     /// <inheritdoc/>
-    public BuddyMember? this[int index]
+    public IBuddyMember? this[int index]
     {
         get
         {
@@ -97,13 +98,13 @@ internal sealed partial class BuddyList : IServiceType, IBuddyList
     /// <inheritdoc/>
     public unsafe IntPtr GetCompanionBuddyMemberAddress()
     {
-        return (IntPtr)(&this.BuddyListStruct->Companion);
+        return (IntPtr)this.BuddyListStruct->CompanionInfo.Companion;
     }
 
     /// <inheritdoc/>
     public unsafe IntPtr GetPetBuddyMemberAddress()
     {
-        return (IntPtr)(&this.BuddyListStruct->Pet);
+        return (IntPtr)this.BuddyListStruct->PetInfo.Pet;
     }
 
     /// <inheritdoc/>
@@ -112,11 +113,11 @@ internal sealed partial class BuddyList : IServiceType, IBuddyList
         if (index < 0 || index >= 3)
             return IntPtr.Zero;
 
-        return (IntPtr)(this.BuddyListStruct->BattleBuddies + (index * BuddyMemberSize));
+        return (IntPtr)Unsafe.AsPointer(ref this.BuddyListStruct->BattleBuddies[index]);
     }
 
     /// <inheritdoc/>
-    public BuddyMember? CreateBuddyMemberReference(IntPtr address)
+    public IBuddyMember? CreateBuddyMemberReference(IntPtr address)
     {
         if (this.clientState.LocalContentId == 0)
             return null;
@@ -138,10 +139,10 @@ internal sealed partial class BuddyList : IServiceType, IBuddyList
 internal sealed partial class BuddyList
 {
     /// <inheritdoc/>
-    int IReadOnlyCollection<BuddyMember>.Count => this.Length;
+    int IReadOnlyCollection<IBuddyMember>.Count => this.Length;
 
     /// <inheritdoc/>
-    public IEnumerator<BuddyMember> GetEnumerator()
+    public IEnumerator<IBuddyMember> GetEnumerator()
     {
         for (var i = 0; i < this.Length; i++)
         {

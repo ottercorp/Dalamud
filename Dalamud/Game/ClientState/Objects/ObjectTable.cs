@@ -23,7 +23,6 @@ namespace Dalamud.Game.ClientState.Objects;
 /// This collection represents the currently spawned FFXIV game objects.
 /// </summary>
 [PluginInterface]
-[InterfaceVersion("1.0")]
 [ServiceManager.EarlyLoadedService]
 #pragma warning disable SA1015
 [ResolveVia<IObjectTable>]
@@ -54,7 +53,7 @@ internal sealed partial class ObjectTable : IServiceType, IObjectTable
         for (var i = 0; i < this.frameworkThreadEnumerators.Length; i++)
             this.frameworkThreadEnumerators[i] = new(this, i);
 
-        Log.Verbose($"Object table address 0x{this.clientState.AddressResolver.ObjectTable.ToInt64():X}");
+        Log.Verbose($"Object table address {Util.DescribeAddress(this.clientState.AddressResolver.ObjectTable)}");
     }
 
     /// <inheritdoc/>
@@ -72,7 +71,7 @@ internal sealed partial class ObjectTable : IServiceType, IObjectTable
     public int Length => ObjectTableLength;
 
     /// <inheritdoc/>
-    public GameObject? this[int index]
+    public IGameObject? this[int index]
     {
         get
         {
@@ -83,16 +82,33 @@ internal sealed partial class ObjectTable : IServiceType, IObjectTable
     }
 
     /// <inheritdoc/>
-    public GameObject? SearchById(ulong objectId)
+    public IGameObject? SearchById(ulong gameObjectId)
     {
         _ = this.WarnMultithreadedUsage();
 
-        if (objectId is GameObject.InvalidGameObjectId or 0)
+        if (gameObjectId is 0)
             return null;
 
         foreach (var e in this.cachedObjectTable)
         {
-            if (e.Update() is { } o && o.ObjectId == objectId)
+            if (e.Update() is { } o && o.GameObjectId == gameObjectId)
+                return o;
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc/>
+    public IGameObject? SearchByEntityId(uint entityId)
+    {
+        _ = this.WarnMultithreadedUsage();
+
+        if (entityId is 0 or 0xE0000000)
+            return null;
+
+        foreach (var e in this.cachedObjectTable)
+        {
+            if (e.Update() is { } o && o.EntityId == entityId)
                 return o;
         }
 
@@ -108,7 +124,7 @@ internal sealed partial class ObjectTable : IServiceType, IObjectTable
     }
 
     /// <inheritdoc/>
-    public unsafe GameObject? CreateObjectReference(nint address)
+    public unsafe IGameObject? CreateObjectReference(nint address)
     {
         _ = this.WarnMultithreadedUsage();
 
@@ -217,10 +233,7 @@ internal sealed partial class ObjectTable : IServiceType, IObjectTable
 internal sealed partial class ObjectTable
 {
     /// <inheritdoc/>
-    int IReadOnlyCollection<GameObject>.Count => this.Length;
-
-    /// <inheritdoc/>
-    public IEnumerator<GameObject> GetEnumerator()
+    public IEnumerator<IGameObject> GetEnumerator()
     {
         // If something's trying to enumerate outside the framework thread, we use the ObjectPool.
         if (this.WarnMultithreadedUsage())
@@ -250,7 +263,7 @@ internal sealed partial class ObjectTable
     /// <inheritdoc/>
     IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
 
-    private sealed class Enumerator : IEnumerator<GameObject>, IResettable
+    private sealed class Enumerator : IEnumerator<IGameObject>, IResettable
     {
         private readonly int slotId;
         private ObjectTable? owner;
@@ -265,7 +278,7 @@ internal sealed partial class ObjectTable
             this.slotId = slotId;
         }
 
-        public GameObject Current { get; private set; } = null!;
+        public IGameObject Current { get; private set; } = null!;
 
         object IEnumerator.Current => this.Current;
 

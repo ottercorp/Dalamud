@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 
 using CheapLoc;
 using Dalamud.Configuration.Internal;
+using Dalamud.Console;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Keys;
@@ -102,7 +103,8 @@ internal class DalamudInterface : IInternalDisposableService
         Game.Framework framework,
         ClientState clientState,
         TitleScreenMenu titleScreenMenu,
-        GameGui gameGui)
+        GameGui gameGui,
+        ConsoleManager consoleManager)
     {
         this.dalamud = dalamud;
         this.configuration = configuration;
@@ -127,11 +129,14 @@ internal class DalamudInterface : IInternalDisposableService
             fontAtlasFactory,
             framework,
             gameGui,
-            titleScreenMenu) { IsOpen = false };
+            titleScreenMenu,
+            consoleManager) { IsOpen = false };
         this.changelogWindow = new ChangelogWindow(
             this.titleScreenMenuWindow,
             fontAtlasFactory,
-            dalamudAssetManager) { IsOpen = false };
+            dalamudAssetManager,
+            gameGui,
+            framework) { IsOpen = false };
         this.profilerWindow = new ProfilerWindow() { IsOpen = false };
         this.branchSwitcherWindow = new BranchSwitcherWindow() { IsOpen = false };
         this.hitchSettingsWindow = new HitchSettingsWindow() { IsOpen = false };
@@ -209,6 +214,15 @@ internal class DalamudInterface : IInternalDisposableService
     {
         get => this.isImGuiDrawDevMenu;
         set => this.isImGuiDrawDevMenu = value;
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the plugin installer is open.
+    /// </summary>
+    public bool IsPluginInstallerOpen
+    {
+        get => this.pluginWindow.IsOpen;
+        set => this.pluginWindow.IsOpen = value;
     }
 
     /// <inheritdoc/>
@@ -560,7 +574,7 @@ internal class DalamudInterface : IInternalDisposableService
         using var style2 = ImRaii.PushStyle(ImGuiStyleVar.WindowBorderSize, 0f);
         using var color = ImRaii.PushColor(ImGuiCol.WindowBg, new Vector4(0, 0, 0, 0));
 
-        ImGui.SetNextWindowPos(new Vector2(0, 0));
+        ImGui.SetNextWindowPos(ImGuiHelpers.MainViewport.Pos);
         ImGui.SetNextWindowSize(ImGuiHelpers.MainViewport.Size);
         ImGuiHelpers.ForceNextWindowMainViewport();
 
@@ -793,7 +807,7 @@ internal class DalamudInterface : IInternalDisposableService
                             unsafe
                             {
                                 var hook = Hook<CrashDebugDelegate>.FromAddress(
-                                    (nint)UIModule.StaticVTable.GetUIInputData,
+                                    (nint)UIModule.StaticVirtualTablePointer->GetUIInputData,
                                     self =>
                                     {
                                         _ = *(byte*)0;
@@ -821,7 +835,7 @@ internal class DalamudInterface : IInternalDisposableService
 
                     ImGui.MenuItem(Util.AssemblyVersion, false);
                     ImGui.MenuItem(this.dalamud.StartInfo.GameVersion?.ToString() ?? "Unknown version", false);
-                    ImGui.MenuItem($"D: {Util.GetGitHash()}[{Util.GetGitCommitCount()}] CS: {Util.GetGitHashClientStructs()}[{FFXIVClientStructs.Interop.Resolver.Version}]", false);
+                    ImGui.MenuItem($"D: {Util.GetGitHash()}[{Util.GetGitCommitCount()}] CS: {Util.GetGitHashClientStructs()}[{FFXIVClientStructs.ThisAssembly.Git.Commits}]", false);
                     ImGui.MenuItem($"CLR: {Environment.Version}", false);
 
                     ImGui.EndMenu();
@@ -894,6 +908,14 @@ internal class DalamudInterface : IInternalDisposableService
                     if (ImGui.MenuItem("Show dev bar info", null, this.configuration.ShowDevBarInfo))
                     {
                         this.configuration.ShowDevBarInfo = !this.configuration.ShowDevBarInfo;
+                    }
+                    
+                    ImGui.Separator();
+
+                    if (ImGui.MenuItem("Show loading window"))
+                    {
+                        var dialog = new LoadingDialog();
+                        dialog.Show();
                     }
 
                     ImGui.EndMenu();

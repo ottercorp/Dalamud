@@ -17,7 +17,6 @@ namespace Dalamud.Game.Addon.Events;
 /// <summary>
 /// Service provider for addon event management.
 /// </summary>
-[InterfaceVersion("1.0")]
 [ServiceManager.EarlyLoadedService]
 internal unsafe class AddonEventManager : IInternalDisposableService
 {
@@ -173,14 +172,14 @@ internal unsafe class AddonEventManager : IInternalDisposableService
     {
         try
         {
-            var atkStage = AtkStage.GetSingleton();
+            var atkStage = AtkStage.Instance();
             
             if (this.cursorOverride is not null && atkStage is not null)
             {
                 var cursor = (AddonCursorType)atkStage->AtkCursor.Type;
                 if (cursor != this.cursorOverride) 
                 {
-                    AtkStage.GetSingleton()->AtkCursor.SetCursorType((AtkCursor.CursorType)this.cursorOverride, 1);
+                    AtkStage.Instance()->AtkCursor.SetCursorType((AtkCursor.CursorType)this.cursorOverride, 1);
                 }
                 
                 return nint.Zero;
@@ -199,7 +198,6 @@ internal unsafe class AddonEventManager : IInternalDisposableService
 /// Plugin-scoped version of a AddonEventManager service.
 /// </summary>
 [PluginInterface]
-[InterfaceVersion("1.0")]
 [ServiceManager.ScopedService]
 #pragma warning disable SA1015
 [ResolveVia<IAddonEventManager>]

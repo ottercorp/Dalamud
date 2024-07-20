@@ -22,7 +22,7 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
-
+using Dalamud.Support;
 using ImGuiNET;
 using Lumina.Excel.GeneratedSheets;
 using Serilog;
@@ -30,7 +30,12 @@ using Newtonsoft.Json;
 
 using TerraFX.Interop.Windows;
 using Windows.Win32.Storage.FileSystem;
-using Dalamud.Networking.Http;
+using Windows.Win32.System.Memory;
+using Windows.Win32.System.Ole;
+
+using static TerraFX.Interop.Windows.Windows;
+
+using Win32_PInvoke = Windows.Win32.PInvoke;
 
 namespace Dalamud.Utility;
 
@@ -40,6 +45,27 @@ namespace Dalamud.Utility;
 public static class Util
 {
     internal static string TOSRemoteUrl = "https://aonyx.ffxiv.wang/Dalamud/ToS";
+    private static readonly string[] PageProtectionFlagNames = [
+        "PAGE_NOACCESS",
+        "PAGE_READONLY",
+        "PAGE_READWRITE",
+        "PAGE_WRITECOPY",
+        "PAGE_EXECUTE",
+        "PAGE_EXECUTE_READ",
+        "PAGE_EXECUTE_READWRITE",
+        "PAGE_EXECUTE_WRITECOPY",
+        "PAGE_GUARD",
+        "PAGE_NOCACHE",
+        "PAGE_WRITECOMBINE",
+        "PAGE_GRAPHICS_NOACCESS",
+        "PAGE_GRAPHICS_READONLY",
+        "PAGE_GRAPHICS_READWRITE",
+        "PAGE_GRAPHICS_EXECUTE",
+        "PAGE_GRAPHICS_EXECUTE_READ",
+        "PAGE_GRAPHICS_EXECUTE_READWRITE",
+        "PAGE_GRAPHICS_COHERENT",
+        "PAGE_GRAPHICS_NOCACHE",
+    ];
 
     private static readonly Type GenericSpanType = typeof(Span<>);
     private static string? gitHashInternal;
@@ -163,6 +189,100 @@ public static class Util
         return gitHashClientStructsInternal;
     }
 
+    /// <inheritdoc cref="DescribeAddress(nint)"/>
+    public static unsafe string DescribeAddress(void* p) => DescribeAddress((nint)p);
+
+    /// <summary>Describes a memory address relative to module, or allocation base.</summary>
+    /// <param name="p">Address.</param>
+    /// <returns>Address description.</returns>
+    public static unsafe string DescribeAddress(nint p)
+    {
+        Span<char> namebuf = stackalloc char[9];
+        var modules = CurrentProcessModules.ModuleCollection;
+        for (var i = 0; i < modules.Count; i++)
+        {
+            if (p < modules[i].BaseAddress) continue;
+            var d = p - modules[i].BaseAddress;
+            if (d > modules[i].ModuleMemorySize) continue;
+
+            // Display module name without path, only if there exists exactly one module loaded in the memory.
+            var fileName = modules[i].ModuleName;
+            for (var j = 0; j < modules.Count; j++)
+            {
+                if (i == j)
+                    continue;
+                if (!modules[j].ModuleName.Equals(fileName, StringComparison.InvariantCultureIgnoreCase))
+                    continue;
+                fileName = modules[i].FileName;
+                break;
+            }
+
+            var dos = (IMAGE_DOS_HEADER*)modules[i].BaseAddress;
+            if (dos->e_magic != 0x5A4D)
+                return $"0x{p:X}({fileName}+0x{d:X}: ???)";
+
+            Span<IMAGE_SECTION_HEADER> sections;
+            switch (((IMAGE_NT_HEADERS32*)(modules[i].BaseAddress + dos->e_lfanew))->OptionalHeader.Magic)
+            {
+                case IMAGE.IMAGE_NT_OPTIONAL_HDR32_MAGIC:
+                {
+                    var nth = (IMAGE_NT_HEADERS32*)(modules[i].BaseAddress + dos->e_lfanew);
+                    if (d < dos->e_lfanew + sizeof(IMAGE_NT_HEADERS32)
+                        + (nth->FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER)))
+                        goto default;
+                    sections = new(
+                        (void*)(modules[i].BaseAddress + dos->e_lfanew + sizeof(IMAGE_NT_HEADERS32)),
+                        nth->FileHeader.NumberOfSections);
+                    break;
+                }
+
+                case IMAGE.IMAGE_NT_OPTIONAL_HDR64_MAGIC:
+                {
+                    var nth = (IMAGE_NT_HEADERS64*)(modules[i].BaseAddress + dos->e_lfanew);
+                    if (d < dos->e_lfanew + sizeof(IMAGE_NT_HEADERS64)
+                        + (nth->FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER)))
+                        goto default;
+                    sections = new(
+                        (void*)(modules[i].BaseAddress + dos->e_lfanew + sizeof(IMAGE_NT_HEADERS64)),
+                        nth->FileHeader.NumberOfSections);
+                    break;
+                }
+
+                default:
+                    return $"0x{p:X}({fileName}+0x{d:X}: header)";
+            }
+
+            for (var j = 0; j < sections.Length; j++)
+            {
+                if (d >= sections[j].VirtualAddress && d < sections[j].VirtualAddress + sections[j].Misc.VirtualSize)
+                {
+                    var d2 = d - sections[j].VirtualAddress;
+                    var name8 = new Span<byte>((byte*)Unsafe.AsPointer(ref sections[j].Name[0]), 8).TrimEnd((byte)0);
+                    return $"0x{p:X}({fileName}+0x{d:X}({namebuf[..Encoding.UTF8.GetChars(name8, namebuf)]}+0x{d2:X}))";
+                }
+            }
+
+            return $"0x{p:X}({fileName}+0x{d:X}: ???)";
+        }
+
+        MEMORY_BASIC_INFORMATION mbi;
+        if (VirtualQuery((void*)p, &mbi, (nuint)sizeof(MEMORY_BASIC_INFORMATION)) == 0)
+            return $"0x{p:X}(???)";
+
+        var sb = new StringBuilder();
+        sb.Append($"0x{p:X}(");
+        for (int i = 0, c = 0; i < PageProtectionFlagNames.Length; i++)
+        {
+            if ((mbi.Protect & (1 << i)) == 0)
+                continue;
+            if (c++ == 0)
+                sb.Append(" | ");
+            sb.Append(PageProtectionFlagNames[i]);
+        }
+
+        return sb.Append(')').ToString();
+    }
+
     /// <summary>
     /// Read memory from an offset and hexdump them via Serilog.
     /// </summary>
@@ -273,7 +393,7 @@ public static class Util
     /// </summary>
     /// <param name="go">The GameObject to show.</param>
     /// <param name="autoExpand">Whether or not the struct should start as expanded.</param>
-    public static unsafe void ShowGameObjectStruct(GameObject go, bool autoExpand = true)
+    public static unsafe void ShowGameObjectStruct(IGameObject go, bool autoExpand = true)
     {
         switch (go)
         {
@@ -283,8 +403,8 @@ public static class Util
             case Character chara:
                 ShowStruct(chara.Struct, autoExpand);
                 break;
-            default:
-                ShowStruct(go.Struct, autoExpand);
+            case GameObject gameObject:
+                ShowStruct(gameObject.Struct, autoExpand);
                 break;
         }
     }
@@ -484,12 +604,12 @@ public static class Util
             case "MacOS": return OSPlatform.OSX;
             case "Linux": return OSPlatform.Linux;
         }
-        
+
         // n.b. we had some fancy code here to check if the Wine host version returned "Darwin" but apparently
         // *all* our Wines report Darwin if exports aren't hidden. As such, it is effectively impossible (without some
         // (very cursed and inaccurate heuristics) to determine if we're on macOS or Linux unless we're explicitly told
         // by our launcher. See commit a7aacb15e4603a367e2f980578271a9a639d8852 for the old check.
-        
+
         return IsWine() ? OSPlatform.Linux : OSPlatform.Windows;
     }
     
@@ -570,7 +690,7 @@ public static class Util
                     }
                 }
             }
-        } 
+        }
         finally
         {
             foreach (var enumerator in enumerators)
@@ -611,7 +731,7 @@ public static class Util
     {
         WriteAllTextSafe(path, text, Encoding.UTF8);
     }
-    
+
     /// <summary>
     /// Overwrite text in a file by first writing it to a temporary file, and then
     /// moving that file to the path specified.
@@ -623,7 +743,7 @@ public static class Util
     {
         WriteAllBytesSafe(path, encoding.GetBytes(text));
     }
-    
+
     /// <summary>
     /// Overwrite data in a file by first writing it to a temporary file, and then
     /// moving that file to the path specified.
@@ -633,13 +753,13 @@ public static class Util
     public static unsafe void WriteAllBytesSafe(string path, byte[] bytes)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        
+
         // Open the temp file
         var tempPath = path + ".tmp";
 
         using var tempFile = Windows.Win32.PInvoke.CreateFile(
-            tempPath, 
-            (uint)(FILE_ACCESS_RIGHTS.FILE_GENERIC_READ | FILE_ACCESS_RIGHTS.FILE_GENERIC_WRITE), 
+            tempPath,
+            (uint)(FILE_ACCESS_RIGHTS.FILE_GENERIC_READ | FILE_ACCESS_RIGHTS.FILE_GENERIC_WRITE),
             FILE_SHARE_MODE.FILE_SHARE_NONE,
             null,
             FILE_CREATION_DISPOSITION.CREATE_ALWAYS,
@@ -648,7 +768,7 @@ public static class Util
 
         if (tempFile.IsInvalid)
             throw new Win32Exception();
-        
+
         // Write the data
         uint bytesWritten = 0;
         if (!Windows.Win32.PInvoke.WriteFile(tempFile, new ReadOnlySpan<byte>(bytes), &bytesWritten, null))
@@ -659,11 +779,35 @@ public static class Util
 
         if (!Windows.Win32.PInvoke.FlushFileBuffers(tempFile))
             throw new Win32Exception();
-        
+
         tempFile.Close();
 
         if (!Windows.Win32.PInvoke.MoveFileEx(tempPath, path, MOVE_FILE_FLAGS.MOVEFILE_REPLACE_EXISTING | MOVE_FILE_FLAGS.MOVEFILE_WRITE_THROUGH))
             throw new Win32Exception();
+    }
+
+    /// <summary>Gets a temporary file name, for use as the sourceFileName in
+    /// <see cref="File.Replace(string,string,string?)"/>.</summary>
+    /// <param name="targetFile">The target file.</param>
+    /// <returns>A temporary file name that should be usable with <see cref="File.Replace(string,string,string?)"/>.
+    /// </returns>
+    /// <remarks>No write operation is done on the filesystem.</remarks>
+    public static string GetTempFileNameForFileReplacement(string targetFile)
+    {
+        Span<byte> buf = stackalloc byte[9];
+        Random.Shared.NextBytes(buf);
+        for (var i = 0; ; i++)
+        {
+            var tempName =
+                Path.GetFileName(targetFile) +
+                Convert.ToBase64String(buf)
+                       .TrimEnd('=')
+                       .Replace('+', '-')
+                       .Replace('/', '_');
+            var tempPath = Path.Join(Path.GetDirectoryName(targetFile), tempName);
+            if (i >= 64 || !Path.Exists(tempPath))
+                return tempPath;
+        }
     }
 
     /// <summary>
@@ -683,11 +827,20 @@ public static class Util
     /// Throws a corresponding exception if <see cref="HRESULT.FAILED"/> is true.
     /// </summary>
     /// <param name="hr">The result value.</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static void ThrowOnError(this HRESULT hr)
     {
         if (hr.FAILED)
             Marshal.ThrowExceptionForHR(hr.Value);
     }
+
+    /// <summary>Determines if the specified instance of <see cref="ComPtr{T}"/> points to null.</summary>
+    /// <param name="f">The pointer.</param>
+    /// <typeparam name="T">The COM interface type from TerraFX.</typeparam>
+    /// <returns><c>true</c> if not empty.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static unsafe bool IsEmpty<T>(in this ComPtr<T> f) where T : unmanaged, IUnknown.Interface =>
+        f.Get() is null;
 
     /// <summary>
     /// Calls <see cref="TaskCompletionSource.SetException(System.Exception)"/> if the task is incomplete.
@@ -727,6 +880,40 @@ public static class Util
             // ignore
         }
     }
+    
+    /// <summary>
+    /// Print formatted IGameObject Information to ImGui.
+    /// </summary>
+    /// <param name="actor">IGameObject to Display.</param>
+    /// <param name="tag">Display Tag.</param>
+    /// <param name="resolveGameData">If the IGameObjects data should be resolved.</param>
+    internal static void PrintGameObject(IGameObject actor, string tag, bool resolveGameData)
+    {
+        var actorString =
+            $"{actor.Address.ToInt64():X}:{actor.GameObjectId:X}[{tag}] - {actor.ObjectKind} - {actor.Name} - X{actor.Position.X} Y{actor.Position.Y} Z{actor.Position.Z} D{actor.YalmDistanceX} R{actor.Rotation} - Target: {actor.TargetObjectId:X}\n";
+
+        if (actor is Npc npc)
+            actorString += $"       DataId: {npc.DataId}  NameId:{npc.NameId}\n";
+
+        if (actor is ICharacter chara)
+        {
+            actorString +=
+                $"       Level: {chara.Level} ClassJob: {(resolveGameData ? chara.ClassJob.GameData?.Name : chara.ClassJob.Id.ToString())} CHP: {chara.CurrentHp} MHP: {chara.MaxHp} CMP: {chara.CurrentMp} MMP: {chara.MaxMp}\n       Customize: {BitConverter.ToString(chara.Customize).Replace("-", " ")} StatusFlags: {chara.StatusFlags}\n";
+        }
+
+        if (actor is IPlayerCharacter pc)
+        {
+            actorString +=
+                $"       HomeWorld: {(resolveGameData ? pc.HomeWorld.GameData?.Name : pc.HomeWorld.Id.ToString())} CurrentWorld: {(resolveGameData ? pc.CurrentWorld.GameData?.Name : pc.CurrentWorld.Id.ToString())} FC: {pc.CompanyTag}\n";
+        }
+
+        ImGui.TextUnformatted(actorString);
+        ImGui.SameLine();
+        if (ImGui.Button($"C##{actor.Address.ToInt64()}"))
+        {
+            ImGui.SetClipboardText(actor.Address.ToInt64().ToString("X"));
+        }
+    }
 
     /// <summary>
     /// Print formatted GameObject Information to ImGui.
@@ -737,7 +924,7 @@ public static class Util
     internal static void PrintGameObject(GameObject actor, string tag, bool resolveGameData)
     {
         var actorString =
-            $"{actor.Address.ToInt64():X}:{actor.ObjectId:X}[{tag}] - {actor.ObjectKind} - {actor.Name} - X{actor.Position.X} Y{actor.Position.Y} Z{actor.Position.Z} D{actor.YalmDistanceX} R{actor.Rotation} - Target: {actor.TargetObjectId:X}\n";
+            $"{actor.Address.ToInt64():X}:{actor.GameObjectId:X}[{tag}] - {actor.ObjectKind} - {actor.Name} - X{actor.Position.X} Y{actor.Position.Y} Z{actor.Position.Z} D{actor.YalmDistanceX} R{actor.Rotation} - Target: {actor.TargetObjectId:X}\n";
 
         if (actor is Npc npc)
             actorString += $"       DataId: {npc.DataId}  NameId:{npc.NameId}\n";
@@ -762,6 +949,69 @@ public static class Util
         }
     }
 
+    /// <summary>
+    /// Copy files to the clipboard as if they were copied in Explorer.
+    /// </summary>
+    /// <param name="paths">Full paths to files to be copied.</param>
+    /// <returns>Returns true on success.</returns>
+    internal static unsafe bool CopyFilesToClipboard(IEnumerable<string> paths)
+    {
+        var pathBytes = paths
+                        .Select(Encoding.Unicode.GetBytes)
+                        .ToArray();
+        var pathBytesSize = pathBytes
+                            .Select(bytes => bytes.Length)
+                            .Sum();
+        var sizeWithTerminators = pathBytesSize + (pathBytes.Length * 2);
+
+        var dropFilesSize = sizeof(DROPFILES);
+        var hGlobal = Win32_PInvoke.GlobalAlloc_SafeHandle(
+            GLOBAL_ALLOC_FLAGS.GHND,
+            // struct size + size of encoded strings + null terminator for each
+            // string + two null terminators for end of list
+            (uint)(dropFilesSize + sizeWithTerminators + 4));
+        var dropFiles = (DROPFILES*)Win32_PInvoke.GlobalLock(hGlobal);
+
+        *dropFiles = default;
+        dropFiles->fWide = true;
+        dropFiles->pFiles = (uint)dropFilesSize;
+
+        var pathLoc = (byte*)((nint)dropFiles + dropFilesSize);
+        foreach (var bytes in pathBytes)
+        {
+            // copy the encoded strings
+            for (var i = 0; i < bytes.Length; i++)
+            {
+                pathLoc![i] = bytes[i];
+            }
+
+            // null terminate
+            pathLoc![bytes.Length] = 0;
+            pathLoc[bytes.Length + 1] = 0;
+            pathLoc += bytes.Length + 2;
+        }
+
+        // double null terminator for end of list
+        for (var i = 0; i < 4; i++)
+        {
+            pathLoc![i] = 0;
+        }
+
+        Win32_PInvoke.GlobalUnlock(hGlobal);
+
+        if (Win32_PInvoke.OpenClipboard(default))
+        {
+            Win32_PInvoke.SetClipboardData(
+                (uint)CLIPBOARD_FORMAT.CF_HDROP,
+                hGlobal);
+            Win32_PInvoke.CloseClipboard();
+            return true;
+        }
+
+        hGlobal.Dispose();
+        return false;
+    }
+
     private static void ShowSpanProperty(ulong addr, IList<string> path, PropertyInfo p, object obj)
     {
         var objType = obj.GetType();
@@ -776,7 +1026,7 @@ public static class Util
             "-",
             MethodAttributes.Public | MethodAttributes.Static,
             CallingConventions.Standard,
-            null, 
+            null,
             new[] { typeof(object), typeof(IList<string>), typeof(ulong) },
             obj.GetType(),
             true);
@@ -933,7 +1183,7 @@ public static class Util
             }
         }
     }
-    
+
     /// <summary>
     /// Show a structure in an ImGui context.
     /// </summary>
