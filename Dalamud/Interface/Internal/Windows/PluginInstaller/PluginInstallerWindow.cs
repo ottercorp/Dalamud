@@ -2915,6 +2915,7 @@ internal class PluginInstallerWindow : Window, IDisposable
                     }
 
                     configuration.QueueSave();
+                    _ = pluginManager.ReloadPluginMastersAsync();
                 }
 
                 if (repoManifest?.IsTestingExclusive == true)
@@ -3800,7 +3801,7 @@ internal class PluginInstallerWindow : Window, IDisposable
         this.errorModalMessage = message;
         this.errorModalDrawing = true;
         this.errorModalOnNextFrame = true;
-        this.errorModalTaskCompletionSource = new TaskCompletionSource();
+        this.errorModalTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
         return this.errorModalTaskCompletionSource.Task;
     }
 
@@ -3808,7 +3809,7 @@ internal class PluginInstallerWindow : Window, IDisposable
     {
         this.updateModalOnNextFrame = true;
         this.updateModalPlugin = plugin;
-        this.updateModalTaskCompletionSource = new TaskCompletionSource<bool>();
+        this.updateModalTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
         return this.updateModalTaskCompletionSource.Task;
     }
 
