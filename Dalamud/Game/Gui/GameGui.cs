@@ -12,6 +12,7 @@ using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
 using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Common.Component.BGCollision;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using ImGuiNET;
@@ -330,7 +331,7 @@ internal sealed unsafe class GameGui : IInternalDisposableService, IGameGui
         var index = 0;
         while (true)
         {
-            var agent = agentModule->GetAgentByInternalID((uint)index++);
+            var agent = agentModule->GetAgentByInternalId((AgentId)index++);
             if (agent == uiModule || agent == null)
                 break;
 
@@ -495,6 +496,9 @@ internal sealed unsafe class GameGui : IInternalDisposableService, IGameGui
     private char HandleImmDetour(IntPtr framework, char a2, byte a3)
     {
         var result = this.handleImmHook.Original(framework, a2, a3);
+        if (!ImGuiHelpers.IsImGuiInitialized)
+            return result;
+
         return ImGui.GetIO().WantTextInput
                    ? (char)0
                    : result;
