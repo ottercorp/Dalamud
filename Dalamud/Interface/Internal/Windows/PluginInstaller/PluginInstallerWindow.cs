@@ -306,7 +306,7 @@ internal class PluginInstallerWindow : Window, IDisposable
                     return;
                 
                 var versionInfo = t.Result;
-                if (versionInfo.AssemblyVersion != Util.GetGitHash() &&
+                if (versionInfo.AssemblyVersion != Util.GetScmVersion() &&
                     versionInfo.Track != "release" &&
                     string.Equals(versionInfo.Key, config.DalamudBetaKey, StringComparison.OrdinalIgnoreCase))
                     this.staleDalamudNewVersion = versionInfo.AssemblyVersion;
@@ -1588,7 +1588,7 @@ internal class PluginInstallerWindow : Window, IDisposable
             DrawWarningIcon();
             DrawLinesCentered("A new version of Dalamud is available.\n" +
                               "Please restart the game to ensure compatibility with updated plugins.\n" +
-                              $"old: {Util.GetGitHash()} new: {this.staleDalamudNewVersion}");
+                              $"old: {Util.GetScmVersion()} new: {this.staleDalamudNewVersion}");
 
             ImGuiHelpers.ScaledDummy(10);
         }
@@ -3968,7 +3968,7 @@ internal class PluginInstallerWindow : Window, IDisposable
         
         public static string TabBody_NoPluginsUpdateable => Loc.Localize("InstallerNoPluginsUpdate", "No plugins have updates available at the moment.");
         
-        public static string TabBody_NoPluginsDev => Loc.Localize("InstallerNoPluginsDev", "You don't have any dev plugins. Add them some the settings.");
+        public static string TabBody_NoPluginsDev => Loc.Localize("InstallerNoPluginsDev", "You don't have any dev plugins. Add them from the settings.");
         
         #endregion
 

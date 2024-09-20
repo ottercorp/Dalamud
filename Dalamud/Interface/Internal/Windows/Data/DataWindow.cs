@@ -50,12 +50,14 @@ internal class DataWindow : Window, IDisposable
         new PluginIpcWidget(),
         new SeFontTestWidget(),
         new ServicesWidget(),
+        new SeStringRendererTestWidget(),
         new StartInfoWidget(),
         new TargetWidget(),
         new TaskSchedulerWidget(),
         new TexWidget(),
         new ToastWidget(),
-        new UIColorWidget(),
+        new UiColorWidget(),
+        new UldWidget(),
     };
 
     private readonly IOrderedEnumerable<IDataWindowWidget> orderedModules;
