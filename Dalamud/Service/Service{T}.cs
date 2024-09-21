@@ -82,7 +82,7 @@ internal static class Service<T> where T : IServiceType
         ServiceManager.Log.Debug("Service<{0}>: Provided", typeof(T).Name);
         if (obj is IPublicDisposableService pds)
             pds.MarkDisposeOnlyFromService();
-        instanceTcs.SetResult(obj);
+        instanceTcs.TrySetResult(obj);
     }
 
     /// <summary>
