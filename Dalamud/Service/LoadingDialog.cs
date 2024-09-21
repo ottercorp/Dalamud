@@ -1,34 +1,45 @@
-﻿using System.Drawing;
+﻿using System.Collections.Concurrent;
+using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Forms;
+
+using CheapLoc;
 
 using Dalamud.Plugin.Internal;
 using Dalamud.Utility;
-using Windows.Win32.Foundation;
-using Windows.Win32.UI.WindowsAndMessaging;
+
+using Serilog;
+using Serilog.Events;
+
+using TerraFX.Interop.Windows;
+
+using static TerraFX.Interop.Windows.TASKDIALOG_FLAGS;
+using static TerraFX.Interop.Windows.Windows;
 
 namespace Dalamud;
 
 /// <summary>
 /// Class providing an early-loading dialog.
 /// </summary>
-internal class LoadingDialog
+[SuppressMessage(
+    "StyleCop.CSharp.LayoutRules",
+    "SA1519:Braces should not be omitted from multi-line child statement",
+    Justification = "Multiple fixed blocks")]
+internal sealed class LoadingDialog
 {
-    // TODO: We can't localize any of what's in here at the moment, because Localization is an EarlyLoadedService.
-    
-    private static int wasGloballyHidden = 0;
-    
+    private readonly RollingList<string> logs = new(20);
+    private readonly TaskCompletionSource<HWND> hwndTaskDialog = new();
+
     private Thread? thread;
-    private TaskDialogButton? inProgressHideButton;
-    private TaskDialogPage? page;
-    private bool canHide;
-    private State currentState = State.LoadingDalamud;
     private DateTime firstShowTime;
-    
+
     /// <summary>
     /// Enum representing the state of the dialog.
     /// </summary>
@@ -38,215 +49,340 @@ internal class LoadingDialog
         /// Show a message stating that Dalamud is currently loading.
         /// </summary>
         LoadingDalamud,
-        
+
         /// <summary>
         /// Show a message stating that Dalamud is currently loading plugins.
         /// </summary>
         LoadingPlugins,
-        
+
         /// <summary>
         /// Show a message stating that Dalamud is currently updating plugins.
         /// </summary>
         AutoUpdatePlugins,
     }
-    
+
+    /// <summary>Gets the queue where log entries that are not processed yet are stored.</summary>
+    public static ConcurrentQueue<(string Line, LogEvent LogEvent)> NewLogEntries { get; } = new();
+
+    /// <summary>Gets a value indicating whether the initial Dalamud loading dialog will not show again until next
+    /// game restart.</summary>
+    public static bool IsGloballyHidden { get; private set; }
+
     /// <summary>
     /// Gets or sets the current state of the dialog.
     /// </summary>
-    public State CurrentState
-    {
-        get => this.currentState;
-        set
-        {
-            this.currentState = value;
-            this.UpdatePage();
-        }
-    }
-    
+    public State CurrentState { get; set; } = State.LoadingDalamud;
+
     /// <summary>
-    /// Gets or sets a value indicating whether or not the dialog can be hidden by the user.
+    /// Gets or sets a value indicating whether the dialog can be hidden by the user.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown if called before the dialog has been created.</exception>
-    public bool CanHide
-    {
-        get => this.canHide;
-        set
-        {
-            this.canHide = value;
-            this.UpdatePage();
-        }
-    }
+    public bool CanHide { get; set; }
 
     /// <summary>
     /// Show the dialog.
     /// </summary>
     public void Show()
     {
-        if (Volatile.Read(ref wasGloballyHidden) == 1)
+        if (IsGloballyHidden)
             return;
-        
-        if (this.thread?.IsAlive == true)
+
+        if (this.thread is not null)
             return;
-        
+
         this.thread = new Thread(this.ThreadStart)
         {
             Name = "Dalamud Loading Dialog",
         };
         this.thread.SetApartmentState(ApartmentState.STA);
         this.thread.Start();
-        
+
         this.firstShowTime = DateTime.Now;
     }
 
     /// <summary>
     /// Hide the dialog.
     /// </summary>
-    public void HideAndJoin()
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    public async Task HideAndJoin()
     {
-        if (this.thread == null || !this.thread.IsAlive)
+        IsGloballyHidden = true;
+        if (this.hwndTaskDialog.TrySetCanceled() || this.hwndTaskDialog.Task.IsCanceled)
             return;
-        
-        this.inProgressHideButton?.PerformClick();
-        this.thread!.Join();
+
+        try
+        {
+            SendMessageW(await this.hwndTaskDialog.Task, WM.WM_CLOSE, default, default);
+        }
+        catch (OperationCanceledException)
+        {
+            // ignore
+        }
+
+        this.thread?.Join();
     }
 
-    private void UpdatePage()
+    private unsafe void UpdateMainInstructionText(HWND hwnd)
     {
-        if (this.page == null)
-            return;
-
-        this.page.Heading = this.currentState switch
+        fixed (void* pszText = this.CurrentState switch
+               {
+                   State.LoadingDalamud => Loc.Localize(
+                       "LoadingDialogMainInstructionLoadingDalamud",
+                       "Dalamud is loading..."),
+                   State.LoadingPlugins => Loc.Localize(
+                       "LoadingDialogMainInstructionLoadingPlugins",
+                       "Waiting for plugins to load..."),
+                   State.AutoUpdatePlugins => Loc.Localize(
+                       "LoadingDialogMainInstructionAutoUpdatePlugins",
+                       "Updating plugins..."),
+                   _ => string.Empty, // should not happen
+               })
         {
-            State.LoadingDalamud => "Dalamud is loading...",
-            State.LoadingPlugins => "Waiting for plugins to load...",
-            State.AutoUpdatePlugins => "Updating plugins...",
-            _ => throw new ArgumentOutOfRangeException(),
-        };
+            SendMessageW(
+                hwnd,
+                (uint)TASKDIALOG_MESSAGES.TDM_SET_ELEMENT_TEXT,
+                (WPARAM)(int)TASKDIALOG_ELEMENTS.TDE_MAIN_INSTRUCTION,
+                (LPARAM)pszText);
+        }
+    }
 
-        var context = string.Empty;
-        if (this.currentState == State.LoadingPlugins)
+    private unsafe void UpdateContentText(HWND hwnd)
+    {
+        var contentBuilder = new StringBuilder(
+            Loc.Localize(
+                "LoadingDialogContentInfo",
+                "Some of the plugins you have installed through Dalamud are taking a long time to load.\n" +
+                "This is likely normal, please wait a little while longer."));
+
+        if (this.CurrentState == State.LoadingPlugins)
         {
-            context = "\nPreparing...";
-            
             var tracker = Service<PluginManager>.GetNullable()?.StartupLoadTracking;
             if (tracker != null)
             {
-                var nameString = tracker.GetPendingInternalNames()
-                                        .Select(x => tracker.GetPublicName(x))
-                                        .Where(x => x != null)
-                                        .Aggregate(string.Empty, (acc, x) => acc + x + ", ");
-                
+                var nameString = string.Join(
+                    ", ",
+                    tracker.GetPendingInternalNames()
+                           .Select(x => tracker.GetPublicName(x))
+                           .Where(x => x != null));
+
                 if (!nameString.IsNullOrEmpty())
-                    context = $"\nWaiting for: {nameString[..^2]}";
+                {
+                    contentBuilder
+                        .AppendLine()
+                        .AppendLine()
+                        .Append(
+                            string.Format(
+                                Loc.Localize("LoadingDialogContentCurrentPlugin", "Waiting for: {0}"),
+                                nameString));
+                }
             }
         }
-        
+
         // Add some text if loading takes more than a few minutes
         if (DateTime.Now - this.firstShowTime > TimeSpan.FromMinutes(3))
-            context += "\nIt's been a while now. Please report this issue on our Discord server.";
-
-        this.page.Text = this.currentState switch
         {
-            State.LoadingDalamud => "Please wait while Dalamud loads...",
-            State.LoadingPlugins => "Please wait while Dalamud loads plugins...",
-            State.AutoUpdatePlugins => "Please wait while Dalamud updates your plugins...",
-            _ => throw new ArgumentOutOfRangeException(),
-#pragma warning disable SA1513
-        } + context;
-#pragma warning restore SA1513
+            contentBuilder
+                .AppendLine()
+                .AppendLine()
+                .Append(
+                    Loc.Localize(
+                        "LoadingDialogContentTakingTooLong",
+                        "It's been a while now. Please report this issue on our Discord server."));
+        }
 
-        this.inProgressHideButton!.Enabled = this.canHide;
-    }
-    
-    private async Task DialogStatePeriodicUpdate(CancellationToken token)
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(50));
-        while (!token.IsCancellationRequested)
+        fixed (void* pszText = contentBuilder.ToString())
         {
-            await timer.WaitForNextTickAsync(token);
-            this.UpdatePage();
+            SendMessageW(
+                hwnd,
+                (uint)TASKDIALOG_MESSAGES.TDM_SET_ELEMENT_TEXT,
+                (WPARAM)(int)TASKDIALOG_ELEMENTS.TDE_CONTENT,
+                (LPARAM)pszText);
         }
     }
 
-    private void ThreadStart()
+    private unsafe void UpdateExpandedInformation(HWND hwnd)
     {
-        Application.EnableVisualStyles();
+        const int maxCharactersPerLine = 80;
 
-        this.inProgressHideButton = new TaskDialogButton("Hide", this.canHide);
-
-        // We don't have access to the asset service here.
-        var workingDirectory = Service<Dalamud>.Get().StartInfo.WorkingDirectory;
-        TaskDialogIcon? dialogIcon = null;
-        if (!workingDirectory.IsNullOrEmpty())
+        if (NewLogEntries.IsEmpty)
+            return;
+        
+        var sb = new StringBuilder();
+        while (NewLogEntries.TryDequeue(out var e))
         {
-            var extractedIcon = Icon.ExtractAssociatedIcon(Path.Combine(workingDirectory, "Dalamud.Injector.exe"));
-            if (extractedIcon != null)
+            var t = e.Line.AsSpan();
+            var first = true;
+            while (!t.IsEmpty)
             {
-                dialogIcon = new TaskDialogIcon(extractedIcon);
+                var i = t.IndexOfAny('\r', '\n');
+                var line = i == -1 ? t : t[..i];
+                t = i == -1 ? ReadOnlySpan<char>.Empty : t[(i + 1)..];
+                if (line.IsEmpty)
+                    continue;
+                
+                sb.Clear();
+                if (first)
+                    sb.Append($"{e.LogEvent.Timestamp:HH:mm:ss} | ");
+                else
+                    sb.Append("         | ");
+                first = false;
+                if (line.Length < maxCharactersPerLine)
+                    sb.Append(line);
+                else
+                    sb.Append($"{line[..(maxCharactersPerLine - 3)]}...");
+                this.logs.Add(sb.ToString());
             }
         }
 
-        dialogIcon ??= TaskDialogIcon.Information;
-        this.page = new TaskDialogPage
+        sb.Clear();
+        foreach (var l in this.logs)
+            sb.AppendLine(l);
+
+        fixed (void* pszText = sb.ToString())
         {
-            ProgressBar = new TaskDialogProgressBar(TaskDialogProgressBarState.Marquee),
-            Caption = "Dalamud",
-            Icon = dialogIcon,
-            Buttons = { this.inProgressHideButton },
-            AllowMinimize = false,
-            AllowCancel = false,
-            Expander = new TaskDialogExpander
+            SendMessageW(
+                hwnd,
+                (uint)TASKDIALOG_MESSAGES.TDM_SET_ELEMENT_TEXT,
+                (WPARAM)(int)TASKDIALOG_ELEMENTS.TDE_EXPANDED_INFORMATION,
+                (LPARAM)pszText);
+        }
+    }
+
+    private void UpdateButtonEnabled(HWND hwnd) =>
+        SendMessageW(hwnd, (uint)TASKDIALOG_MESSAGES.TDM_ENABLE_BUTTON, IDOK, this.CanHide ? 1 : 0);
+
+    private HRESULT TaskDialogCallback(HWND hwnd, uint msg, WPARAM wParam, LPARAM lParam)
+    {
+        switch ((TASKDIALOG_NOTIFICATIONS)msg)
+        {
+            case TASKDIALOG_NOTIFICATIONS.TDN_CREATED:
+                if (!this.hwndTaskDialog.TrySetResult(hwnd))
+                    return E.E_FAIL;
+
+                this.UpdateMainInstructionText(hwnd);
+                this.UpdateContentText(hwnd);
+                this.UpdateExpandedInformation(hwnd);
+                this.UpdateButtonEnabled(hwnd);
+                SendMessageW(hwnd, (int)TASKDIALOG_MESSAGES.TDM_SET_PROGRESS_BAR_MARQUEE, 1, 0);
+
+                // Bring to front
+                ShowWindow(hwnd, SW.SW_SHOW);
+                SetWindowPos(hwnd, HWND.HWND_TOPMOST, 0, 0, 0, 0, SWP.SWP_NOSIZE | SWP.SWP_NOMOVE);
+                SetWindowPos(hwnd, HWND.HWND_NOTOPMOST, 0, 0, 0, 0, SWP.SWP_NOSIZE | SWP.SWP_NOMOVE);
+                SetForegroundWindow(hwnd);
+                SetFocus(hwnd);
+                SetActiveWindow(hwnd);
+                return S.S_OK;
+
+            case TASKDIALOG_NOTIFICATIONS.TDN_TIMER:
+                this.UpdateMainInstructionText(hwnd);
+                this.UpdateContentText(hwnd);
+                this.UpdateExpandedInformation(hwnd);
+                this.UpdateButtonEnabled(hwnd);
+                return S.S_OK;
+        }
+
+        return S.S_OK;
+    }
+
+    private unsafe void ThreadStart()
+    {
+        // We don't have access to the asset service here.
+        var workingDirectory = Service<Dalamud>.Get().StartInfo.WorkingDirectory;
+        using var extractedIcon =
+            string.IsNullOrEmpty(workingDirectory)
+                ? null
+                : Icon.ExtractAssociatedIcon(Path.Combine(workingDirectory, "Dalamud.Injector.exe"));
+
+        fixed (void* pszEmpty = "-")
+        fixed (void* pszWindowTitle = "Dalamud")
+        fixed (void* pszDalamudBoot = "Dalamud.Boot.dll")
+        fixed (void* pszThemesManifestResourceName = "RT_MANIFEST_THEMES")
+        fixed (void* pszHide = Loc.Localize("LoadingDialogHide", "Hide"))
+        fixed (void* pszShowLatestLogs = Loc.Localize("LoadingDialogShowLatestLogs", "Show Latest Logs"))
+        fixed (void* pszHideLatestLogs = Loc.Localize("LoadingDialogHideLatestLogs", "Hide Latest Logs"))
+        {
+            var taskDialogButton = new TASKDIALOG_BUTTON
             {
-                CollapsedButtonText = "What does this mean?",
-                ExpandedButtonText = "What does this mean?",
-                Text = "Some of the plugins you have installed through Dalamud are taking a long time to load.\n" +
-                       "This is likely normal, please wait a little while longer.",
-            },
-            SizeToContent = true,
-        };
-        
-        this.UpdatePage();
+                nButtonID = IDOK,
+                pszButtonText = (ushort*)pszHide,
+            };
+            var taskDialogConfig = new TASKDIALOGCONFIG
+            {
+                cbSize = (uint)sizeof(TASKDIALOGCONFIG),
+                hwndParent = default,
+                hInstance = (HINSTANCE)Marshal.GetHINSTANCE(Assembly.GetExecutingAssembly().ManifestModule),
+                dwFlags = (int)TDF_CAN_BE_MINIMIZED |
+                          (int)TDF_SHOW_MARQUEE_PROGRESS_BAR |
+                          (int)TDF_EXPAND_FOOTER_AREA |
+                          (int)TDF_CALLBACK_TIMER |
+                          (extractedIcon is null ? 0 : (int)TDF_USE_HICON_MAIN),
+                dwCommonButtons = 0,
+                pszWindowTitle = (ushort*)pszWindowTitle,
+                pszMainIcon = extractedIcon is null ? TD.TD_INFORMATION_ICON : (ushort*)extractedIcon.Handle,
+                pszMainInstruction = null,
+                pszContent = null,
+                cButtons = 1,
+                pButtons = &taskDialogButton,
+                nDefaultButton = IDOK,
+                cRadioButtons = 0,
+                pRadioButtons = null,
+                nDefaultRadioButton = 0,
+                pszVerificationText = null,
+                pszExpandedInformation = (ushort*)pszEmpty,
+                pszExpandedControlText = (ushort*)pszShowLatestLogs,
+                pszCollapsedControlText = (ushort*)pszHideLatestLogs,
+                pszFooterIcon = null,
+                pszFooter = null,
+                pfCallback = &HResultFuncBinder,
+                lpCallbackData = 0,
+                cxWidth = 360,
+            };
 
-        // Call private TaskDialog ctor
-        var ctor = typeof(TaskDialog).GetConstructor(
-            BindingFlags.Instance | BindingFlags.NonPublic,
-            null,
-            Array.Empty<Type>(),
-            null);
+            HANDLE hActCtx = default;
+            GCHandle gch = default;
+            nuint cookie = 0;
+            try
+            {
+                var actctx = new ACTCTXW
+                {
+                    cbSize = (uint)sizeof(ACTCTXW),
+                    dwFlags = ACTCTX_FLAG_HMODULE_VALID | ACTCTX_FLAG_RESOURCE_NAME_VALID,
+                    lpResourceName = (ushort*)pszThemesManifestResourceName,
+                    hModule = GetModuleHandleW((ushort*)pszDalamudBoot),
+                };
+                hActCtx = CreateActCtxW(&actctx);
+                if (hActCtx == default)
+                    throw new Win32Exception("CreateActCtxW failure.");
 
-        var taskDialog = (TaskDialog)ctor!.Invoke(Array.Empty<object>())!;
+                if (!ActivateActCtx(hActCtx, &cookie))
+                    throw new Win32Exception("ActivateActCtx failure.");
 
-        this.page.Created += (_, _) =>
-        {
-            var hwnd = new HWND(taskDialog.Handle);
+                gch = GCHandle.Alloc((Func<HWND, uint, WPARAM, LPARAM, HRESULT>)this.TaskDialogCallback);
+                taskDialogConfig.lpCallbackData = GCHandle.ToIntPtr(gch);
+                TaskDialogIndirect(&taskDialogConfig, null, null, null);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "TaskDialogIndirect failure.");
+            }
+            finally
+            {
+                if (gch.IsAllocated)
+                    gch.Free();
+                if (cookie != 0)
+                    DeactivateActCtx(0, cookie);
+                ReleaseActCtx(hActCtx);
+            }
+        }
 
-            // Bring to front
-            Windows.Win32.PInvoke.SetWindowPos(hwnd, HWND.HWND_TOPMOST, 0, 0, 0, 0, 
-                                               SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOMOVE);
-            Windows.Win32.PInvoke.SetWindowPos(hwnd, HWND.HWND_NOTOPMOST, 0, 0, 0, 0, 
-                                               SET_WINDOW_POS_FLAGS.SWP_SHOWWINDOW | SET_WINDOW_POS_FLAGS.SWP_NOSIZE |
-                                               SET_WINDOW_POS_FLAGS.SWP_NOMOVE);
-            Windows.Win32.PInvoke.SetForegroundWindow(hwnd);
-            Windows.Win32.PInvoke.SetFocus(hwnd);
-            Windows.Win32.PInvoke.SetActiveWindow(hwnd);
-        };
+        IsGloballyHidden = true;
 
-        // Call private "ShowDialogInternal"
-        var showDialogInternal = typeof(TaskDialog).GetMethod(
-            "ShowDialogInternal",
-            BindingFlags.Instance | BindingFlags.NonPublic,
-            null,
-            [typeof(IntPtr), typeof(TaskDialogPage), typeof(TaskDialogStartupLocation)],
-            null);
+        return;
 
-        var cts = new CancellationTokenSource();
-        _ = this.DialogStatePeriodicUpdate(cts.Token);
-
-        showDialogInternal!.Invoke(
-            taskDialog,
-            [IntPtr.Zero, this.page, TaskDialogStartupLocation.CenterScreen]);
-        
-        Interlocked.Exchange(ref wasGloballyHidden, 1);
-        cts.Cancel();
+        [UnmanagedCallersOnly]
+        static HRESULT HResultFuncBinder(HWND hwnd, uint msg, WPARAM wParam, LPARAM lParam, nint user) =>
+            ((Func<HWND, uint, WPARAM, LPARAM, HRESULT>)GCHandle.FromIntPtr(user).Target!)
+            .Invoke(hwnd, msg, wParam, lParam);
     }
 }

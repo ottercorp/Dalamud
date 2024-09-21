@@ -99,7 +99,6 @@ namespace Dalamud.Injector
                 args.Remove("--no-plugin");
                 args.Remove("--no-3rd-plugin");
                 args.Remove("--crash-handler-console");
-                args.Remove("--no-exception-handlers");
 
                 var mainCommand = args[1].ToLowerInvariant();
                 if (mainCommand.Length > 0 && mainCommand.Length <= 6 && "inject"[..mainCommand.Length] == mainCommand)
@@ -199,9 +198,10 @@ namespace Dalamud.Injector
 
             CullLogFile(logPath, 1 * 1024 * 1024);
 
+            const long maxLogSize = 100 * 1024 * 1024; // 100MB
             Log.Logger = new LoggerConfiguration()
                          .WriteTo.Console(standardErrorFromLevel: LogEventLevel.Debug)
-                         .WriteTo.File(logPath, fileSizeLimitBytes: null)
+                         .WriteTo.File(logPath, fileSizeLimitBytes: maxLogSize)
                          .MinimumLevel.ControlledBy(levelSwitch)
                          .CreateLogger();
 
@@ -277,6 +277,7 @@ namespace Dalamud.Injector
             var logName = startInfo.LogName;
             var logPath = startInfo.LogPath;
             var languageStr = startInfo.Language.ToString().ToLowerInvariant();
+            var unhandledExceptionStr = startInfo.UnhandledException.ToString().ToLowerInvariant();
             var troubleshootingData = "{\"empty\": true, \"description\": \"No troubleshooting data supplied.\"}";
 
             for (var i = 2; i < args.Count; i++)
@@ -316,6 +317,10 @@ namespace Dalamud.Injector
                 else if (args[i].StartsWith(key = "--logpath="))
                 {
                     logPath = args[i][key.Length..];
+                }
+                else if (args[i].StartsWith(key = "--unhandled-exception="))
+                {
+                    unhandledExceptionStr = args[i][key.Length..];
                 }
                 else
                 {
@@ -428,7 +433,14 @@ namespace Dalamud.Injector
             startInfo.NoLoadThirdPartyPlugins = args.Contains("--no-3rd-plugin");
             // startInfo.BootUnhookDlls = new List<string>() { "kernel32.dll", "ntdll.dll", "user32.dll" };
             startInfo.CrashHandlerShow = args.Contains("--crash-handler-console");
-            startInfo.NoExceptionHandlers = args.Contains("--no-exception-handlers");
+            startInfo.UnhandledException =
+                Enum.TryParse<UnhandledExceptionHandlingMode>(
+                    unhandledExceptionStr,
+                    true,
+                    out var parsedUnhandledException)
+                    ? parsedUnhandledException
+                    : throw new CommandLineException(
+                          $"\"{unhandledExceptionStr}\" is not a valid unhandled exception handling mode.");
 
             return startInfo;
         }
@@ -470,7 +482,7 @@ namespace Dalamud.Injector
             Console.WriteLine("Verbose logging:\t[-v]");
             Console.WriteLine("Show Console:\t[--console] [--crash-handler-console]");
             Console.WriteLine("Enable ETW:\t[--etw]");
-            Console.WriteLine("Enable VEH:\t[--veh], [--veh-full], [--no-exception-handlers]");
+            Console.WriteLine("Enable VEH:\t[--veh], [--veh-full], [--unhandled-exception=default|stalldebug|none]");
             Console.WriteLine("Show messagebox:\t[--msgbox1], [--msgbox2], [--msgbox3]");
             Console.WriteLine("No plugins:\t[--no-plugin] [--no-3rd-plugin]");
             Console.WriteLine("Logging:\t[--logname=<logfile suffix>] [--logpath=<log base directory>]");

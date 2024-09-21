@@ -1,3 +1,5 @@
+using Dalamud.Game;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 
 namespace Dalamud.Plugin.Services;
@@ -8,9 +10,33 @@ namespace Dalamud.Plugin.Services;
 public interface IClientState
 {
     /// <summary>
+    /// A delegate type used for the <see cref="ClassJobChanged"/> event.
+    /// </summary>
+    /// <param name="classJobId">The new ClassJob id.</param>
+    public delegate void ClassJobChangeDelegate(uint classJobId);
+
+    /// <summary>
+    /// A delegate type used for the <see cref="LevelChanged"/> event.
+    /// </summary>
+    /// <param name="classJobId">The ClassJob id.</param>
+    /// <param name="level">The level of the corresponding ClassJob.</param>
+    public delegate void LevelChangeDelegate(uint classJobId, uint level);
+
+    /// <summary>
     /// Event that gets fired when the current Territory changes.
     /// </summary>
     public event Action<ushort> TerritoryChanged;
+
+    /// <summary>
+    /// Event that fires when a characters ClassJob changed.
+    /// </summary>
+    public event ClassJobChangeDelegate? ClassJobChanged;
+
+    /// <summary>
+    /// Event that fires when <em>any</em> character level changes, including levels
+    /// for a not-currently-active ClassJob (e.g. PvP matches, DoH/DoL).
+    /// </summary>
+    public event LevelChangeDelegate? LevelChanged;
 
     /// <summary>
     /// Event that fires when a character is logging in, and the local character object is available.
@@ -55,7 +81,7 @@ public interface IClientState
     /// <summary>
     /// Gets the local player character, if one is present.
     /// </summary>
-    public PlayerCharacter? LocalPlayer { get; }
+    public IPlayerCharacter? LocalPlayer { get; }
 
     /// <summary>
     /// Gets the content ID of the local character.
@@ -81,4 +107,19 @@ public interface IClientState
     /// Gets a value indicating whether the client is currently in Group Pose (GPose) mode. 
     /// </summary>
     public bool IsGPosing { get; }
+
+    /// <summary>
+    /// Check whether the client is currently "idle". This means a player is not logged in, or is notctively in combat
+    /// or doing anything that we may not want to disrupt.
+    /// </summary>
+    /// <param name="blockingFlag">An outvar containing the first observed condition blocking the "idle" state. 0 if idle.</param>
+    /// <returns>Returns true if the client is idle, false otherwise.</returns>
+    public bool IsClientIdle(out ConditionFlag blockingFlag);
+
+    /// <summary>
+    /// Check whether the client is currently "idle". This means a player is not logged in, or is notctively in combat
+    /// or doing anything that we may not want to disrupt.
+    /// </summary>
+    /// <returns>Returns true if the client is idle, false otherwise.</returns>
+    public bool IsClientIdle() => this.IsClientIdle(out _);
 }

@@ -134,7 +134,9 @@ internal class DalamudInterface : IInternalDisposableService
         this.changelogWindow = new ChangelogWindow(
             this.titleScreenMenuWindow,
             fontAtlasFactory,
-            dalamudAssetManager) { IsOpen = false };
+            dalamudAssetManager,
+            gameGui,
+            framework) { IsOpen = false };
         this.profilerWindow = new ProfilerWindow() { IsOpen = false };
         this.branchSwitcherWindow = new BranchSwitcherWindow() { IsOpen = false };
         this.hitchSettingsWindow = new HitchSettingsWindow() { IsOpen = false };
@@ -191,6 +193,29 @@ internal class DalamudInterface : IInternalDisposableService
 
         this.creditsDarkeningAnimation.Point1 = Vector2.Zero;
         this.creditsDarkeningAnimation.Point2 = new Vector2(CreditsDarkeningMaxAlpha);
+        
+        // This is temporary, until we know the repercussions of vtable hooking mode
+        consoleManager.AddCommand(
+            "dalamud.interface.swapchain_mode",
+            "Set swapchain hooking mode",
+            (string mode) =>
+            {
+                switch (mode)
+                {
+                    case "vtable":
+                        this.configuration.SwapChainHookMode = SwapChainHelper.HookMode.VTable;
+                        break;
+                    case "bytecode":
+                        this.configuration.SwapChainHookMode = SwapChainHelper.HookMode.ByteCode;
+                        break;
+                    default:
+                        Log.Error("Unknown swapchain mode: {Mode}", mode);
+                        return false;
+                }
+                
+                this.configuration.QueueSave();
+                return true;
+            });
     }
     
     private delegate nint CrashDebugDelegate(nint self);
@@ -212,6 +237,15 @@ internal class DalamudInterface : IInternalDisposableService
     {
         get => this.isImGuiDrawDevMenu;
         set => this.isImGuiDrawDevMenu = value;
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the plugin installer is open.
+    /// </summary>
+    public bool IsPluginInstallerOpen
+    {
+        get => this.pluginWindow.IsOpen;
+        set => this.pluginWindow.IsOpen = value;
     }
 
     /// <inheritdoc/>
@@ -563,7 +597,7 @@ internal class DalamudInterface : IInternalDisposableService
         using var style2 = ImRaii.PushStyle(ImGuiStyleVar.WindowBorderSize, 0f);
         using var color = ImRaii.PushColor(ImGuiCol.WindowBg, new Vector4(0, 0, 0, 0));
 
-        ImGui.SetNextWindowPos(new Vector2(0, 0));
+        ImGui.SetNextWindowPos(ImGuiHelpers.MainViewport.Pos);
         ImGui.SetNextWindowSize(ImGuiHelpers.MainViewport.Size);
         ImGuiHelpers.ForceNextWindowMainViewport();
 
@@ -796,7 +830,7 @@ internal class DalamudInterface : IInternalDisposableService
                             unsafe
                             {
                                 var hook = Hook<CrashDebugDelegate>.FromAddress(
-                                    (nint)UIModule.StaticVTable.GetUIInputData,
+                                    (nint)UIModule.StaticVirtualTablePointer->GetUIInputData,
                                     self =>
                                     {
                                         _ = *(byte*)0;
@@ -821,10 +855,9 @@ internal class DalamudInterface : IInternalDisposableService
                     {
                         this.OpenBranchSwitcher();
                     }
-
-                    ImGui.MenuItem(Util.AssemblyVersion, false);
+                    
                     ImGui.MenuItem(this.dalamud.StartInfo.GameVersion?.ToString() ?? "Unknown version", false);
-                    ImGui.MenuItem($"D: {Util.GetGitHash()}[{Util.GetGitCommitCount()}] CS: {Util.GetGitHashClientStructs()}[{FFXIVClientStructs.Interop.Resolver.Version}]", false);
+                    ImGui.MenuItem($"D: {Util.GetScmVersion()} CS: {Util.GetGitHashClientStructs()}[{FFXIVClientStructs.ThisAssembly.Git.Commits}]", false);
                     ImGui.MenuItem($"CLR: {Environment.Version}", false);
 
                     ImGui.EndMenu();
@@ -897,6 +930,14 @@ internal class DalamudInterface : IInternalDisposableService
                     if (ImGui.MenuItem("Show dev bar info", null, this.configuration.ShowDevBarInfo))
                     {
                         this.configuration.ShowDevBarInfo = !this.configuration.ShowDevBarInfo;
+                    }
+                    
+                    ImGui.Separator();
+
+                    if (ImGui.MenuItem("Show loading window"))
+                    {
+                        var dialog = new LoadingDialog();
+                        dialog.Show();
                     }
 
                     ImGui.EndMenu();
@@ -1015,7 +1056,7 @@ internal class DalamudInterface : IInternalDisposableService
                 {
                     ImGui.PushFont(InterfaceManager.MonoFont);
 
-                    ImGui.BeginMenu($"{Util.GetGitHash()}({Util.GetGitCommitCount()})", false);
+                    ImGui.BeginMenu(Util.GetScmVersion(), false);
                     ImGui.BeginMenu(this.FrameCount.ToString("000000"), false);
                     ImGui.BeginMenu(ImGui.GetIO().Framerate.ToString("000"), false);
                     ImGui.BeginMenu($"W:{Util.FormatBytes(GC.GetTotalMemory(false))}", false);

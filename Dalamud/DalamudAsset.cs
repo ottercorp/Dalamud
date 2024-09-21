@@ -1,5 +1,7 @@
 using Dalamud.Storage.Assets;
 
+using TerraFX.Interop.DirectX;
+
 namespace Dalamud;
 
 /// <summary>
@@ -7,20 +9,28 @@ namespace Dalamud;
 /// <strong>Any asset can cease to exist at any point, even if the enum value exists.</strong><br />
 /// Either ship your own assets, or be prepared for errors.
 /// </summary>
+// Implementation notes: avoid specifying numbers too high here. Lookup table is currently implemented as an array.
 public enum DalamudAsset
 {
     /// <summary>
     /// Nothing.
     /// </summary>
-    [DalamudAsset(DalamudAssetPurpose.Empty, data: new byte[0])]
+    [DalamudAsset(DalamudAssetPurpose.Empty, data: [])]
     Unspecified = 0,
 
     /// <summary>
-    /// <see cref="DalamudAssetPurpose.TextureFromRaw"/>: The fallback empty texture.
+    /// <see cref="DalamudAssetPurpose.TextureFromRaw"/>: A texture that is completely transparent.
     /// </summary>
-    [DalamudAsset(DalamudAssetPurpose.TextureFromRaw, data: new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 })]
-    [DalamudAssetRawTexture(4, 8, 4, SharpDX.DXGI.Format.BC1_UNorm)]
+    [DalamudAsset(DalamudAssetPurpose.TextureFromRaw, data: [0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF])]
+    [DalamudAssetRawTexture(4, 4, DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM, 8)]
     Empty4X4 = 1000,
+
+    /// <summary>
+    /// <see cref="DalamudAssetPurpose.TextureFromRaw"/>: A texture that is completely white.
+    /// </summary>
+    [DalamudAsset(DalamudAssetPurpose.TextureFromRaw, data: [0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0])]
+    [DalamudAssetRawTexture(4, 4, DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM, 8)]
+    White4X4 = 1014,
 
     /// <summary>
     /// <see cref="DalamudAssetPurpose.TextureFromPng"/>: The Dalamud logo.

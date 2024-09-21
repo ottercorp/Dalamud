@@ -1,7 +1,9 @@
 using System.IO;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 
+using Dalamud.Game;
 using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Plugin.Services;
@@ -21,7 +23,6 @@ namespace Dalamud.Data;
 /// This class provides data for Dalamud-internal features, but can also be used by plugins if needed.
 /// </summary>
 [PluginInterface]
-[InterfaceVersion("1.0")]
 [ServiceManager.EarlyLoadedService]
 #pragma warning disable SA1015
 [ResolveVia<IDataManager>]
@@ -242,6 +243,16 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
             return default;
         return this.GameData.Repositories.TryGetValue(filePath.Repository, out var repository) ? repository.GetFile<T>(filePath.Category, filePath) : default;
     }
+
+    /// <inheritdoc/>
+    public Task<T> GetFileAsync<T>(string path, CancellationToken cancellationToken) where T : FileResource =>
+        GameData.ParseFilePath(path) is { } filePath &&
+        this.GameData.Repositories.TryGetValue(filePath.Repository, out var repository)
+            ? Task.Run(
+                () => repository.GetFile<T>(filePath.Category, filePath) ?? throw new FileNotFoundException(
+                          "Failed to load file, most likely because the file could not be found."),
+                cancellationToken)
+            : Task.FromException<T>(new FileNotFoundException("The file could not be found."));
 
     /// <inheritdoc/>
     public bool FileExists(string path) 

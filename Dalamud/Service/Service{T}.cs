@@ -24,7 +24,7 @@ namespace Dalamud;
 internal static class Service<T> where T : IServiceType
 {
     private static readonly ServiceManager.ServiceAttribute ServiceAttribute;
-    private static TaskCompletionSource<T> instanceTcs = new();
+    private static TaskCompletionSource<T> instanceTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static List<Type>? dependencyServices;
     private static List<Type>? dependencyServicesForUnload;
 
@@ -82,7 +82,7 @@ internal static class Service<T> where T : IServiceType
         ServiceManager.Log.Debug("Service<{0}>: Provided", typeof(T).Name);
         if (obj is IPublicDisposableService pds)
             pds.MarkDisposeOnlyFromService();
-        instanceTcs.SetResult(obj);
+        instanceTcs.TrySetResult(obj);
     }
 
     /// <summary>
@@ -332,7 +332,7 @@ internal static class Service<T> where T : IServiceType
                 break;
         }
 
-        instanceTcs = new TaskCompletionSource<T>();
+        instanceTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         instanceTcs.SetException(new UnloadedException());
     }
 

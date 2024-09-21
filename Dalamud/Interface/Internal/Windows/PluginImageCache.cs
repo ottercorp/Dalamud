@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Dalamud.Game;
+using Dalamud.Interface.Textures.Internal;
+using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Networking.Http;
 using Dalamud.Plugin.Internal;
 using Dalamud.Plugin.Internal.Types;
@@ -280,33 +282,19 @@ internal class PluginImageCache : IInternalDisposableService
         if (bytes == null)
             return null;
 
-        var interfaceManager = (await Service<InterfaceManager.InterfaceManagerWithScene>.GetAsync()).Manager;
-        var framework = await Service<Framework>.GetAsync();
+        var textureManager = await Service<TextureManager>.GetAsync();
 
         IDalamudTextureWrap? image;
         // FIXME(goat): This is a hack around this call failing randomly in certain situations. Might be related to not being called on the main thread.
         try
         {
-            image = interfaceManager.LoadImage(bytes);
+            image = await textureManager.CreateFromImageAsync(
+                        bytes,
+                        $"{nameof(PluginImageCache)}({name} for {manifest.InternalName} at {loc})");
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Access violation during load plugin {name} from {Loc} (Async Thread)", name, loc);
-
-            try
-            {
-                image = await framework.RunOnFrameworkThread(() => interfaceManager.LoadImage(bytes));
-            }
-            catch (Exception ex2)
-            {
-                Log.Error(ex2, "Access violation during load plugin {name} from {Loc} (Framework Thread)", name, loc);
-                return null;
-            }
-        }
-
-        if (image == null)
-        {
-            Log.Error($"Could not load {name} for {manifest.InternalName} at {loc}");
+            Log.Error(ex, $"Could not load {name} for {manifest.InternalName} at {loc}");
             return null;
         }
 
@@ -329,7 +317,7 @@ internal class PluginImageCache : IInternalDisposableService
 
     private Task<T> RunInDownloadQueue<T>(Func<Task<T>> func, ulong requestedFrame)
     {
-        var tcs = new TaskCompletionSource<T>();
+        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         this.downloadQueue.Add(Tuple.Create(requestedFrame, async () =>
         {
             try
@@ -346,7 +334,7 @@ internal class PluginImageCache : IInternalDisposableService
 
     private Task<T> RunInLoadQueue<T>(Func<Task<T>> func)
     {
-        var tcs = new TaskCompletionSource<T>();
+        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         this.loadQueue.Add(async () =>
         {
             try

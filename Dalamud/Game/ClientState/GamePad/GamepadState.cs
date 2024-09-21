@@ -4,6 +4,7 @@ using Dalamud.Hooking;
 using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 
 using ImGuiNET;
 using Serilog;
@@ -16,7 +17,6 @@ namespace Dalamud.Game.ClientState.GamePad;
 /// Will block game's gamepad input if <see cref="ImGuiConfigFlags.NavEnableGamepad"/> is set.
 /// </summary>
 [PluginInterface]
-[InterfaceVersion("1.0")]
 [ServiceManager.EarlyLoadedService]
 #pragma warning disable SA1015
 [ResolveVia<IGamepadState>]
@@ -36,7 +36,7 @@ internal unsafe class GamepadState : IInternalDisposableService, IGamepadState
     private GamepadState(ClientState clientState)
     {
         var resolver = clientState.AddressResolver;
-        Log.Verbose($"GamepadPoll address 0x{resolver.GamepadPoll.ToInt64():X}");
+        Log.Verbose($"GamepadPoll address {Util.DescribeAddress(resolver.GamepadPoll)}");
         this.gamepadPoll = Hook<ControllerPoll>.FromAddress(resolver.GamepadPoll, this.GamepadPollDetour);
         this.gamepadPoll?.Enable();
     }

@@ -13,14 +13,20 @@ namespace Dalamud.Game.Config;
 /// <summary>
 /// This class represents the game's configuration.
 /// </summary>
-[InterfaceVersion("1.0")]
 [ServiceManager.EarlyLoadedService]
 internal sealed class GameConfig : IInternalDisposableService, IGameConfig
 {
-    private readonly TaskCompletionSource tcsInitialization = new();
-    private readonly TaskCompletionSource<GameConfigSection> tcsSystem = new();
-    private readonly TaskCompletionSource<GameConfigSection> tcsUiConfig = new();
-    private readonly TaskCompletionSource<GameConfigSection> tcsUiControl = new(); 
+    private readonly TaskCompletionSource tcsInitialization =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private readonly TaskCompletionSource<GameConfigSection> tcsSystem =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private readonly TaskCompletionSource<GameConfigSection> tcsUiConfig =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private readonly TaskCompletionSource<GameConfigSection> tcsUiControl =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly GameConfigAddressResolver address = new();
     private Hook<ConfigChangeDelegate>? configChangeHook;
@@ -34,7 +40,7 @@ internal sealed class GameConfig : IInternalDisposableService, IGameConfig
             {
                 Log.Verbose("[GameConfig] Initializing");
                 var csFramework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
-                var commonConfig = &csFramework->SystemConfig.CommonSystemConfig;
+                var commonConfig = &csFramework->SystemConfig.SystemConfigBase;
                 this.tcsSystem.SetResult(new("System", framework, &commonConfig->ConfigBase));
                 this.tcsUiConfig.SetResult(new("UiConfig", framework, &commonConfig->UiConfig));
                 this.tcsUiControl.SetResult(
@@ -115,7 +121,10 @@ internal sealed class GameConfig : IInternalDisposableService, IGameConfig
     
     /// <inheritdoc/>
     public bool TryGet(SystemConfigOption option, out StringConfigProperties? properties) => this.System.TryGetProperties(option.GetName(), out properties);
-    
+
+    /// <inheritdoc/>
+    public bool TryGet(SystemConfigOption option, out PadButtonValue value) => this.System.TryGetStringAsEnum(option.GetName(), out value);
+
     /// <inheritdoc/>
     public bool TryGet(UiConfigOption option, out bool value) => this.UiConfig.TryGet(option.GetName(), out value);
 
@@ -243,7 +252,6 @@ internal sealed class GameConfig : IInternalDisposableService, IGameConfig
 /// Plugin-scoped version of a GameConfig service.
 /// </summary>
 [PluginInterface]
-[InterfaceVersion("1.0")]
 [ServiceManager.ScopedService]
 #pragma warning disable SA1015
 [ResolveVia<IGameConfig>]
@@ -341,7 +349,11 @@ internal class GameConfigPluginScoped : IInternalDisposableService, IGameConfig
     /// <inheritdoc/>
     public bool TryGet(SystemConfigOption option, out StringConfigProperties? properties)
         => this.gameConfigService.TryGet(option, out properties);
-    
+
+    /// <inheritdoc/>
+    public bool TryGet(SystemConfigOption option, out PadButtonValue value)
+        => this.gameConfigService.TryGet(option, out value);
+
     /// <inheritdoc/>
     public bool TryGet(UiConfigOption option, out bool value)
         => this.gameConfigService.TryGet(option, out value);

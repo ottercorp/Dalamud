@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Resolvers;
 using Dalamud.Game.Text.SeStringHandling;
@@ -7,9 +9,108 @@ using Lumina.Excel.GeneratedSheets;
 namespace Dalamud.Game.ClientState.Objects.Types;
 
 /// <summary>
+/// Interface representing a character.
+/// </summary>
+public interface ICharacter : IGameObject
+{
+    /// <summary>
+    /// Gets the current HP of this Chara.
+    /// </summary>
+    public uint CurrentHp { get; }
+
+    /// <summary>
+    /// Gets the maximum HP of this Chara.
+    /// </summary>
+    public uint MaxHp { get; }
+
+    /// <summary>
+    /// Gets the current MP of this Chara.
+    /// </summary>
+    public uint CurrentMp { get; }
+
+    /// <summary>
+    /// Gets the maximum MP of this Chara.
+    /// </summary>
+    public uint MaxMp { get; }
+
+    /// <summary>
+    /// Gets the current GP of this Chara.
+    /// </summary>
+    public uint CurrentGp { get; }
+
+    /// <summary>
+    /// Gets the maximum GP of this Chara.
+    /// </summary>
+    public uint MaxGp { get; }
+
+    /// <summary>
+    /// Gets the current CP of this Chara.
+    /// </summary>
+    public uint CurrentCp { get; }
+
+    /// <summary>
+    /// Gets the maximum CP of this Chara.
+    /// </summary>
+    public uint MaxCp { get; }
+
+    /// <summary>
+    /// Gets the shield percentage of this Chara.
+    /// </summary>
+    public byte ShieldPercentage { get; }
+
+    /// <summary>
+    /// Gets the ClassJob of this Chara.
+    /// </summary>
+    public ExcelResolver<ClassJob> ClassJob { get; }
+
+    /// <summary>
+    /// Gets the level of this Chara.
+    /// </summary>
+    public byte Level { get; }
+
+    /// <summary>
+    /// Gets a byte array describing the visual appearance of this Chara.
+    /// Indexed by <see cref="CustomizeIndex"/>.
+    /// </summary>
+    public byte[] Customize { get; }
+
+    /// <summary>
+    /// Gets the Free Company tag of this chara.
+    /// </summary>
+    public SeString CompanyTag { get; }
+
+    /// <summary>
+    /// Gets the name ID of the character.
+    /// </summary>
+    public uint NameId { get; }
+
+    /// <summary>
+    /// Gets the current online status of the character.
+    /// </summary>
+    public ExcelResolver<OnlineStatus> OnlineStatus { get; }
+
+    /// <summary>
+    /// Gets the status flags.
+    /// </summary>
+    public StatusFlags StatusFlags { get; }
+    
+    /// <summary>
+    /// Gets the current mount for this character. Will be <c>null</c> if the character doesn't have a mount.
+    /// </summary>
+    public ExcelResolver<Mount>? CurrentMount { get; }
+    
+    /// <summary>
+    /// Gets the current minion summoned for this character. Will be <c>null</c> if the character doesn't have a minion.
+    /// This method *will* return information about a spawned (but invisible) minion, e.g. if the character is riding a
+    /// mount.
+    /// </summary>
+    public ExcelResolver<Companion>? CurrentMinion { get; }
+}
+
+/// <summary>
 /// This class represents the base for non-static entities.
 /// </summary>
-public unsafe class Character : GameObject
+internal unsafe class Character : GameObject, ICharacter
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="Character"/> class.
@@ -21,85 +122,54 @@ public unsafe class Character : GameObject
     {
     }
 
-    /// <summary>
-    /// Gets the current HP of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public uint CurrentHp => this.Struct->CharacterData.Health;
 
-    /// <summary>
-    /// Gets the maximum HP of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public uint MaxHp => this.Struct->CharacterData.MaxHealth;
 
-    /// <summary>
-    /// Gets the current MP of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public uint CurrentMp => this.Struct->CharacterData.Mana;
 
-    /// <summary>
-    /// Gets the maximum MP of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public uint MaxMp => this.Struct->CharacterData.MaxMana;
 
-    /// <summary>
-    /// Gets the current GP of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public uint CurrentGp => this.Struct->CharacterData.GatheringPoints;
 
-    /// <summary>
-    /// Gets the maximum GP of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public uint MaxGp => this.Struct->CharacterData.MaxGatheringPoints;
 
-    /// <summary>
-    /// Gets the current CP of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public uint CurrentCp => this.Struct->CharacterData.CraftingPoints;
 
-    /// <summary>
-    /// Gets the maximum CP of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public uint MaxCp => this.Struct->CharacterData.MaxCraftingPoints;
 
-    /// <summary>
-    /// Gets the shield percentage of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public byte ShieldPercentage => this.Struct->CharacterData.ShieldValue;
 
-    /// <summary>
-    /// Gets the ClassJob of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public ExcelResolver<ClassJob> ClassJob => new(this.Struct->CharacterData.ClassJob);
 
-    /// <summary>
-    /// Gets the level of this Chara.
-    /// </summary>
+    /// <inheritdoc/>
     public byte Level => this.Struct->CharacterData.Level;
 
-    /// <summary>
-    /// Gets a byte array describing the visual appearance of this Chara.
-    /// Indexed by <see cref="CustomizeIndex"/>.
-    /// </summary>
-    public byte[] Customize => MemoryHelper.Read<byte>((IntPtr)this.Struct->DrawData.CustomizeData.Data, 28);
+    /// <inheritdoc/>
+    public byte[] Customize => this.Struct->DrawData.CustomizeData.Data.ToArray();
 
-    /// <summary>
-    /// Gets the Free Company tag of this chara.
-    /// </summary>
-    public SeString CompanyTag => MemoryHelper.ReadSeString((IntPtr)this.Struct->FreeCompanyTag, 6);
+    /// <inheritdoc/>
+    public SeString CompanyTag => MemoryHelper.ReadSeString((nint)Unsafe.AsPointer(ref this.Struct->FreeCompanyTag[0]), 6);
 
     /// <summary>
     /// Gets the target object ID of the character.
     /// </summary>
     public override ulong TargetObjectId => this.Struct->TargetId;
 
-    /// <summary>
-    /// Gets the name ID of the character.
-    /// </summary>
-    public uint NameId => this.Struct->NameID;
+    /// <inheritdoc/>
+    public uint NameId => this.Struct->NameId;
 
-    /// <summary>
-    /// Gets the current online status of the character.
-    /// </summary>
+    /// <inheritdoc/>
     public ExcelResolver<OnlineStatus> OnlineStatus => new(this.Struct->CharacterData.OnlineStatus);
 
     /// <summary>
@@ -114,6 +184,32 @@ public unsafe class Character : GameObject
         (this.Struct->IsAllianceMember ? StatusFlags.AllianceMember : StatusFlags.None) |
         (this.Struct->IsFriend ? StatusFlags.Friend : StatusFlags.None) |
         (this.Struct->IsCasting ? StatusFlags.IsCasting : StatusFlags.None);
+    
+    /// <inheritdoc />
+    public ExcelResolver<Mount>? CurrentMount
+    {
+        get
+        {
+            if (this.Struct->IsNotMounted()) return null; // just for safety.
+            
+            var mountId = this.Struct->Mount.MountId;
+            return mountId == 0 ? null : new ExcelResolver<Mount>(mountId);
+        }
+    }
+
+    /// <inheritdoc />
+    public ExcelResolver<Companion>? CurrentMinion
+    {
+        get
+        {
+            if (this.Struct->CompanionObject != null) 
+                return new ExcelResolver<Companion>(this.Struct->CompanionObject->BaseId);
+
+            // this is only present if a minion is summoned but hidden (e.g. the player's on a mount).
+            var hiddenCompanionId = this.Struct->CompanionData.CompanionId;
+            return hiddenCompanionId == 0 ? null : new ExcelResolver<Companion>(hiddenCompanionId);
+        }
+    }
 
     /// <summary>
     /// Gets the underlying structure.

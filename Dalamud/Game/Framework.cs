@@ -21,7 +21,6 @@ namespace Dalamud.Game;
 /// <summary>
 /// This class represents the Framework of the native game client and grants access to various subsystems.
 /// </summary>
-[InterfaceVersion("1.0")]
 [ServiceManager.EarlyLoadedService]
 internal sealed class Framework : IInternalDisposableService, IFramework
 {
@@ -140,7 +139,7 @@ internal sealed class Framework : IInternalDisposableService, IFramework
         if (numTicks <= 0)
             return Task.CompletedTask;
 
-        var tcs = new TaskCompletionSource();
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         this.tickDelayedTaskCompletionSources[tcs] = (this.tickCounter + (ulong)numTicks, cancellationToken);
         return tcs.Task;
     }
@@ -513,7 +512,6 @@ internal sealed class Framework : IInternalDisposableService, IFramework
 /// Plugin-scoped version of a Framework service.
 /// </summary>
 [PluginInterface]
-[InterfaceVersion("1.0")]
 [ServiceManager.ScopedService]
 #pragma warning disable SA1015
 [ResolveVia<IFramework>]

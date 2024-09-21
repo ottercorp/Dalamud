@@ -1,6 +1,8 @@
+using System.Linq;
 using System.Runtime.InteropServices;
 
 using Dalamud.Data;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Gui;
@@ -11,7 +13,10 @@ using Dalamud.IoC.Internal;
 using Dalamud.Logging.Internal;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
+
 using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.Game.Event;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 
 using Lumina.Excel.GeneratedSheets;
@@ -23,15 +28,15 @@ namespace Dalamud.Game.ClientState;
 /// <summary>
 /// This class represents the state of the game client at the time of access.
 /// </summary>
-[InterfaceVersion("1.0")]
 [ServiceManager.EarlyLoadedService]
 internal sealed class ClientState : IInternalDisposableService, IClientState
 {
     private static readonly ModuleLog Log = new("ClientState");
-    
+
     private readonly GameLifecycle lifecycle;
     private readonly ClientStateAddressResolver address;
     private readonly Hook<SetupTerritoryTypeDelegate> setupTerritoryTypeHook;
+    private readonly Hook<UIModule.Delegates.HandlePacket> uiModuleHandlePacketHook;
 
     [ServiceManager.ServiceDependency]
     private readonly Framework framework = Service<Framework>.Get();
@@ -43,7 +48,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
     private bool lastFramePvP;
 
     [ServiceManager.ServiceConstructor]
-    private ClientState(TargetSigScanner sigScanner, Dalamud dalamud, GameLifecycle lifecycle)
+    private unsafe ClientState(TargetSigScanner sigScanner, Dalamud dalamud, GameLifecycle lifecycle)
     {
         this.lifecycle = lifecycle;
         this.address = new ClientStateAddressResolver();
@@ -53,22 +58,30 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
 
         this.ClientLanguage = (ClientLanguage)dalamud.StartInfo.Language;
 
-        Log.Verbose($"SetupTerritoryType address 0x{this.address.SetupTerritoryType.ToInt64():X}");
+        Log.Verbose($"SetupTerritoryType address {Util.DescribeAddress(this.address.SetupTerritoryType)}");
 
         this.setupTerritoryTypeHook = Hook<SetupTerritoryTypeDelegate>.FromAddress(this.address.SetupTerritoryType, this.SetupTerritoryTypeDetour);
+        this.uiModuleHandlePacketHook = Hook<UIModule.Delegates.HandlePacket>.FromAddress((nint)UIModule.StaticVirtualTablePointer->HandlePacket, this.UIModuleHandlePacketDetour);
 
         this.framework.Update += this.FrameworkOnOnUpdateEvent;
 
         this.networkHandlers.CfPop += this.NetworkHandlersOnCfPop;
 
         this.setupTerritoryTypeHook.Enable();
+        this.uiModuleHandlePacketHook.Enable();
     }
 
     [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
-    private delegate IntPtr SetupTerritoryTypeDelegate(IntPtr manager, ushort terriType);
+    private unsafe delegate void SetupTerritoryTypeDelegate(EventFramework* eventFramework, ushort terriType);
 
     /// <inheritdoc/>
     public event Action<ushort>? TerritoryChanged;
+
+    /// <inheritdoc/>
+    public event IClientState.ClassJobChangeDelegate? ClassJobChanged;
+
+    /// <inheritdoc/>
+    public event IClientState.LevelChangeDelegate? LevelChanged;
 
     /// <inheritdoc/>
     public event Action? Login;
@@ -102,7 +115,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
     }
 
     /// <inheritdoc/>
-    public PlayerCharacter? LocalPlayer => Service<ObjectTable>.GetNullable()?[0] as PlayerCharacter;
+    public IPlayerCharacter? LocalPlayer => Service<ObjectTable>.GetNullable()?[0] as IPlayerCharacter;
 
     /// <inheritdoc/>
     public ulong LocalContentId => (ulong)Marshal.ReadInt64(this.address.LocalContentId);
@@ -124,24 +137,93 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
     /// </summary>
     internal ClientStateAddressResolver AddressResolver => this.address;
 
+    /// <inheritdoc/>
+    public bool IsClientIdle(out ConditionFlag blockingFlag)
+    {
+        blockingFlag = 0;
+        if (this.LocalPlayer is null) return true;
+
+        var condition = Service<Conditions.Condition>.GetNullable();
+
+        var blockingConditions = condition.AsReadOnlySet().Except([
+            ConditionFlag.NormalConditions,
+            ConditionFlag.Jumping,
+            ConditionFlag.Mounted,
+            ConditionFlag.UsingParasol]);
+
+        blockingFlag = blockingConditions.FirstOrDefault();
+        return blockingFlag == 0;
+    }
+
+    /// <inheritdoc/>
+    public bool IsClientIdle() => this.IsClientIdle(out _);
+
     /// <summary>
     /// Dispose of managed and unmanaged resources.
     /// </summary>
     void IInternalDisposableService.DisposeService()
     {
         this.setupTerritoryTypeHook.Dispose();
+        this.uiModuleHandlePacketHook.Dispose();
         this.framework.Update -= this.FrameworkOnOnUpdateEvent;
         this.networkHandlers.CfPop -= this.NetworkHandlersOnCfPop;
     }
 
-    private IntPtr SetupTerritoryTypeDetour(IntPtr manager, ushort terriType)
+    private unsafe void SetupTerritoryTypeDetour(EventFramework* eventFramework, ushort territoryType)
     {
-        this.TerritoryType = terriType;
-        this.TerritoryChanged?.InvokeSafely(terriType);
+        this.TerritoryType = territoryType;
+        this.TerritoryChanged?.InvokeSafely(territoryType);
 
-        Log.Debug("TerritoryType changed: {0}", terriType);
+        Log.Debug("TerritoryType changed: {0}", territoryType);
 
-        return this.setupTerritoryTypeHook.Original(manager, terriType);
+        this.setupTerritoryTypeHook.Original(eventFramework, territoryType);
+    }
+
+    private unsafe void UIModuleHandlePacketDetour(UIModule* thisPtr, UIModulePacketType type, uint uintParam, void* packet)
+    {
+        this.uiModuleHandlePacketHook!.Original(thisPtr, type, uintParam, packet);
+
+        switch (type)
+        {
+            case UIModulePacketType.ClassJobChange when this.ClassJobChanged is { } callback:
+                {
+                    var classJobId = uintParam;
+
+                    foreach (var action in callback.GetInvocationList().Cast<IClientState.ClassJobChangeDelegate>())
+                    {
+                        try
+                        {
+                            action(classJobId);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error(ex, "Exception during raise of {handler}", action.Method);
+                        }
+                    }
+
+                    break;
+                }
+
+            case UIModulePacketType.LevelChange when this.LevelChanged is { } callback:
+                {
+                    var classJobId = *(uint*)packet;
+                    var level = *(ushort*)((nint)packet + 4);
+
+                    foreach (var action in callback.GetInvocationList().Cast<IClientState.LevelChangeDelegate>())
+                    {
+                        try
+                        {
+                            action(classJobId, level);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error(ex, "Exception during raise of {handler}", action.Method);
+                        }
+                    }
+
+                    break;
+                }
+        }
     }
 
     private void NetworkHandlersOnCfPop(ContentFinderCondition e)
@@ -203,7 +285,6 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
 /// Plugin-scoped version of a GameConfig service.
 /// </summary>
 [PluginInterface]
-[InterfaceVersion("1.0")]
 [ServiceManager.ScopedService]
 #pragma warning disable SA1015
 [ResolveVia<IClientState>]
@@ -219,28 +300,36 @@ internal class ClientStatePluginScoped : IInternalDisposableService, IClientStat
     internal ClientStatePluginScoped()
     {
         this.clientStateService.TerritoryChanged += this.TerritoryChangedForward;
+        this.clientStateService.ClassJobChanged += this.ClassJobChangedForward;
+        this.clientStateService.LevelChanged += this.LevelChangedForward;
         this.clientStateService.Login += this.LoginForward;
         this.clientStateService.Logout += this.LogoutForward;
         this.clientStateService.EnterPvP += this.EnterPvPForward;
         this.clientStateService.LeavePvP += this.ExitPvPForward;
         this.clientStateService.CfPop += this.ContentFinderPopForward;
     }
-    
+
     /// <inheritdoc/>
     public event Action<ushort>? TerritoryChanged;
-    
+
+    /// <inheritdoc/>
+    public event IClientState.ClassJobChangeDelegate? ClassJobChanged;
+
+    /// <inheritdoc/>
+    public event IClientState.LevelChangeDelegate? LevelChanged;
+
     /// <inheritdoc/>
     public event Action? Login;
-    
+
     /// <inheritdoc/>
     public event Action? Logout;
-    
+
     /// <inheritdoc/>
     public event Action? EnterPvP;
-    
+
     /// <inheritdoc/>
     public event Action? LeavePvP;
-    
+
     /// <inheritdoc/>
     public event Action<ContentFinderCondition>? CfPop;
 
@@ -249,12 +338,12 @@ internal class ClientStatePluginScoped : IInternalDisposableService, IClientStat
 
     /// <inheritdoc/>
     public ushort TerritoryType => this.clientStateService.TerritoryType;
-    
+
     /// <inheritdoc/>
     public uint MapId => this.clientStateService.MapId;
 
     /// <inheritdoc/>
-    public PlayerCharacter? LocalPlayer => this.clientStateService.LocalPlayer;
+    public IPlayerCharacter? LocalPlayer => this.clientStateService.LocalPlayer;
 
     /// <inheritdoc/>
     public ulong LocalContentId => this.clientStateService.LocalContentId;
@@ -272,9 +361,17 @@ internal class ClientStatePluginScoped : IInternalDisposableService, IClientStat
     public bool IsGPosing => this.clientStateService.IsGPosing;
 
     /// <inheritdoc/>
+    public bool IsClientIdle(out ConditionFlag blockingFlag) => this.clientStateService.IsClientIdle(out blockingFlag);
+
+    /// <inheritdoc/>
+    public bool IsClientIdle() => this.clientStateService.IsClientIdle();
+
+    /// <inheritdoc/>
     void IInternalDisposableService.DisposeService()
     {
         this.clientStateService.TerritoryChanged -= this.TerritoryChangedForward;
+        this.clientStateService.ClassJobChanged -= this.ClassJobChangedForward;
+        this.clientStateService.LevelChanged -= this.LevelChangedForward;
         this.clientStateService.Login -= this.LoginForward;
         this.clientStateService.Logout -= this.LogoutForward;
         this.clientStateService.EnterPvP -= this.EnterPvPForward;
@@ -290,13 +387,17 @@ internal class ClientStatePluginScoped : IInternalDisposableService, IClientStat
     }
 
     private void TerritoryChangedForward(ushort territoryId) => this.TerritoryChanged?.Invoke(territoryId);
-    
+
+    private void ClassJobChangedForward(uint classJobId) => this.ClassJobChanged?.Invoke(classJobId);
+
+    private void LevelChangedForward(uint classJobId, uint level) => this.LevelChanged?.Invoke(classJobId, level);
+
     private void LoginForward() => this.Login?.Invoke();
-    
+
     private void LogoutForward() => this.Logout?.Invoke();
-    
+
     private void EnterPvPForward() => this.EnterPvP?.Invoke();
-    
+
     private void ExitPvPForward() => this.LeavePvP?.Invoke();
 
     private void ContentFinderPopForward(ContentFinderCondition cfc) => this.CfPop?.Invoke(cfc);

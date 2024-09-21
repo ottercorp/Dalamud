@@ -1,9 +1,9 @@
-﻿using System.Linq;
-
-using Dalamud.Configuration.Internal;
+﻿using Dalamud.Configuration.Internal;
 using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Plugin.Internal.Types;
 using Dalamud.Utility;
 
+using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Dalamud.Game.Gui.Dtr;
@@ -26,12 +26,12 @@ public interface IReadOnlyDtrBarEntry
     /// <summary>
     /// Gets the text of this entry.
     /// </summary>
-    public SeString Text { get; }
+    public SeString? Text { get; }
     
     /// <summary>
     /// Gets a tooltip to be shown when the user mouses over the dtr entry.
     /// </summary>
-    public SeString Tooltip { get; }
+    public SeString? Tooltip { get; }
     
     /// <summary>
     /// Gets a value indicating whether this entry should be shown.
@@ -85,6 +85,7 @@ public interface IDtrBarEntry : IReadOnlyDtrBarEntry
 /// <summary>
 /// Class representing an entry in the server info bar.
 /// </summary>
+[Api11ToDo(Api11ToDoAttribute.MakeInternal)]
 public sealed unsafe class DtrBarEntry : IDisposable, IDtrBarEntry
 {
     private readonly DalamudConfiguration configuration;
@@ -136,24 +137,32 @@ public sealed unsafe class DtrBarEntry : IDisposable, IDtrBarEntry
         get => this.shownBacking;
         set
         {
-            this.shownBacking = value;
-            this.Dirty = true;
+            if (value != this.shownBacking)
+            {
+                this.shownBacking = value;
+                this.Dirty = true;
+            }
         }
     }
 
     /// <inheritdoc/>
-    [Api10ToDo("Maybe make this config scoped to internalname?")]
-    public bool UserHidden => this.configuration.DtrIgnore?.Any(x => x == this.Title) ?? false;
+    [Api11ToDo("Maybe make this config scoped to internalname?")]
+    public bool UserHidden => this.configuration.DtrIgnore?.Contains(this.Title) ?? false;
 
     /// <summary>
     /// Gets or sets the internal text node of this entry.
     /// </summary>
     internal AtkTextNode* TextNode { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the storage for the text of this entry.
+    /// </summary>
+    internal Utf8String* Storage { get; set; }
 
     /// <summary>
-    /// Gets a value indicating whether this entry should be removed.
+    /// Gets or sets a value indicating whether this entry should be removed.
     /// </summary>
-    internal bool ShouldBeRemoved { get; private set; }
+    internal bool ShouldBeRemoved { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether this entry is dirty.
@@ -164,6 +173,11 @@ public sealed unsafe class DtrBarEntry : IDisposable, IDtrBarEntry
     /// Gets or sets a value indicating whether this entry has just been added.
     /// </summary>
     internal bool Added { get; set; } 
+
+    /// <summary>
+    /// Gets or sets the plugin that owns this entry.
+    /// </summary>
+    internal LocalPlugin? OwnerPlugin { get; set; }
 
     /// <inheritdoc/>
     public bool TriggerClickAction()
