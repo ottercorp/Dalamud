@@ -45,7 +45,7 @@ jobs:
       - name: Create hashlist
         run: .\CreateHashList.ps1 .\bin\Release
       - name: Attest Build
-        if: ${{ github.repository_owner == 'goatcorp' && github.event_name == 'push' }}
+        if: ${{ github.repository_owner == 'ottercorp' && github.event_name == 'push' }}
         uses: actions/attest-build-provenance@v1
         with:
           subject-path: |
