@@ -40,10 +40,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
     private const string WarrantsChangelogForMajorMinor = "10.0.";
     
     private const string ChangeLog =
-        @"• Updated Dalamud for compatibility with Patch 7.0
-• Made a lot of behind-the-scenes changes to make Dalamud and plugins more stable and reliable
-• Added new functionality developers can take advantage of
-• Refreshed the Dalamud/plugin installer UI
+        @"• 大概是国服7.0测试版
 ";
 
     private static readonly TimeSpan TitleScreenWaitTime = TimeSpan.FromSeconds(0.5f); 
