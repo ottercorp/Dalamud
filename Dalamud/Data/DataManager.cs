@@ -114,7 +114,7 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
     }
 
     /// <summary>
-    /// 为国服服务器临时修正isPublic & DataCenter数据.
+    /// 为国服服务器临时修正isPublic数据.
     /// </summary>
     private void ChangeWorldForCN()
     {
@@ -169,7 +169,7 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
                 new
                 {
                    Name = "豆豆柴",
-                   Id   = 201u,
+                   Id   = 104u,
                    Worlds = new[]
                    {
                         new { Id = 1201u, Name = "红茶川"    },
@@ -183,19 +183,19 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
                    },
                 },
             };
-        var dcExcel = this.GameData.Excel.GetSheet<WorldDCGroupType>();
+        //var dcExcel = this.GameData.Excel.GetSheet<WorldDCGroupType>();
         var worldExcel = this.GameData.Excel.GetSheet<World>();
         foreach (var dc in chineseWorldDCGroups)
         {
-            var dcToReplaced = dcExcel.GetRow(dc.Id);
-            dcToReplaced.Name = new SeString(dc.Name);
-            dcToReplaced.Region = 5;
+            // var dcToReplaced = dcExcel.GetRow(dc.Id);
+            // dcToReplaced.Name = new SeString(dc.Name);
+            // dcToReplaced.Region = 5;
 
             foreach (var world in dc.Worlds)
             {
                 var worldToUpdated = worldExcel.GetRow(world.Id);
                 worldToUpdated.IsPublic = true;
-                worldToUpdated.DataCenter = new LazyRow<WorldDCGroupType>(this.GameData, dc.Id, Lumina.Data.Language.ChineseSimplified);
+                //worldToUpdated.DataCenter = new LazyRow<WorldDCGroupType>(this.GameData, dc.Id, Lumina.Data.Language.ChineseSimplified);
             }
         }
 
