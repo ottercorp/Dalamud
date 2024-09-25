@@ -40,7 +40,10 @@ internal sealed class ChangelogWindow : Window, IDisposable
     private const string WarrantsChangelogForMajorMinor = "10.0.";
     
     private const string ChangeLog =
-        @"• 大概是国服7.0测试版
+        @"• 更新了 Dalamud 以兼容版本 7.0
+• 进行了大量幕后更改，使 Dalamud 和插件更加稳定可靠
+• 添加了开发人员可以利用的新功能
+• 重新设计了 Dalamud/插件安装程序 UI
 ";
 
     private static readonly TimeSpan TitleScreenWaitTime = TimeSpan.FromSeconds(0.5f); 
@@ -368,7 +371,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         ImGui.TextWrapped(ChangeLog);
                         ImGuiHelpers.ScaledDummy(5);
                         ImGui.TextWrapped("这个更新日志是对本版本中最重要的更改的快速概述");
-                        ImGui.TextWrapped("请点击Next以查看更新插件的快速指南。");
+                        ImGui.TextWrapped("请点击 Next 以查看更新插件的快速指南。");
 
                         ImGui.Image(
                             this.fontTipsTexture.Value.ImGuiHandle,
@@ -424,16 +427,11 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         break;
                     
                     case State.AskAutoUpdate:
-                        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudWhite, Loc.Localize("DalamudSettingsAutoUpdateHint",
-                                                "Dalamud can update your plugins automatically, making sure that you always " +
-                                                "have the newest features and bug fixes. You can choose when and how auto-updates are run here."));
+                        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudWhite, "Dalamud 可以自动更新您的插件，确保您始终拥有最新的功能和错误修复。您可以在此处选择何时以及如何运行自动更新。");
                         ImGuiHelpers.ScaledDummy(2);
                         
-                        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsAutoUpdateDisclaimer1",
-                                                                "You can always update your plugins manually by clicking the update button in the plugin list. " +
-                                                                "You can also opt into updates for specific plugins by right-clicking them and selecting \"Always auto-update\"."));
-                        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, Loc.Localize("DalamudSettingsAutoUpdateDisclaimer2",
-                                                                "Dalamud will only notify you about updates while you are idle."));
+                        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, "您始终可以通过单击插件列表中的更新按钮来手动更新插件。您还可以通过右键单击特定插件并选择“始终自动更新”来选择更新特定插件。");
+                        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, "Dalamud 只会在您处于休闲状态下通知您更新。");
                         
                         ImGuiHelpers.ScaledDummy(15);
                         
@@ -449,7 +447,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
                         using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.DPSRed))
                         {
-                            if (DrawCenteredButton("Enable auto-updates", 30))
+                            if (DrawCenteredButton("启用自动更新", 30))
                             { 
                                 this.chosenAutoUpdateBehavior = AutoUpdateBehavior.UpdateMainRepo;
                                 GoToNextState(State.Links);
@@ -462,7 +460,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         using (var buttonColor = ImRaii.PushColor(ImGuiCol.Button, Vector4.Zero))
                         {
                             buttonColor.Push(ImGuiCol.Border, ImGuiColors.DalamudGrey3);
-                            if (DrawCenteredButton("Disable auto-updates", 25))
+                            if (DrawCenteredButton("禁用自动更新", 25))
                             { 
                                 this.chosenAutoUpdateBehavior = AutoUpdateBehavior.OnlyNotify;
                                 GoToNextState(State.Links);
@@ -473,7 +471,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
                     
                     case State.Links:
                         ImGui.TextWrapped("如果您注意到任何问题或需要帮助，请查看常见问题解答，并在需要帮助的情况下在我们的QQ频道上联系我们。");
-                        ImGui.TextWrapped("Enjoy your time with the game and Dalamud!");
+                        ImGui.TextWrapped("祝您享受游戏和 Dalamud 的时光！");
                         
                         ImGuiHelpers.ScaledDummy(45);
                         
@@ -494,13 +492,13 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         ImGuiHelpers.ScaledDummy(5);
                         
                         ImGuiHelpers.CenterCursorFor(
-                            (int)(ImGuiComponents.GetIconButtonWithTextWidth(FontAwesomeIcon.Globe, "See the FAQ") +
+                            (int)(ImGuiComponents.GetIconButtonWithTextWidth(FontAwesomeIcon.Globe, "查看 FAQ") +
                             ImGuiComponents.GetIconButtonWithTextWidth(FontAwesomeIcon.LaughBeam, "加入我们的QQ频道") +
                             (5 * ImGuiHelpers.GlobalScale) + 
                             (ImGui.GetStyle().ItemSpacing.X * 4)));
-                        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Globe, "See the FAQ"))
+                        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Globe, "查看 FAQ"))
                         {
-                            Util.OpenLink("https://goatcorp.github.io/faq/");
+                            Util.OpenLink("https://ottercorp.github.io/faq/");
                         }
                         
                         ImGui.SameLine();
@@ -514,13 +512,13 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         
                         ImGuiHelpers.ScaledDummy(5);
                         
-                        if (CenteredIconButton(FontAwesomeIcon.Heart, "Support what we care about"))
+                        if (CenteredIconButton(FontAwesomeIcon.Heart, "支持我们"))
                         {
-                            Util.OpenLink("https://goatcorp.github.io/faq/support");
+                            Util.OpenLink("https://ottercorp.github.io/faq/support");
                         }
                         
                         var buttonHeight = 30 * ImGuiHelpers.GlobalScale;
-                        var buttonText = "Close";
+                        var buttonText = "关闭";
                         var buttonWidth = ImGui.CalcTextSize(buttonText).X + 40 * ImGuiHelpers.GlobalScale;
                         ImGui.SetCursorPosY(windowSize.Y - buttonHeight - (20 * ImGuiHelpers.GlobalScale));
                         ImGuiHelpers.CenterCursorFor((int)buttonWidth);
@@ -555,7 +553,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
             if (ImGui.IsItemHovered())
             {
-                ImGui.SetTooltip("I don't care about this");
+                ImGui.SetTooltip("我不关心这个");
             }
         }
     }
