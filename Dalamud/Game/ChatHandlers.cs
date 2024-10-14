@@ -92,6 +92,7 @@ internal class ChatHandlers : IServiceType
     {
         chatGui.CheckMessageHandled += this.OnCheckMessageHandled;
         chatGui.ChatMessage += this.OnChatMessage;
+        Service<ClientState.ClientState>.Get().Logout += () => { this.hasSendMeasurement = false; };
     }
 
     /// <summary>
