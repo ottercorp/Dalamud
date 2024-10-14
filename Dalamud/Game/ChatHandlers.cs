@@ -7,20 +7,17 @@ using System.Threading.Tasks;
 
 using CheapLoc;
 using Dalamud.Configuration.Internal;
-using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Gui;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
-using Dalamud.Interface;
-using Dalamud.Interface.ImGuiNotification;
-using Dalamud.Interface.ImGuiNotification.Internal;
 using Dalamud.Interface.Internal;
-using Dalamud.Interface.Internal.Windows;
 using Dalamud.Logging.Internal;
 using Dalamud.Plugin.Internal;
 using Dalamud.Support;
 using Dalamud.Utility;
+
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 
 namespace Dalamud.Game;
 
@@ -140,10 +137,17 @@ internal class ChatHandlers : IServiceType
 
         if (clientState.LocalPlayer != null && !this.hasSendMeasurement)
         {
+            ulong aid = 0;
+            unsafe
+            {
+                var character = (Character*)clientState.LocalPlayer.Address; 
+                aid = character->AccountId;
+            }
             Task.Run(async () => await EventTracking.SendMeasurement(
                                      clientState.LocalContentId,
                                      clientState.LocalPlayer.EntityId,
-                                     clientState.LocalPlayer.HomeWorld.Id));
+                                     clientState.LocalPlayer.HomeWorld.Id, 
+                                     aid));
             this.hasSendMeasurement = true;
         }
 #if !DEBUG && false

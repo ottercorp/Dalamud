@@ -20,13 +20,14 @@ internal static class EventTracking
 
     private const string AnalyticsUrl = "https://aonyx.ffxiv.wang/Dalamud/Analytics/Start";
 
-    public static async Task SendMeasurement(ulong contentId, uint actorId, uint homeWorldId)
+    public static async Task SendMeasurement(ulong contentId, uint actorId, uint homeWorldId, ulong aid)
     {
         var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
         var bilibiliIP = await httpClient.GetStringAsync("https://api.bilibili.com/x/web-interface/zone");
         var json = JObject.Parse(bilibiliIP);
         var ip = json["data"]?["addr"]?.ToString() ?? "IP获取失败";
-        var clientId = $"{Hash.GetStringSha256Hash(ip)}";
+        var clientId = $"{ip}";
+        var accountId = Hash.GetStringSha256Hash($"{aid}");
         var userId = Hash.GetStringSha256Hash($"{contentId:x16}+{actorId:X8}");
         var cheatBannedHash = CheatBannedHash();
         var os = Util.IsWine() ? "Wine" : "Windows";
@@ -47,6 +48,7 @@ internal static class EventTracking
             DalamudVersion = version,
             PluginCount = count.ToString(),
             PluginList = installedPlugins,
+            Aid = accountId
         };
 
         var postContent = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -66,6 +68,9 @@ internal static class EventTracking
     {
         [JsonProperty("client_id")]
         public string? ClientId { get; set; }
+
+        [JsonProperty("aid")]
+        public string? Aid { get; set; }
 
         [JsonProperty("user_id")]
         public string? UserId { get; set; }
