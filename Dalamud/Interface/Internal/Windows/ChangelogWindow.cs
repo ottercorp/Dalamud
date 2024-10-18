@@ -44,6 +44,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 • 进行了大量幕后更改，使 Dalamud 和插件更加稳定可靠
 • 添加了开发人员可以利用的新功能
 • 重新设计了 Dalamud/插件安装程序 UI
+• 将Roaming文件夹重新放回了AppData中
 ";
 
     private static readonly TimeSpan TitleScreenWaitTime = TimeSpan.FromSeconds(0.5f); 
