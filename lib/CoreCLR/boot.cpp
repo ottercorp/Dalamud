@@ -71,7 +71,7 @@ HRESULT InitializeClrAndGetEntryPoint(
     }
     else
     {
-        /*
+        
         result = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, nullptr, &_appdata);
 
         if (result != 0)
@@ -81,11 +81,9 @@ HRESULT InitializeClrAndGetEntryPoint(
         }
 
         std::filesystem::path fs_app_data(_appdata);
-        dotnet_path = _wcsdup(fs_app_data.append("XIVLauncher").append("runtime").c_str());
-        */
+        dotnet_path = _wcsdup(fs_app_data.append("XIVLauncherCN").append("runtime").c_str());
+        
 
-        std::filesystem::path fs_app_data(module_path);
-        dotnet_path = _wcsdup(fs_app_data.parent_path().append("..").append("..").append("..").append("runtime").c_str());
     }
 
     // =========================================================================== //
