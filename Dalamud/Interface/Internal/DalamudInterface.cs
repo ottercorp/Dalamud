@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using CheapLoc;
 using Dalamud.Configuration.Internal;
 using Dalamud.Console;
+using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Keys;
@@ -104,7 +105,8 @@ internal class DalamudInterface : IInternalDisposableService
         ClientState clientState,
         TitleScreenMenu titleScreenMenu,
         GameGui gameGui,
-        ConsoleManager consoleManager)
+        ConsoleManager consoleManager,
+        AddonLifecycle addonLifecycle)
     {
         this.dalamud = dalamud;
         this.configuration = configuration;
@@ -130,7 +132,8 @@ internal class DalamudInterface : IInternalDisposableService
             framework,
             gameGui,
             titleScreenMenu,
-            consoleManager) { IsOpen = false };
+            consoleManager,
+            addonLifecycle) { IsOpen = false };
         this.changelogWindow = new ChangelogWindow(
             this.titleScreenMenuWindow,
             fontAtlasFactory,
