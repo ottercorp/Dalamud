@@ -65,6 +65,8 @@ internal sealed class Dalamud : IServiceType
                 true, new FileInfo(Path.Combine(cacheDir.FullName, $"{this.StartInfo.GameVersion}.json")));
         }
 
+        Support.EventTracking.ConfigVaildationCheck(configuration);
+
         ServiceManager.InitializeProvidedServices(
             this,
             fs,

@@ -3,12 +3,16 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+
+using Dalamud.Configuration.Internal;
+using Dalamud.Networking.Http;
 using Dalamud.Plugin.Internal;
 using Dalamud.Utility;
-using Dalamud.Networking.Http;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Serilog;
 
 namespace Dalamud.Support;
 
@@ -48,7 +52,7 @@ internal static class EventTracking
             DalamudVersion = version,
             PluginCount = count.ToString(),
             PluginList = installedPlugins,
-            Aid = accountId
+            Aid = accountId,
         };
 
         var postContent = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -92,5 +96,26 @@ internal static class EventTracking
 
         [JsonProperty("plugin_list")]
         public List<string>? PluginList { get; set; }
+    }
+
+    public static void ConfigVaildationCheck(DalamudConfiguration config)
+    {
+        foreach (var devLocation in config.DevPluginLoadLocations)
+        {
+            if (ContainChinese(devLocation.Path))
+                Log.Information($"Dev plugin path: {devLocation.Path}");
+        }
+
+        foreach (var (name, _) in config.DevPluginSettings)
+        {
+            if (ContainChinese(name))
+                Log.Information($"Dev plugin Settings: {name}");
+        }
+    }
+
+    private static bool ContainChinese(string input)
+    {
+        string pattern = "[\u4e00-\u9fbb]";
+        return Regex.IsMatch(input, pattern);
     }
 }

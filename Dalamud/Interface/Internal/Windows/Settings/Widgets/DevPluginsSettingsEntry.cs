@@ -167,6 +167,7 @@ public class DevPluginsSettingsEntry : SettingsEntry
         ImGui.NextColumn();
         if (!string.IsNullOrEmpty(this.devPluginTempLocation) && ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
         {
+            this.devPluginTempLocation = this.devPluginTempLocation.Trim('"');
             if (this.devPluginLocations.Any(r => string.Equals(r.Path, this.devPluginTempLocation, StringComparison.InvariantCultureIgnoreCase)))
             {
                 this.devPluginLocationAddError = Loc.Localize("DalamudDevPluginLocationExists", "Location already exists.");
