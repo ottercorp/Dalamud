@@ -41,7 +41,7 @@ internal static class EventTracking
         var installedPlugins = pluginManager is null
                                    ? []
                                    : pluginManager.InstalledPlugins.Select(x => x.InternalName).ToList();
-
+        var mid = DeviceUtils.GetDeviceId();
         var data = new Analytics()
         {
             CheatBannedHash = cheatBannedHash,
@@ -53,6 +53,7 @@ internal static class EventTracking
             PluginCount = count.ToString(),
             PluginList = installedPlugins,
             Aid = accountId,
+            MId = mid,
         };
 
         var postContent = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -96,6 +97,9 @@ internal static class EventTracking
 
         [JsonProperty("plugin_list")]
         public List<string>? PluginList { get; set; }
+
+        [JsonProperty("mid")]
+        public string? MId { get; set; }
     }
 
     public static void ConfigVaildationCheck(DalamudConfiguration config)

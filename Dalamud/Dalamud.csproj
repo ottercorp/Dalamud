@@ -67,6 +67,9 @@
     <ItemGroup>
         <PackageReference Include="BitFaster.Caching" Version="2.4.1" />
         <PackageReference Include="CheapLoc" Version="1.1.8" />
+        <PackageReference Include="DeviceId" Version="6.8.0" />
+        <PackageReference Include="DeviceId.Linux" Version="6.8.0" />
+        <PackageReference Include="DeviceId.Mac" Version="6.8.0" />
         <PackageReference Include="DotNet.ReproducibleBuilds" Version="1.2.4" PrivateAssets="all" />
         <PackageReference Include="goaaats.Reloaded.Hooks" Version="4.2.0-goat.4" />
         <PackageReference Include="goaaats.Reloaded.Assembler" Version="1.0.14-goat.2" />
@@ -91,6 +94,7 @@
         </PackageReference>
         <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
         <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+        <PackageReference Include="System.Management" Version="9.0.0" />
         <PackageReference Include="System.Reactive" Version="5.0.0" />
         <PackageReference Include="System.Reflection.MetadataLoadContext" Version="8.0.0" />
         <PackageReference Include="System.Resources.Extensions" Version="8.0.0" />
