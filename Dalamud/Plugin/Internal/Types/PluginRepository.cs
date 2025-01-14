@@ -43,18 +43,6 @@ internal class PluginRepository
         },
         CacheExpirationProvider.CreateSimple(TimeSpan.FromHours(3), TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(0)));
 
-    private static readonly HttpClient HttpClient = new(CacheHandler)
-    {
-        Timeout = TimeSpan.FromSeconds(5),
-        DefaultRequestHeaders =
-        {
-            CacheControl = new CacheControlHeaderValue
-            {
-                NoCache = true,
-            },
-        },
-    };
-
     /// <summary>
     /// Initializes a new instance of the <see cref="PluginRepository"/> class.
     /// </summary>
@@ -86,6 +74,7 @@ internal class PluginRepository
                 },
             },
         };
+        this.httpClient.DefaultRequestHeaders.Add("X-Machine-Token", DeviceUtils.GetDeviceId());
         this.PluginMasterUrl = pluginMasterUrl;
         this.IsThirdParty = pluginMasterUrl != MainRepoUrl;
         this.IsEnabled = isEnabled;

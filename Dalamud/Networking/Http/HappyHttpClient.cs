@@ -40,6 +40,7 @@ internal class HappyHttpClient : IInternalDisposableService
                 },
             },
         };
+        this.SharedHttpClient.DefaultRequestHeaders.Add("X-Machine-Token", DeviceUtils.GetDeviceId());
     }
 
     /// <summary>
