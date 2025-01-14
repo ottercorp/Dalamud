@@ -148,4 +148,6 @@ public record DalamudStartInfo
     /// Gets or sets a value indicating how to deal with unhandled exceptions.
     /// </summary>
     public UnhandledExceptionHandlingMode UnhandledException { get; set; }
+
+    public string? LauncherDirectory { get; set; }
 }

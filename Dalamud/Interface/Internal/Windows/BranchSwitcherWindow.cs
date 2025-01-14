@@ -107,8 +107,8 @@ public class BranchSwitcherWindow : Window
                 // If we exit immediately, we need to write out the new config now
                 Service<DalamudConfiguration>.Get().ForceSave();
 
-                var appData = Service<Dalamud>.Get().StartInfo.WorkingDirectory;
-                var xlPath = Path.Combine(appData, "..", "..", "..", "..", "XIVLauncherCN.exe");
+                var appData = Service<Dalamud>.Get().StartInfo.LauncherDirectory ?? string.Empty;
+                var xlPath = Path.Combine(appData, "XIVLauncherCN.exe");
 
                 if (File.Exists(xlPath))
                 {
