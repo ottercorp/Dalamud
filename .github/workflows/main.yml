@@ -129,7 +129,7 @@ jobs:
         GH_BRANCH: ${{ steps.extract_branch.outputs.branch }}
       run: |
         Write-Host "Remove useless files"
-        .\PruneDalamud.ps1
+        # .\PruneDalamud.ps1
 
         Write-Host "Create hashlist"
         $hash = .\CreateHashList.ps1 .\scratch 
