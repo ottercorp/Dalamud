@@ -279,6 +279,7 @@ namespace Dalamud.Injector
             var languageStr = startInfo.Language.ToString().ToLowerInvariant();
             var unhandledExceptionStr = startInfo.UnhandledException.ToString().ToLowerInvariant();
             var troubleshootingData = "{\"empty\": true, \"description\": \"No troubleshooting data supplied.\"}";
+            var launcherDirectory = startInfo.LauncherDirectory;
 
             for (var i = 2; i < args.Count; i++)
             {
@@ -321,6 +322,10 @@ namespace Dalamud.Injector
                 else if (args[i].StartsWith(key = "--unhandled-exception="))
                 {
                     unhandledExceptionStr = args[i][key.Length..];
+                }
+                else if (args[i].StartsWith(key = "--launcher-directory="))
+                {
+                    launcherDirectory = args[i][key.Length..];
                 }
                 else
                 {
@@ -391,6 +396,7 @@ namespace Dalamud.Injector
             startInfo.TroubleshootingPackData = troubleshootingData;
             startInfo.LogName = logName;
             startInfo.LogPath = logPath;
+            startInfo.LauncherDirectory = launcherDirectory;
 
             // TODO: XL should set --logpath to its roaming path. We are only doing this here until that's rolled out.
 #if DEBUG
