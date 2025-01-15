@@ -9,7 +9,7 @@
     </PropertyGroup>
 
     <PropertyGroup Label="Feature">
-        <DalamudVersion>10.0.0.18</DalamudVersion>
+        <DalamudVersion>10.0.0.20</DalamudVersion>
         <Description>XIV Launcher addon framework</Description>
         <AssemblyVersion>$(DalamudVersion)</AssemblyVersion>
         <Version>$(DalamudVersion)</Version>
@@ -68,7 +68,7 @@
         <PackageReference Include="BitFaster.Caching" Version="2.4.1" />
         <PackageReference Include="CheapLoc" Version="1.1.8" />
         <PackageReference Include="DeviceId" Version="6.8.0" />
-        <PackageReference Include="DeviceId.Linux" Version="6.8.0" />
+        <PackageReference Include="DeviceId.Linux" Version="6.4.0" />
         <PackageReference Include="DeviceId.Mac" Version="6.8.0" />
         <PackageReference Include="DotNet.ReproducibleBuilds" Version="1.2.4" PrivateAssets="all" />
         <PackageReference Include="goaaats.Reloaded.Hooks" Version="4.2.0-goat.4" />
