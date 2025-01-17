@@ -10,10 +10,11 @@ namespace Dalamud.Utility
 {
     public class DeviceUtils
     {
+        private static Lazy<string> deviceId = new(() => string.Join(":", GetMacAddress(), GetCPUId(), GetDiskSerialNumber()));
+
         public static string GetDeviceId()
         {
-            var deviceId = string.Join(":", GetMacAddress(), GetCPUId(), GetDiskSerialNumber());
-            return deviceId;
+            return deviceId.Value;
         }
 
         public static string GetMD5(byte[] payload)
