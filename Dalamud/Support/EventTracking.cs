@@ -57,7 +57,7 @@ internal static class EventTracking
         };
 
         var postContent = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-        Log.Information("Sending measurement:" + Environment.NewLine + JsonConvert.SerializeObject(data));
+        Log.Information("Sending measurement:" + Environment.NewLine + Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data))));
 
         var response = await httpClient.PostAsync(AnalyticsUrl, postContent);
         response.EnsureSuccessStatusCode();
