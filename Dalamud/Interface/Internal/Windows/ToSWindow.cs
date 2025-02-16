@@ -12,7 +12,7 @@ using Dalamud.Utility;
 using Dalamud.Networking.Http;
 using ImGuiNET;
 using ImGuiScene;
-using Lumina.Excel.GeneratedSheets;
+using Lumina.Excel.Sheets;
 using Newtonsoft.Json;
 using Serilog;
 

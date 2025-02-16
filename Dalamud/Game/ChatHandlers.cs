@@ -1,6 +1,9 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 using CheapLoc;
 
@@ -77,7 +80,7 @@ internal partial class ChatHandlers : IServiceType
 
     [ServiceManager.ServiceDependency]
     private readonly Dalamud dalamud = Service<Dalamud>.Get();
-    
+
     [ServiceManager.ServiceDependency]
     private readonly DalamudConfiguration configuration = Service<DalamudConfiguration>.Get();
 
@@ -90,7 +93,7 @@ internal partial class ChatHandlers : IServiceType
     {
         chatGui.CheckMessageHandled += this.OnCheckMessageHandled;
         chatGui.ChatMessage += this.OnChatMessage;
-        Service<ClientState.ClientState>.Get().Logout += () => { this.hasSendMeasurement = false; };
+        Service<ClientState.ClientState>.Get().Logout += (_, _) => { this.hasSendMeasurement = false; };
     }
 
     /// <summary>
@@ -142,13 +145,14 @@ internal partial class ChatHandlers : IServiceType
             ulong aid = 0;
             unsafe
             {
-                var character = (Character*)clientState.LocalPlayer.Address; 
+                var character = (Character*)clientState.LocalPlayer.Address;
                 aid = character->AccountId;
             }
+
             Task.Run(async () => await EventTracking.SendMeasurement(
                                      clientState.LocalContentId,
                                      clientState.LocalPlayer.EntityId,
-                                     clientState.LocalPlayer.HomeWorld.Id, 
+                                     clientState.LocalPlayer.HomeWorld.RowId,
                                      aid));
             this.hasSendMeasurement = true;
         }
