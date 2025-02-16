@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -328,9 +328,22 @@ internal unsafe class NamePlateUpdateHandler : INamePlateUpdateHandler
     public ulong GameObjectId => this.gameObjectId ??= this.NamePlateInfo->ObjectId;
 
     /// <inheritdoc/>
-    public IGameObject? GameObject => this.gameObject ??= this.context.ObjectTable.CreateObjectReference(
-                                          (nint)this.context.Ui3DModule->NamePlateObjectInfoPointers[
-                                              this.ArrayIndex].Value->GameObject);
+    public IGameObject? GameObject
+    {
+        get
+        {
+            if (this.GameObjectId == 0xE0000000)
+            {
+                // Skipping Ui3DModule lookup for invalid nameplate (NamePlateInfo->ObjectId is 0xE0000000). This
+                // prevents crashes around certain Doman Reconstruction cutscenes.
+                return null;
+            }
+
+            return this.gameObject ??= this.context.ObjectTable[
+                       this.context.Ui3DModule->NamePlateObjectInfoPointers[this.ArrayIndex]
+                           .Value->GameObject->ObjectIndex];
+        }
+    }
 
     /// <inheritdoc/>
     public IBattleChara? BattleChara => this.GameObject as IBattleChara;

@@ -85,8 +85,7 @@ public interface IDtrBarEntry : IReadOnlyDtrBarEntry
 /// <summary>
 /// Class representing an entry in the server info bar.
 /// </summary>
-[Api11ToDo(Api11ToDoAttribute.MakeInternal)]
-public sealed unsafe class DtrBarEntry : IDisposable, IDtrBarEntry
+internal sealed unsafe class DtrBarEntry : IDisposable, IDtrBarEntry
 {
     private readonly DalamudConfiguration configuration;
 
@@ -146,7 +145,7 @@ public sealed unsafe class DtrBarEntry : IDisposable, IDtrBarEntry
     }
 
     /// <inheritdoc/>
-    [Api11ToDo("Maybe make this config scoped to internalname?")]
+    [Api12ToDo("Maybe make this config scoped to internalname?")]
     public bool UserHidden => this.configuration.DtrIgnore?.Contains(this.Title) ?? false;
 
     /// <summary>

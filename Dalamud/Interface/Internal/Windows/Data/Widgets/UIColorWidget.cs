@@ -1,5 +1,4 @@
-﻿using System.Buffers.Binary;
-using System.Linq;
+using System.Buffers.Binary;
 using System.Numerics;
 using System.Text;
 
@@ -7,12 +6,10 @@ using Dalamud.Data;
 using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Interface.ImGuiNotification.Internal;
 using Dalamud.Interface.ImGuiSeStringRenderer.Internal;
-using Dalamud.Interface.Utility;
-using Dalamud.Storage.Assets;
 
 using ImGuiNET;
 
-using Lumina.Excel.GeneratedSheets;
+using Lumina.Excel.Sheets;
 
 namespace Dalamud.Interface.Internal.Windows.Data.Widgets;
 
@@ -21,8 +18,6 @@ namespace Dalamud.Interface.Internal.Windows.Data.Widgets;
 /// </summary>
 internal class UiColorWidget : IDataWindowWidget
 {
-    private UIColor[]? colors;
-
     /// <inheritdoc/>
     public string[]? CommandShortcuts { get; init; } = ["uicolor"];
 
@@ -36,14 +31,13 @@ internal class UiColorWidget : IDataWindowWidget
     public void Load()
     {
         this.Ready = true;
-        this.colors = null;
     }
 
     /// <inheritdoc/>
     public unsafe void Draw()
     {
-        this.colors ??= Service<DataManager>.Get().GetExcelSheet<UIColor>()?.ToArray();
-        if (this.colors is null) return;
+        var colors = Service<DataManager>.GetNullable()?.GetExcelSheet<UIColor>()
+            ?? throw new InvalidOperationException("UIColor sheet not loaded.");
 
         Service<SeStringRenderer>.Get().CompileAndDrawWrapped(
             "· Color notation is #" +
@@ -73,12 +67,24 @@ internal class UiColorWidget : IDataWindowWidget
         ImGui.TableHeadersRow();
 
         var clipper = new ImGuiListClipperPtr(ImGuiNative.ImGuiListClipper_ImGuiListClipper());
-        clipper.Begin(this.colors.Length, ImGui.GetFrameHeightWithSpacing());
+        clipper.Begin(colors.Count, ImGui.GetFrameHeightWithSpacing());
         while (clipper.Step())
         {
             for (var i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
             {
-                var id = this.colors[i].RowId;
+                var row = colors.GetRowAt(i);
+                UIColor? adjacentRow = null;
+                if (i + 1 < colors.Count)
+                {
+                    var adjRow = colors.GetRowAt(i + 1);
+                    if (adjRow.RowId == row.RowId + 1)
+                    {
+                        adjacentRow = adjRow;
+                    }
+                }
+
+                var id = row.RowId;
+
                 ImGui.TableNextRow();
 
                 ImGui.TableNextColumn();
@@ -88,33 +94,33 @@ internal class UiColorWidget : IDataWindowWidget
                 ImGui.TableNextColumn();
                 ImGui.AlignTextToFramePadding();
                 ImGui.PushID($"row{id}_col1");
-                if (this.DrawColorColumn(this.colors[i].UIForeground) &&
-                    i + 1 < this.colors.Length && this.colors[i + 1].RowId == id + 1)
-                    DrawEdgePreview(id, this.colors[i].UIForeground, this.colors[i + 1].UIForeground);
+                if (this.DrawColorColumn(row.UIForeground) &&
+                    adjacentRow.HasValue)
+                    DrawEdgePreview(id, row.UIForeground, adjacentRow.Value.UIForeground);
                 ImGui.PopID();
 
                 ImGui.TableNextColumn();
                 ImGui.AlignTextToFramePadding();
                 ImGui.PushID($"row{id}_col2");
-                if (this.DrawColorColumn(this.colors[i].UIGlow) &&
-                    i + 1 < this.colors.Length && this.colors[i + 1].RowId == id + 1)
-                    DrawEdgePreview(id, this.colors[i].UIGlow, this.colors[i + 1].UIGlow);
+                if (this.DrawColorColumn(row.UIGlow) &&
+                    adjacentRow.HasValue)
+                    DrawEdgePreview(id, row.UIGlow, adjacentRow.Value.UIGlow);
                 ImGui.PopID();
 
                 ImGui.TableNextColumn();
                 ImGui.AlignTextToFramePadding();
                 ImGui.PushID($"row{id}_col3");
-                if (this.DrawColorColumn(this.colors[i].Unknown2) &&
-                    i + 1 < this.colors.Length && this.colors[i + 1].RowId == id + 1)
-                    DrawEdgePreview(id, this.colors[i].Unknown2, this.colors[i + 1].Unknown2);
+                if (this.DrawColorColumn(row.Unknown0) &&
+                    adjacentRow.HasValue)
+                    DrawEdgePreview(id, row.Unknown0, adjacentRow.Value.Unknown0);
                 ImGui.PopID();
 
                 ImGui.TableNextColumn();
                 ImGui.AlignTextToFramePadding();
                 ImGui.PushID($"row{id}_col4");
-                if (this.DrawColorColumn(this.colors[i].Unknown3) &&
-                    i + 1 < this.colors.Length && this.colors[i + 1].RowId == id + 1)
-                    DrawEdgePreview(id, this.colors[i].Unknown3, this.colors[i + 1].Unknown3);
+                if (this.DrawColorColumn(row.Unknown1) &&
+                    adjacentRow.HasValue)
+                    DrawEdgePreview(id, row.Unknown1, adjacentRow.Value.Unknown1);
                 ImGui.PopID();
             }
         }

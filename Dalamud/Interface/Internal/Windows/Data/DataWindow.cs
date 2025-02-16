@@ -43,6 +43,7 @@ internal class DataWindow : Window, IDisposable
         new HookWidget(),
         new IconBrowserWidget(),
         new ImGuiWidget(),
+        new InventoryWidget(),
         new KeyStateWidget(),
         new MarketBoardWidget(),
         new NetworkMonitorWidget(),
@@ -59,6 +60,7 @@ internal class DataWindow : Window, IDisposable
         new ToastWidget(),
         new UiColorWidget(),
         new UldWidget(),
+        new VfsWidget(),
     };
 
     private readonly IOrderedEnumerable<IDataWindowWidget> orderedModules;

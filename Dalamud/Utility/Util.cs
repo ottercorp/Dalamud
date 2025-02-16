@@ -22,9 +22,10 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Support;
 using ImGuiNET;
-using Lumina.Excel.GeneratedSheets;
+using Lumina.Excel.Sheets;
 using Serilog;
 using Newtonsoft.Json;
 
@@ -72,7 +73,6 @@ public static class Util
     private static readonly Type GenericSpanType = typeof(Span<>);
     private static string? scmVersionInternal;
     private static string? gitHashInternal;
-    private static int? gitCommitCountInternal;
     private static string? gitHashClientStructsInternal;
 
     private static ulong moduleStartAddr;
@@ -85,58 +85,6 @@ public static class Util
         Assembly.GetAssembly(typeof(ChatHandlers)).GetName().Version.ToString();
 
     /// <summary>
-    /// Check two byte arrays for equality.
-    /// </summary>
-    /// <param name="a1">The first byte array.</param>
-    /// <param name="a2">The second byte array.</param>
-    /// <returns>Whether or not the byte arrays are equal.</returns>
-    public static unsafe bool FastByteArrayCompare(byte[]? a1, byte[]? a2)
-    {
-        // Copyright (c) 2008-2013 Hafthor Stefansson
-        // Distributed under the MIT/X11 software license
-        // Ref: http://www.opensource.org/licenses/mit-license.php.
-        // https://stackoverflow.com/a/8808245
-
-        if (a1 == a2) return true;
-        if (a1 == null || a2 == null || a1.Length != a2.Length)
-            return false;
-        fixed (byte* p1 = a1, p2 = a2)
-        {
-            byte* x1 = p1, x2 = p2;
-            var l = a1.Length;
-            for (var i = 0; i < l / 8; i++, x1 += 8, x2 += 8)
-            {
-                if (*((long*)x1) != *((long*)x2))
-                    return false;
-            }
-
-            if ((l & 4) != 0)
-            {
-                if (*((int*)x1) != *((int*)x2))
-                    return false;
-                x1 += 4;
-                x2 += 4;
-            }
-
-            if ((l & 2) != 0)
-            {
-                if (*((short*)x1) != *((short*)x2))
-                    return false;
-                x1 += 2;
-                x2 += 2;
-            }
-
-            if ((l & 1) != 0)
-            {
-                if (*((byte*)x1) != *((byte*)x2))
-                    return false;
-            }
-
-            return true;
-        }
-    }
-
-    /// <summary>
     /// Gets the SCM Version from the assembly, or null if it cannot be found. This method will generally return
     /// the <c>git describe</c> output for this build, which will be a raw version if this is a stable build or an
     /// appropriately-annotated version if this is *not* stable. Local builds will return a `Local Build` text string.
@@ -145,11 +93,11 @@ public static class Util
     public static string GetScmVersion()
     {
         if (scmVersionInternal != null) return scmVersionInternal;
-        
+
         var asm = typeof(Util).Assembly;
         var attrs = asm.GetCustomAttributes<AssemblyMetadataAttribute>();
 
-        return scmVersionInternal = attrs.First(a => a.Key == "SCMVersion").Value 
+        return scmVersionInternal = attrs.First(a => a.Key == "SCMVersion").Value
                                         ?? asm.GetName().Version!.ToString();
     }
 
@@ -170,29 +118,7 @@ public static class Util
     }
 
     /// <summary>
-    /// Gets the amount of commits in the current branch, or null if undetermined.
-    /// </summary>
-    /// <returns>The amount of commits in the current branch.</returns>
-    [Obsolete($"Planned for removal in API 11. Use {nameof(GetScmVersion)} for version tracking.")]
-    public static int? GetGitCommitCount()
-    {
-        if (gitCommitCountInternal != null)
-            return gitCommitCountInternal.Value;
-
-        var asm = typeof(Util).Assembly;
-        var attrs = asm.GetCustomAttributes<AssemblyMetadataAttribute>();
-
-        var value = attrs.First(a => a.Key == "GitCommitCount").Value;
-        if (value == null)
-            return null;
-
-        gitCommitCountInternal = int.Parse(value);
-        return gitCommitCountInternal.Value;
-    }
-
-    /// <summary>
-    /// Gets the git hash value from the assembly
-    /// or null if it cannot be found.
+    /// Gets the git hash value from the assembly or null if it cannot be found.
     /// </summary>
     /// <returns>The git hash of the assembly.</returns>
     public static string? GetGitHashClientStructs()
@@ -839,7 +765,7 @@ public static class Util
         var names = data.GetExcelSheet<BNpcName>(ClientLanguage.ChineseSimplified)!;
         var rng = new Random();
 
-        return names.ElementAt(rng.Next(0, names.Count() - 1)).Singular.RawString;
+        return names.GetRowAt(rng.Next(0, names.Count - 1)).Singular.ExtractText();
     }
 
     /// <summary>
@@ -899,7 +825,7 @@ public static class Util
             // ignore
         }
     }
-    
+
     /// <summary>
     /// Print formatted IGameObject Information to ImGui.
     /// </summary>
@@ -917,13 +843,13 @@ public static class Util
         if (actor is ICharacter chara)
         {
             actorString +=
-                $"       Level: {chara.Level} ClassJob: {(resolveGameData ? chara.ClassJob.GameData?.Name : chara.ClassJob.Id.ToString())} CHP: {chara.CurrentHp} MHP: {chara.MaxHp} CMP: {chara.CurrentMp} MMP: {chara.MaxMp}\n       Customize: {BitConverter.ToString(chara.Customize).Replace("-", " ")} StatusFlags: {chara.StatusFlags}\n";
+                $"       Level: {chara.Level} ClassJob: {(resolveGameData ? chara.ClassJob.ValueNullable?.Name : chara.ClassJob.RowId.ToString())} CHP: {chara.CurrentHp} MHP: {chara.MaxHp} CMP: {chara.CurrentMp} MMP: {chara.MaxMp}\n       Customize: {BitConverter.ToString(chara.Customize).Replace("-", " ")} StatusFlags: {chara.StatusFlags}\n";
         }
 
         if (actor is IPlayerCharacter pc)
         {
             actorString +=
-                $"       HomeWorld: {(resolveGameData ? pc.HomeWorld.GameData?.Name : pc.HomeWorld.Id.ToString())} CurrentWorld: {(resolveGameData ? pc.CurrentWorld.GameData?.Name : pc.CurrentWorld.Id.ToString())} FC: {pc.CompanyTag}\n";
+                $"       HomeWorld: {(resolveGameData ? pc.HomeWorld.ValueNullable?.Name : pc.HomeWorld.RowId.ToString())} CurrentWorld: {(resolveGameData ? pc.CurrentWorld.ValueNullable?.Name : pc.CurrentWorld.RowId.ToString())} FC: {pc.CompanyTag}\n";
         }
 
         ImGui.TextUnformatted(actorString);
@@ -951,13 +877,13 @@ public static class Util
         if (actor is Character chara)
         {
             actorString +=
-                $"       Level: {chara.Level} ClassJob: {(resolveGameData ? chara.ClassJob.GameData?.Name : chara.ClassJob.Id.ToString())} CHP: {chara.CurrentHp} MHP: {chara.MaxHp} CMP: {chara.CurrentMp} MMP: {chara.MaxMp}\n       Customize: {BitConverter.ToString(chara.Customize).Replace("-", " ")} StatusFlags: {chara.StatusFlags}\n";
+                $"       Level: {chara.Level} ClassJob: {(resolveGameData ? chara.ClassJob.ValueNullable?.Name : chara.ClassJob.RowId.ToString())} CHP: {chara.CurrentHp} MHP: {chara.MaxHp} CMP: {chara.CurrentMp} MMP: {chara.MaxMp}\n       Customize: {BitConverter.ToString(chara.Customize).Replace("-", " ")} StatusFlags: {chara.StatusFlags}\n";
         }
 
         if (actor is PlayerCharacter pc)
         {
             actorString +=
-                $"       HomeWorld: {(resolveGameData ? pc.HomeWorld.GameData?.Name : pc.HomeWorld.Id.ToString())} CurrentWorld: {(resolveGameData ? pc.CurrentWorld.GameData?.Name : pc.CurrentWorld.Id.ToString())} FC: {pc.CompanyTag}\n";
+                $"       HomeWorld: {(resolveGameData ? pc.HomeWorld.ValueNullable?.Name : pc.HomeWorld.RowId.ToString())} CurrentWorld: {(resolveGameData ? pc.CurrentWorld.ValueNullable?.Name : pc.CurrentWorld.RowId.ToString())} FC: {pc.CompanyTag}\n";
         }
 
         ImGui.TextUnformatted(actorString);
@@ -1076,73 +1002,71 @@ public static class Util
         dm.Invoke(null, new[] { obj, path, addr });
     }
 
+#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+
     private static unsafe void ShowSpanPrivate<T>(ulong addr, IList<string> path, int offset, bool isTop, in Span<T> spanobj)
     {
-#pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
         if (isTop)
         {
             fixed (void* p = spanobj)
             {
-                if (!ImGui.TreeNode(
-                    $"Span<{typeof(T).Name}> of length {spanobj.Length:n0} (0x{spanobj.Length:X})" +
-                    $"##print-obj-{addr:X}-{string.Join("-", path)}-head"))
+                using var tree = ImRaii.TreeNode($"Span<{typeof(T).Name}> of length {spanobj.Length:n0} (0x{spanobj.Length:X})" + $"##print-obj-{addr:X}-{string.Join("-", path)}-head", ImGuiTreeNodeFlags.SpanFullWidth);
+                if (tree.Success)
                 {
-                    return;
+                    ShowSpanEntryPrivate(addr, path, offset, spanobj);
                 }
             }
         }
-
-        try
+        else
         {
-            const int batchSize = 20;
-            if (spanobj.Length > batchSize)
-            {
-                var skip = batchSize;
-                while ((spanobj.Length + skip - 1) / skip > batchSize)
-                    skip *= batchSize;
-                for (var i = 0; i < spanobj.Length; i += skip)
-                {
-                    var next = Math.Min(i + skip, spanobj.Length);
-                    path.Add($"{offset + i:X}_{skip}");
-                    if (ImGui.TreeNode(
-                        $"{offset + i:n0} ~ {offset + next - 1:n0} (0x{offset + i:X} ~ 0x{offset + next - 1:X})" +
-                        $"##print-obj-{addr:X}-{string.Join("-", path)}"))
-                    {
-                        try
-                        {
-                            ShowSpanPrivate(addr, path, offset + i, false, spanobj[i..next]);
-                        }
-                        finally
-                        {
-                            ImGui.TreePop();
-                        }
-                    }
-
-                    path.RemoveAt(path.Count - 1);
-                }
-            }
-            else
-            {
-                fixed (T* p = spanobj)
-                {
-                    var pointerType = typeof(T*);
-                    for (var i = 0; i < spanobj.Length; i++)
-                    {
-                        ImGui.TextUnformatted($"[{offset + i:n0} (0x{offset + i:X})] ");
-                        ImGui.SameLine();
-                        path.Add($"{offset + i}");
-                        ShowValue(addr, path, pointerType, Pointer.Box(p + i, pointerType), true);
-                    }
-                }
-            }
+            ShowSpanEntryPrivate(addr, path, offset, spanobj);
         }
-        finally
-        {
-            if (isTop)
-                ImGui.TreePop();
-        }
-#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
     }
+
+    private static unsafe void ShowSpanEntryPrivate<T>(ulong addr, IList<string> path, int offset, Span<T> spanobj)
+    {
+        const int batchSize = 20;
+        if (spanobj.Length > batchSize)
+        {
+            var skip = batchSize;
+            while ((spanobj.Length + skip - 1) / skip > batchSize)
+            {
+                skip *= batchSize;
+            }
+
+            for (var i = 0; i < spanobj.Length; i += skip)
+            {
+                var next = Math.Min(i + skip, spanobj.Length);
+                path.Add($"{offset + i:X}_{skip}");
+
+                using (var tree = ImRaii.TreeNode($"{offset + i:n0} ~ {offset + next - 1:n0} (0x{offset + i:X} ~ 0x{offset + next - 1:X})" + $"##print-obj-{addr:X}-{string.Join("-", path)}", ImGuiTreeNodeFlags.SpanFullWidth))
+                {
+                    if (tree.Success)
+                    {
+                        ShowSpanEntryPrivate(addr, path, offset + i, spanobj[i..next]);
+                    }
+                }
+
+                path.RemoveAt(path.Count - 1);
+            }
+        }
+        else
+        {
+            fixed (T* p = spanobj)
+            {
+                var pointerType = typeof(T*);
+                for (var i = 0; i < spanobj.Length; i++)
+                {
+                    ImGui.TextUnformatted($"[{offset + i:n0} (0x{offset + i:X})] ");
+                    ImGui.SameLine();
+                    path.Add($"{offset + i}");
+                    ShowValue(addr, path, pointerType, Pointer.Box(p + i, pointerType), true);
+                }
+            }
+        }
+    }
+
+#pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
 
     private static unsafe void ShowValue(ulong addr, IList<string> path, Type type, object value, bool hideAddress)
     {
@@ -1159,9 +1083,10 @@ public static class Util
                     if (moduleStartAddr > 0 && unboxedAddr >= moduleStartAddr && unboxedAddr <= moduleEndAddr)
                     {
                         ImGui.SameLine();
-                        ImGui.PushStyleColor(ImGuiCol.Text, 0xffcbc0ff);
-                        ImGuiHelpers.ClickToCopyText($"ffxiv_dx11.exe+{unboxedAddr - moduleStartAddr:X}");
-                        ImGui.PopStyleColor();
+                        using (ImRaii.PushColor(ImGuiCol.Text, 0xffcbc0ff))
+                        {
+                            ImGuiHelpers.ClickToCopyText($"ffxiv_dx11.exe+{unboxedAddr - moduleStartAddr:X}");
+                        }
                     }
 
                     ImGui.SameLine();
@@ -1213,117 +1138,136 @@ public static class Util
     /// <param name="hideAddress">Do not print addresses. Use when displaying a copied value.</param>
     private static void ShowStructInternal(object obj, ulong addr, bool autoExpand = false, IEnumerable<string>? path = null, bool hideAddress = false)
     {
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(3, 2));
-        path ??= new List<string>();
-        var pathList = path is List<string> ? (List<string>)path : path.ToList();
-
-        if (moduleEndAddr == 0 && moduleStartAddr == 0)
+        using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, new Vector2(3, 2)))
         {
-            try
+            path ??= new List<string>();
+            var pathList = path as List<string> ?? path.ToList();
+
+            if (moduleEndAddr == 0 && moduleStartAddr == 0)
             {
-                var processModule = Process.GetCurrentProcess().MainModule;
-                if (processModule != null)
+                try
                 {
-                    moduleStartAddr = (ulong)processModule.BaseAddress.ToInt64();
-                    moduleEndAddr = moduleStartAddr + (ulong)processModule.ModuleMemorySize;
+                    var processModule = Process.GetCurrentProcess().MainModule;
+                    if (processModule != null)
+                    {
+                        moduleStartAddr = (ulong)processModule.BaseAddress.ToInt64();
+                        moduleEndAddr = moduleStartAddr + (ulong)processModule.ModuleMemorySize;
+                    }
+                    else
+                    {
+                        moduleEndAddr = 1;
+                    }
                 }
-                else
+                catch
                 {
                     moduleEndAddr = 1;
                 }
             }
-            catch
+
+            if (autoExpand)
             {
-                moduleEndAddr = 1;
+                ImGui.SetNextItemOpen(true, ImGuiCond.Appearing);
             }
-        }
 
-        ImGui.PushStyleColor(ImGuiCol.Text, 0xFF00FFFF);
-        if (autoExpand)
-        {
-            ImGui.SetNextItemOpen(true, ImGuiCond.Appearing);
-        }
+            using var col = ImRaii.PushColor(ImGuiCol.Text, 0xFF00FFFF);
+            using var tree = ImRaii.TreeNode($"{obj}##print-obj-{addr:X}-{string.Join("-", pathList)}", ImGuiTreeNodeFlags.SpanFullWidth);
+            col.Pop();
 
-        if (ImGui.TreeNode($"{obj}##print-obj-{addr:X}-{string.Join("-", pathList)}"))
-        {
-            ImGui.PopStyleColor();
-            foreach (var f in obj.GetType()
-                                 .GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.Instance))
+            if (tree.Success)
             {
-                var fixedBuffer = (FixedBufferAttribute)f.GetCustomAttribute(typeof(FixedBufferAttribute));
-                if (fixedBuffer != null)
+                foreach (var f in obj.GetType()
+                                     .GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.Instance))
                 {
-                    ImGui.Text($"fixed");
+                    var fixedBuffer = (FixedBufferAttribute)f.GetCustomAttribute(typeof(FixedBufferAttribute));
+                    var offset = (FieldOffsetAttribute)f.GetCustomAttribute(typeof(FieldOffsetAttribute));
+
+                    if (fixedBuffer != null)
+                    {
+                        ImGui.Text("fixed");
+                        ImGui.SameLine();
+                        ImGui.TextColored(new Vector4(0.2f, 0.9f, 0.9f, 1), $"{fixedBuffer.ElementType.Name}[0x{fixedBuffer.Length:X}]");
+                    }
+                    else
+                    {
+                        if (offset != null)
+                        {
+                            ImGui.TextDisabled($"[0x{offset.Value:X}]");
+                            ImGui.SameLine();
+                        }
+
+                        ImGui.TextColored(new Vector4(0.2f, 0.9f, 0.9f, 1), $"{f.FieldType.Name}");
+                    }
+
                     ImGui.SameLine();
-                    ImGui.TextColored(new Vector4(0.2f, 0.9f, 0.9f, 1),
-                                      $"{fixedBuffer.ElementType.Name}[0x{fixedBuffer.Length:X}]");
-                }
-                else
-                {
-                    ImGui.TextColored(new Vector4(0.2f, 0.9f, 0.9f, 1), $"{f.FieldType.Name}");
+                    ImGui.TextColored(new Vector4(0.2f, 0.9f, 0.4f, 1), $"{f.Name}: ");
+                    ImGui.SameLine();
+
+                    pathList.Add(f.Name);
+                    try
+                    {
+                        if (f.FieldType.IsGenericType && (f.FieldType.IsByRef || f.FieldType.IsByRefLike))
+                        {
+                            ImGui.Text("Cannot preview ref typed fields."); // object never contains ref struct
+                        }
+                        else if (f.FieldType == typeof(bool) && offset != null)
+                        {
+                            ShowValue(addr, pathList, f.FieldType, Marshal.ReadByte((nint)addr + offset.Value) > 0, hideAddress);
+                        }
+                        else
+                        {
+                            ShowValue(addr, pathList, f.FieldType, f.GetValue(obj), hideAddress);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1f, 0.4f, 0.4f, 1f)))
+                        {
+                            ImGui.TextUnformatted($"Error: {ex.GetType().Name}: {ex.Message}");
+                        }
+                    }
+                    finally
+                    {
+                        pathList.RemoveAt(pathList.Count - 1);
+                    }
                 }
 
-                ImGui.SameLine();
-                ImGui.TextColored(new Vector4(0.2f, 0.9f, 0.4f, 1), $"{f.Name}: ");
-                ImGui.SameLine();
+                foreach (var p in obj.GetType().GetProperties().Where(static p => p.GetGetMethod()?.GetParameters().Length == 0))
+                {
+                    ImGui.TextColored(new Vector4(0.2f, 0.9f, 0.9f, 1), $"{p.PropertyType.Name}");
+                    ImGui.SameLine();
+                    ImGui.TextColored(new Vector4(0.2f, 0.6f, 0.4f, 1), $"{p.Name}: ");
+                    ImGui.SameLine();
 
-                pathList.Add(f.Name);
-                try
-                {
-                    if (f.FieldType.IsGenericType && (f.FieldType.IsByRef || f.FieldType.IsByRefLike))
-                        ImGui.Text("Cannot preview ref typed fields."); // object never contains ref struct
-                    else
-                        ShowValue(addr, pathList, f.FieldType, f.GetValue(obj), hideAddress);
-                }
-                catch (Exception ex)
-                {
-                    ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.4f, 0.4f, 1f));
-                    ImGui.TextUnformatted($"Error: {ex.GetType().Name}: {ex.Message}");
-                    ImGui.PopStyleColor();
-                }
-                finally
-                {
-                    pathList.RemoveAt(pathList.Count - 1);
+                    pathList.Add(p.Name);
+                    try
+                    {
+                        if (p.PropertyType.IsGenericType && p.PropertyType.GetGenericTypeDefinition() == GenericSpanType)
+                        {
+                            ShowSpanProperty(addr, pathList, p, obj);
+                        }
+                        else if (p.PropertyType.IsGenericType && (p.PropertyType.IsByRef || p.PropertyType.IsByRefLike))
+                        {
+                            ImGui.Text("Cannot preview ref typed properties.");
+                        }
+                        else
+                        {
+                            ShowValue(addr, pathList, p.PropertyType, p.GetValue(obj), hideAddress);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1f, 0.4f, 0.4f, 1f)))
+                        {
+                            ImGui.TextUnformatted($"Error: {ex.GetType().Name}: {ex.Message}");
+                        }
+                    }
+                    finally
+                    {
+                        pathList.RemoveAt(pathList.Count - 1);
+                    }
                 }
             }
-
-            foreach (var p in obj.GetType().GetProperties().Where(p => p.GetGetMethod()?.GetParameters().Length == 0))
-            {
-                ImGui.TextColored(new Vector4(0.2f, 0.9f, 0.9f, 1), $"{p.PropertyType.Name}");
-                ImGui.SameLine();
-                ImGui.TextColored(new Vector4(0.2f, 0.6f, 0.4f, 1), $"{p.Name}: ");
-                ImGui.SameLine();
-
-                pathList.Add(p.Name);
-                try
-                {
-                    if (p.PropertyType.IsGenericType && p.PropertyType.GetGenericTypeDefinition() == GenericSpanType)
-                        ShowSpanProperty(addr, pathList, p, obj);
-                    else if (p.PropertyType.IsGenericType && (p.PropertyType.IsByRef || p.PropertyType.IsByRefLike))
-                        ImGui.Text("Cannot preview ref typed properties.");
-                    else
-                        ShowValue(addr, pathList, p.PropertyType, p.GetValue(obj), hideAddress);
-                }
-                catch (Exception ex)
-                {
-                    ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.4f, 0.4f, 1f));
-                    ImGui.TextUnformatted($"Error: {ex.GetType().Name}: {ex.Message}");
-                    ImGui.PopStyleColor();
-                }
-                finally
-                {
-                    pathList.RemoveAt(pathList.Count - 1);
-                }
-            }
-
-            ImGui.TreePop();
         }
-        else
-        {
-            ImGui.PopStyleColor();
-        }
-
-        ImGui.PopStyleVar();
     }
 
     internal static async Task<string> GetRemoteTOSHash()

@@ -60,9 +60,7 @@ internal unsafe partial class TextNodeTree : ResNodeTree
                 EdgeStrength = 1f,
             };
 
-#pragma warning disable SeStringRenderer
             ImGuiHelpers.SeStringWrapped(this.NodeText.AsSpan(), style);
-#pragma warning restore SeStringRenderer
         }
         catch
         {
@@ -85,7 +83,7 @@ internal unsafe partial class TextNodeTree : ResNodeTree
     {
         using var tree = ImRaii.TreeNode($"Text Payloads##{(nint)this.Node:X}");
 
-        if (tree)
+        if (tree.Success)
         {
             var utf8String = this.NodeText;
             var seStringBytes = new byte[utf8String.BufUsed];

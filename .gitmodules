@@ -13,3 +13,12 @@
 [submodule "FfxivArgLauncher"]
 	path = FfxivArgLauncher
 	url = https://github.com/ottercorp/FfxivArgLauncher.git
+[submodule "lib/cimgui"]
+	path = lib/cimgui
+	url = https://github.com/goatcorp/gc-cimgui
+[submodule "lib/cimplot"]
+	path = lib/cimplot
+	url = https://github.com/goatcorp/gc-cimplot
+[submodule "lib/cimguizmo"]
+	path = lib/cimguizmo
+	url = https://github.com/goatcorp/gc-cimguizmo
