@@ -93,7 +93,6 @@ internal partial class ChatHandlers : IServiceType
     {
         chatGui.CheckMessageHandled += this.OnCheckMessageHandled;
         chatGui.ChatMessage += this.OnChatMessage;
-        Service<ClientState.ClientState>.Get().Logout += (_, _) => { this.hasSendMeasurement = false; };
     }
 
     /// <summary>
@@ -155,6 +154,7 @@ internal partial class ChatHandlers : IServiceType
                                      clientState.LocalPlayer.HomeWorld.RowId,
                                      aid));
             this.hasSendMeasurement = true;
+            Service<ClientState.ClientState>.Get().Logout += (_, _) => { this.hasSendMeasurement = false; };
         }
 #if !DEBUG && false
             if (!this.hasSeenLoadingMsg)
