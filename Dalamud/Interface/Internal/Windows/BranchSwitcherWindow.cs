@@ -88,7 +88,7 @@ public class BranchSwitcherWindow : Window
             {
                 var config = Service<DalamudConfiguration>.Get();
                 config.DalamudBetaKind = pickedBranch.Key;
-                config.DalamudBetaKey = pickedBranch.Value.Key;
+                //config.DalamudBetaKey = pickedBranch.Value.Key;
                 config.QueueSave();
             }
 
