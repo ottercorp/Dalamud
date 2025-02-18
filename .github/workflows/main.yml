@@ -118,6 +118,10 @@ jobs:
       with:
         name: dalamud-artifact
         path: .\scratch
+        
+    - uses: geekyeggo/delete-artifact@v5
+      with:
+          name: dalamud-artifact
 
     - name: Extract branch name
       shell: bash
