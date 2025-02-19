@@ -67,8 +67,10 @@ namespace Dalamud.Injector
                 DalamudStartInfo startInfo = null;
                 if (args.Count == 1)
                 {
-                    Console.WriteLine("You must provide at least one argument.");
+#if !DEBUG
+                    Log.Error("You must provide at least one argument.");
                     return 1;
+#endif
                     // No command defaults to inject
                     args.Add("inject");
                     args.Add("--all");
