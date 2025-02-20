@@ -53,6 +53,10 @@ public class SettingsTabExperimental : SettingsTab
 
         new GapSettingsEntry(5, true),
 
+        new ProxySettingsEntry(),
+
+        new GapSettingsEntry(5),
+
         new DevPluginsSettingsEntry(),
 
         new SettingsEntry<bool>(
