@@ -42,19 +42,19 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dalamud.CorePlugin", "Dalam
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFXIVClientStructs", "lib\FFXIVClientStructs\FFXIVClientStructs\FFXIVClientStructs.csproj", "{C9B87BD7-AF49-41C3-91F1-D550ADEB7833}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFXIVClientStructs.Generators", "lib\FFXIVClientStructs\FFXIVClientStructs.Generators\FFXIVClientStructs.Generators.csproj", "{E0D51896-604F-4B40-8CFE-51941607B3A1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFXIVClientStructs.Generators", "lib\FFXIVClientStructs\FFXIVClientStructs.Generators\FFXIVClientStructs.Generators.csproj", "{E0D51896-604F-4B40-8CFE-51941607B3A1}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DalamudCrashHandler", "DalamudCrashHandler\DalamudCrashHandler.vcxproj", "{317A264C-920B-44A1-8A34-F3A6827B0705}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dalamud.Common", "Dalamud.Common\Dalamud.Common.csproj", "{F21B13D2-D7D0-4456-B70F-3F8D695064E2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dalamud.LocExporter", "tools\Dalamud.LocExporter\Dalamud.LocExporter.csproj", "{A568929D-6FF6-4DFA-9D14-5D7DC08FA5E0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dalamud.LocExporter", "tools\Dalamud.LocExporter\Dalamud.LocExporter.csproj", "{A568929D-6FF6-4DFA-9D14-5D7DC08FA5E0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InteropGenerator", "lib\FFXIVClientStructs\InteropGenerator\InteropGenerator.csproj", "{3620414C-7DFC-423E-929F-310E19F5D930}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "InteropGenerator", "lib\FFXIVClientStructs\InteropGenerator\InteropGenerator.csproj", "{3620414C-7DFC-423E-929F-310E19F5D930}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InteropGenerator.Runtime", "lib\FFXIVClientStructs\InteropGenerator.Runtime\InteropGenerator.Runtime.csproj", "{A6AA1C3F-9470-4922-9D3F-D4549657AB22}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "InteropGenerator.Runtime", "lib\FFXIVClientStructs\InteropGenerator.Runtime\InteropGenerator.Runtime.csproj", "{A6AA1C3F-9470-4922-9D3F-D4549657AB22}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FfxivArgLauncher", "lib\FfxivArgLauncher\FfxivArgLauncher.csproj", "{98452E69-C90D-4893-8B0E-CAA0AE86B176}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FfxivArgLauncher", "lib\FfxivArgLauncher\FfxivArgLauncher.csproj", "{98452E69-C90D-4893-8B0E-CAA0AE86B176}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Injector", "Injector", "{19775C83-7117-4A5F-AA00-18889F46A490}"
 EndProject
@@ -69,6 +69,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cimplot", "external\cimplot\cimplot.vcxproj", "{76CAA246-C405-4A8C-B0AE-F4A0EF3D4E16}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cimguizmo", "external\cimguizmo\cimguizmo.vcxproj", "{F258347D-31BE-4605-98CE-40E43BDF6F9D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lumina", "lib\Lumina\src\Lumina\Lumina.csproj", "{2D08A083-2E3D-42C6-9762-EFD4E7962539}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -118,6 +120,10 @@ Global
 		{C9B87BD7-AF49-41C3-91F1-D550ADEB7833}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C9B87BD7-AF49-41C3-91F1-D550ADEB7833}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C9B87BD7-AF49-41C3-91F1-D550ADEB7833}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E0D51896-604F-4B40-8CFE-51941607B3A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E0D51896-604F-4B40-8CFE-51941607B3A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E0D51896-604F-4B40-8CFE-51941607B3A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E0D51896-604F-4B40-8CFE-51941607B3A1}.Release|Any CPU.Build.0 = Release|Any CPU
 		{317A264C-920B-44A1-8A34-F3A6827B0705}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{317A264C-920B-44A1-8A34-F3A6827B0705}.Debug|Any CPU.Build.0 = Debug|x64
 		{317A264C-920B-44A1-8A34-F3A6827B0705}.Release|Any CPU.ActiveCfg = Release|x64
@@ -138,10 +144,6 @@ Global
 		{A6AA1C3F-9470-4922-9D3F-D4549657AB22}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A6AA1C3F-9470-4922-9D3F-D4549657AB22}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A6AA1C3F-9470-4922-9D3F-D4549657AB22}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E0D51896-604F-4B40-8CFE-51941607B3A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E0D51896-604F-4B40-8CFE-51941607B3A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E0D51896-604F-4B40-8CFE-51941607B3A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E0D51896-604F-4B40-8CFE-51941607B3A1}.Release|Any CPU.Build.0 = Release|Any CPU
 		{98452E69-C90D-4893-8B0E-CAA0AE86B176}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{98452E69-C90D-4893-8B0E-CAA0AE86B176}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{98452E69-C90D-4893-8B0E-CAA0AE86B176}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -158,6 +160,10 @@ Global
 		{F258347D-31BE-4605-98CE-40E43BDF6F9D}.Debug|Any CPU.Build.0 = Debug|x64
 		{F258347D-31BE-4605-98CE-40E43BDF6F9D}.Release|Any CPU.ActiveCfg = Release|x64
 		{F258347D-31BE-4605-98CE-40E43BDF6F9D}.Release|Any CPU.Build.0 = Release|x64
+		{2D08A083-2E3D-42C6-9762-EFD4E7962539}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2D08A083-2E3D-42C6-9762-EFD4E7962539}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2D08A083-2E3D-42C6-9762-EFD4E7962539}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2D08A083-2E3D-42C6-9762-EFD4E7962539}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -179,6 +185,7 @@ Global
 		{8BBACF2D-7AB8-4610-A115-0E363D35C291} = {E15BDA6D-E881-4482-94BA-BE5527E917FF}
 		{76CAA246-C405-4A8C-B0AE-F4A0EF3D4E16} = {DBE5345E-6594-4A59-B183-1C3D5592269D}
 		{F258347D-31BE-4605-98CE-40E43BDF6F9D} = {DBE5345E-6594-4A59-B183-1C3D5592269D}
+		{2D08A083-2E3D-42C6-9762-EFD4E7962539} = {DBE5345E-6594-4A59-B183-1C3D5592269D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {79B65AC9-C940-410E-AB61-7EA7E12C7599}
