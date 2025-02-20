@@ -10,8 +10,8 @@
 [submodule "lib/TsudaKageyu-minhook"]
 	path = lib/TsudaKageyu-minhook
 	url = https://github.com/TsudaKageyu/minhook.git
-[submodule "FfxivArgLauncher"]
-	path = FfxivArgLauncher
+[submodule "lib/FfxivArgLauncher"]
+	path = lib/FfxivArgLauncher
 	url = https://github.com/ottercorp/FfxivArgLauncher.git
 [submodule "lib/cimgui"]
 	path = lib/cimgui

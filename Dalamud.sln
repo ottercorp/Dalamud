@@ -54,7 +54,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InteropGenerator", "lib\FFX
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InteropGenerator.Runtime", "lib\FFXIVClientStructs\InteropGenerator.Runtime\InteropGenerator.Runtime.csproj", "{A6AA1C3F-9470-4922-9D3F-D4549657AB22}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FfxivArgLauncher", "FfxivArgLauncher\FfxivArgLauncher.csproj", "{98452E69-C90D-4893-8B0E-CAA0AE86B176}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FfxivArgLauncher", "lib\FfxivArgLauncher\FfxivArgLauncher.csproj", "{98452E69-C90D-4893-8B0E-CAA0AE86B176}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Injector", "Injector", "{19775C83-7117-4A5F-AA00-18889F46A490}"
 EndProject
