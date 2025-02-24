@@ -27,14 +27,14 @@ internal class PluginRepository
     /// <summary>
     /// The URL of the official main repository.
     /// </summary>
-    public const string MainRepoUrl = "https://aonyx.ffxiv.wang/Plugin/PluginMaster?apiLevel=11";
+    public const string MainRepoUrl = ServerAddress.MainAddress + "/Plugin/PluginMaster?apiLevel=11";
 
     private const int HttpRequestTimeoutSeconds = 20;
 
     private static readonly ModuleLog Log = new("PLUGINR");
-    
+
     private readonly HttpClient httpClient;
-    
+
     private static readonly InMemoryCacheHandler CacheHandler = new(
         new SocketsHttpHandler
         {
@@ -184,7 +184,7 @@ internal class PluginRepository
             }
 
             this.PluginMaster = pluginMaster.Where(this.IsValidManifest).ToList().AsReadOnly();
-            
+
             // API9 HACK: Force IsHide to false, we should remove that
             if (!this.IsThirdParty)
             {
@@ -220,7 +220,7 @@ internal class PluginRepository
             Log.Error("Plugin {PluginName} in {RepoLink} has an invalid Name.", manifest.InternalName, this.PluginMasterUrl);
             return false;
         }
-        
+
         // ReSharper disable once ConditionIsAlwaysTrueOrFalse
         if (manifest.AssemblyVersion == null)
         {
@@ -247,7 +247,7 @@ internal class PluginRepository
         request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
 
         using var requestCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeout));
-       
+
         return await httpClient.SendAsync(request, requestCts.Token);
     }
 }

@@ -14,7 +14,7 @@ namespace Dalamud.Support;
 /// </summary>
 internal static class BugBait
 {
-    private const string BugBaitUrl = "https://aonyx.ffxiv.wang/plugin/feedback";
+    private const string BugBaitUrl = ServerAddress.MainAddress + "/plugin/feedback";
 
     /// <summary>
     /// Send feedback to Discord.
@@ -43,7 +43,7 @@ internal static class BugBait
         {
             model.Exception = Troubleshooting.LastException == null ? "Was included, but none happened" : Troubleshooting.LastException?.ToString();
         }
-        
+
         var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
 
         var postContent = new StringContent(JsonConvert.SerializeObject(model), Encoding.UTF8, "application/json");

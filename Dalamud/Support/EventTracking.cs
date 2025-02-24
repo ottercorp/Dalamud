@@ -22,7 +22,7 @@ namespace Dalamud.Support;
 internal static class EventTracking
 {
 
-    private const string AnalyticsUrl = "https://aonyx.ffxiv.wang/Dalamud/Analytics/Start";
+    private const string AnalyticsUrl = ServerAddress.MainAddress + "/Dalamud/Analytics/Start";
 
     public static async Task SendMeasurement(ulong contentId, uint actorId, uint homeWorldId, ulong aid)
     {

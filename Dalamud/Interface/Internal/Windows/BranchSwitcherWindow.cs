@@ -10,6 +10,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 using Dalamud.Networking.Http;
+using Dalamud.Utility;
 
 using ImGuiNET;
 using Newtonsoft.Json;
@@ -21,7 +22,7 @@ namespace Dalamud.Interface.Internal.Windows;
 /// </summary>
 public class BranchSwitcherWindow : Window
 {
-    private const string BranchInfoUrl = "https://aonyx.ffxiv.wang/Dalamud/Release/Meta";
+    private const string BranchInfoUrl = ServerAddress.MainAddress + "/Dalamud/Release/Meta";
 
     private Dictionary<string, VersionEntry>? branches;
     private int selectedBranchIndex;

@@ -47,7 +47,7 @@ namespace Dalamud.Utility;
 /// </summary>
 public static class Util
 {
-    internal static string TOSRemoteUrl = "https://aonyx.ffxiv.wang/Dalamud/ToS";
+    internal static string TOSRemoteUrl = ServerAddress.MainAddress + "/Dalamud/ToS";
     private static readonly string[] PageProtectionFlagNames = [
         "PAGE_NOACCESS",
         "PAGE_READONLY",
@@ -467,7 +467,7 @@ public static class Util
 
         return text;
     }
-    
+
     /// <summary>
     /// Compress a string using GZip.
     /// </summary>
@@ -557,7 +557,7 @@ public static class Util
 
         return IsWine() ? OSPlatform.Linux : OSPlatform.Windows;
     }
-    
+
     /// <summary>
     /// Heuristically determine if the Windows version is higher than Windows 11's first build.
     /// </summary>
