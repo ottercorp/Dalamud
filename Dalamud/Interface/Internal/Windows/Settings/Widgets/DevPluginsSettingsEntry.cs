@@ -219,13 +219,14 @@ public class DevPluginsSettingsEntry : SettingsEntry
                 "DalamudDevPluginInvalid",
                 "The entered value is not a valid path to a potential Dev Plugin.\nDid you mean to enter it as a custom plugin repository in the fields below instead?");
             Task.Delay(5000).ContinueWith(t => this.devPluginLocationAddError = string.Empty);
+            return;
         }
         else
         {
             this.devPluginLocations.Add(
                 new DevPluginLocationSettings
                 {
-                    Path = this.devPluginTempLocation.Replace("\"", string.Empty),
+                    Path = this.devPluginTempLocation,
                     IsEnabled = true,
                 });
             this.devPluginLocationsChanged = true;
