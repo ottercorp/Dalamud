@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 
 using Dalamud.Configuration.Internal;
 using Dalamud.Networking.Http;
+using Dalamud.Utility;
 
 using Newtonsoft.Json;
 
@@ -14,8 +15,8 @@ namespace Dalamud.Support;
 [ServiceManager.EarlyLoadedService]
 internal class DalamudReleases : IServiceType
 {
-    private const string VersionInfoUrl = "https://kamori.goats.dev/Dalamud/Release/VersionInfo?track={0}";
-    
+    private const string VersionInfoUrl = ServerAddress.MainAddress + "/Dalamud/Release/VersionInfo?track={0}";
+
     private readonly HappyHttpClient httpClient;
     private readonly DalamudConfiguration config;
 
@@ -30,7 +31,7 @@ internal class DalamudReleases : IServiceType
         this.httpClient = httpClient;
         this.config = config;
     }
-    
+
     /// <summary>
     /// Get the latest version info for the current track.
     /// </summary>
@@ -43,7 +44,7 @@ internal class DalamudReleases : IServiceType
         var content = await response.Content.ReadAsStringAsync();
         return JsonConvert.DeserializeObject<DalamudVersionInfo>(content);
     }
-    
+
     [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented", Justification = "laziness")]
     public class DalamudVersionInfo
     {
