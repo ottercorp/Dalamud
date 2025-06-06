@@ -225,7 +225,7 @@ internal unsafe class UiDebug
 
                     ImGui.SameLine();
                     if (ImGui.Button($"Decode##{(ulong)textNode:X}"))
-                        textNode->NodeText.SetString(new ReadOnlySeStringSpan(textNode->NodeText.StringPtr).ToString());
+                        textNode->NodeText.SetString(textNode->NodeText.StringPtr.AsReadOnlySeStringSpan().ToString());
 
                     ImGui.Text($"AlignmentType: {(AlignmentType)textNode->AlignmentFontType}  FontSize: {textNode->FontSize}");
                     int b = textNode->AlignmentFontType;
@@ -418,30 +418,30 @@ internal unsafe class UiDebug
                     ImGui.Text("InputBase Text1: ");
                     ImGui.SameLine();
                     Service<SeStringRenderer>.Get().Draw(textInputComponent->AtkComponentInputBase.UnkText1);
-                    
+
                     ImGui.Text("InputBase Text2: ");
                     ImGui.SameLine();
                     Service<SeStringRenderer>.Get().Draw(textInputComponent->AtkComponentInputBase.UnkText2);
-                    
+
                     ImGui.Text("Text1: ");
                     ImGui.SameLine();
                     Service<SeStringRenderer>.Get().Draw(textInputComponent->UnkText01);
-                    
+
                     ImGui.Text("Text2: ");
                     ImGui.SameLine();
                     Service<SeStringRenderer>.Get().Draw(textInputComponent->UnkText02);
-                    
-                    ImGui.Text("Text3: ");
+
+                    ImGui.Text("AvailableLines: ");
                     ImGui.SameLine();
-                    Service<SeStringRenderer>.Get().Draw(textInputComponent->UnkText03);
-                    
-                    ImGui.Text("Text4: ");
+                    Service<SeStringRenderer>.Get().Draw(textInputComponent->AvailableLines);
+
+                    ImGui.Text("HighlightedAutoTranslateOptionColorPrefix: ");
                     ImGui.SameLine();
-                    Service<SeStringRenderer>.Get().Draw(textInputComponent->UnkText04);
-                    
-                    ImGui.Text("Text5: ");
+                    Service<SeStringRenderer>.Get().Draw(textInputComponent->HighlightedAutoTranslateOptionColorPrefix);
+
+                    ImGui.Text("HighlightedAutoTranslateOptionColorSuffix: ");
                     ImGui.SameLine();
-                    Service<SeStringRenderer>.Get().Draw(textInputComponent->UnkText05);
+                    Service<SeStringRenderer>.Get().Draw(textInputComponent->HighlightedAutoTranslateOptionColorSuffix);
                     break;
             }
 

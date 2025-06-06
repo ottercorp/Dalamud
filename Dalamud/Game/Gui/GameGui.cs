@@ -75,7 +75,7 @@ internal sealed unsafe class GameGui : IInternalDisposableService, IGameGui
     }
 
     // Hooked delegates
-    
+
     [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
     private delegate char HandleImmDelegate(IntPtr framework, char a2, byte a3);
 
@@ -259,7 +259,7 @@ internal sealed unsafe class GameGui : IInternalDisposableService, IGameGui
     /// <summary>
     /// Indicates if the game is in the lobby scene (title screen, chara select, chara make, aesthetician etc.).
     /// </summary>
-    /// <returns>A value indicating whether or not the game is in the lobby scene.</returns>
+    /// <returns>A value indicating whether the game is in the lobby scene.</returns>
     internal bool IsInLobby() => RaptureAtkModule.Instance()->CurrentUIScene.StartsWith("LobbyMain"u8);
 
     /// <summary>
@@ -307,15 +307,7 @@ internal sealed unsafe class GameGui : IInternalDisposableService, IGameGui
         if (values != null && valueCount == 1 && values->Int == -1)
         {
             this.HoveredItem = 0;
-
-            try
-            {
-                this.HoveredItemChanged?.Invoke(this, 0);
-            }
-            catch (Exception e)
-            {
-                Log.Error(e, "Could not dispatch HoveredItemChanged event.");
-            }
+            this.HoveredItemChanged?.InvokeSafely(this, 0ul);
 
             Log.Verbose("HoveredItem changed: 0");
         }
@@ -323,7 +315,7 @@ internal sealed unsafe class GameGui : IInternalDisposableService, IGameGui
         return ret;
     }
 
-    private void HandleActionHoverDetour(AgentActionDetail* hoverState, ActionKind actionKind, uint actionId, int a4, byte a5)
+    private void HandleActionHoverDetour(AgentActionDetail* hoverState, FFXIVClientStructs.FFXIV.Client.UI.Agent.ActionKind actionKind, uint actionId, int a4, byte a5)
     {
         this.handleActionHoverHook.Original(hoverState, actionKind, actionId, a4, a5);
         this.HoveredAction.ActionKind = (HoverActionKind)actionKind;
@@ -347,15 +339,7 @@ internal sealed unsafe class GameGui : IInternalDisposableService, IGameGui
                 this.HoveredAction.ActionKind = HoverActionKind.None;
                 this.HoveredAction.BaseActionID = 0;
                 this.HoveredAction.ActionID = 0;
-
-                try
-                {
-                    this.HoveredActionChanged?.Invoke(this, this.HoveredAction);
-                }
-                catch (Exception e)
-                {
-                    Log.Error(e, "Could not dispatch HoveredActionChanged event.");
-                }
+                this.HoveredActionChanged?.InvokeSafely(this, this.HoveredAction);
 
                 Log.Verbose("HoverActionId: 0");
             }

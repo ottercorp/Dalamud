@@ -3,18 +3,17 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 using CheapLoc;
 using Dalamud.Configuration.Internal;
 using Dalamud.Console;
-using Dalamud.Data;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Game.Gui;
-using Dalamud.Game.Internal;
 using Dalamud.Hooking;
 using Dalamud.Interface.Animation.EasingFunctions;
 using Dalamud.Interface.Colors;
@@ -26,6 +25,7 @@ using Dalamud.Interface.Internal.Windows.Settings;
 using Dalamud.Interface.Internal.Windows.StyleEditor;
 using Dalamud.Interface.ManagedFontAtlas.Internals;
 using Dalamud.Interface.Style;
+using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
@@ -36,6 +36,8 @@ using Dalamud.Utility;
 
 using FFXIVClientStructs.FFXIV.Client.System.Framework;
 using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Component.GUI;
+
 using ImGuiNET;
 
 using ImPlotNET;
@@ -45,7 +47,7 @@ using Serilog.Events;
 namespace Dalamud.Interface.Internal;
 
 /// <summary>
-/// This plugin implements all of the Dalamud interface separately, to allow for reloading of the interface and rapid prototyping.
+/// This plugin implements all the Dalamud interface separately, to allow for reloading of the interface and rapid prototyping.
 /// </summary>
 [ServiceManager.EarlyLoadedService]
 internal class DalamudInterface : IInternalDisposableService
@@ -172,16 +174,16 @@ internal class DalamudInterface : IInternalDisposableService
             {
                 titleScreenMenu.AddEntryCore(
                     Loc.Localize("TSMDalamudPlugins", "Plugin Installer"),
-                    dalamudAssetManager.GetDalamudTextureWrap(DalamudAsset.LogoSmall),
+                    new ForwardingSharedImmediateTexture(dalamudAssetManager.GetDalamudTextureWrap(DalamudAsset.LogoSmall)),
                     this.OpenPluginInstaller);
                 titleScreenMenu.AddEntryCore(
                     Loc.Localize("TSMDalamudSettings", "Dalamud Settings"),
-                    dalamudAssetManager.GetDalamudTextureWrap(DalamudAsset.LogoSmall),
+                    new ForwardingSharedImmediateTexture(dalamudAssetManager.GetDalamudTextureWrap(DalamudAsset.LogoSmall)),
                     this.OpenSettings);
 
                 titleScreenMenu.AddEntryCore(
                     "Toggle Dev Menu",
-                    dalamudAssetManager.GetDalamudTextureWrap(DalamudAsset.LogoSmall),
+                    new ForwardingSharedImmediateTexture(dalamudAssetManager.GetDalamudTextureWrap(DalamudAsset.LogoSmall)),
                     () => Service<DalamudInterface>.GetNullable()?.ToggleDevMenu(),
                     VirtualKey.SHIFT);
 
@@ -189,7 +191,7 @@ internal class DalamudInterface : IInternalDisposableService
                 {
                     titleScreenMenu.AddEntryCore(
                         Loc.Localize("TSMDalamudDevMenu", "Developer Menu"),
-                        dalamudAssetManager.GetDalamudTextureWrap(DalamudAsset.LogoSmall),
+                        new ForwardingSharedImmediateTexture(dalamudAssetManager.GetDalamudTextureWrap(DalamudAsset.LogoSmall)),
                         () => this.isImGuiDrawDevMenu = true);
                 }
             });
@@ -309,8 +311,14 @@ internal class DalamudInterface : IInternalDisposableService
     /// <summary>
     /// Opens the <see cref="ConsoleWindow"/>.
     /// </summary>
-    public void OpenLogWindow()
+    /// <param name="textFilter">The filter to set, if not null.</param>
+    public void OpenLogWindow(string? textFilter = "")
     {
+        if (textFilter != null)
+        {
+            this.consoleWindow.TextFilter = textFilter;
+        }
+
         this.consoleWindow.IsOpen = true;
         this.consoleWindow.BringToFront();
     }
@@ -527,7 +535,7 @@ internal class DalamudInterface : IInternalDisposableService
     /// <summary>
     /// Toggle the screen darkening effect used for the credits.
     /// </summary>
-    /// <param name="status">Whether or not to turn the effect on.</param>
+    /// <param name="status">Whether to turn the effect on.</param>
     public void SetCreditsDarkeningAnimation(bool status)
     {
         this.isCreditsDarkening = status;
@@ -719,19 +727,6 @@ internal class DalamudInterface : IInternalDisposableService
                             this.dalamud.StartInfo.LogName);
                     }
 
-                    var antiDebug = Service<AntiDebug>.Get();
-                    if (ImGui.MenuItem("Disable Debugging Protections", null, antiDebug.IsEnabled))
-                    {
-                        var newEnabled = !antiDebug.IsEnabled;
-                        if (newEnabled)
-                            antiDebug.Enable();
-                        else
-                            antiDebug.Disable();
-
-                        this.configuration.IsAntiAntiDebugEnabled = newEnabled;
-                        this.configuration.QueueSave();
-                    }
-
                     ImGui.Separator();
 
                     if (ImGui.MenuItem("Open Data window"))
@@ -841,6 +836,18 @@ internal class DalamudInterface : IInternalDisposableService
                                     });
                                 hook.Enable();
                             }
+                        }
+
+                        if (ImGui.MenuItem("Cause CLR fastfail"))
+                        {
+                            unsafe void CauseFastFail()
+                            {
+                                // ReSharper disable once NotAccessedVariable
+                                var texture = Unsafe.AsRef<AtkTexture>((void*)0x12345678);
+                                texture.TextureType = TextureType.Crest;
+                            }
+
+                            Service<Game.Framework>.Get().RunOnTick(CauseFastFail);
                         }
 
                         if (ImGui.MenuItem("Cause ImGui assert"))
@@ -1011,7 +1018,7 @@ internal class DalamudInterface : IInternalDisposableService
 
                     if (ImGui.MenuItem("Scan dev plugins"))
                     {
-                        pluginManager.ScanDevPlugins();
+                        _ = pluginManager.ScanDevPluginsAsync();
                     }
 
                     ImGui.Separator();

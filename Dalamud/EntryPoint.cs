@@ -178,7 +178,7 @@ public sealed class EntryPoint
                 throw new Exception("Working directory was invalid");
 
             Reloaded.Hooks.Tools.Utilities.FasmBasePath = new DirectoryInfo(info.WorkingDirectory);
-            
+
             // Apply common fixes for culture issues
             CultureFixes.Apply();
 
@@ -193,14 +193,14 @@ public sealed class EntryPoint
             {
                 Log.Error(ex, "Proxy failed.");
             }
-
-            if (!Util.IsWine())
+            // Currently VEH is not fully functional on WINE
+            if (info.Platform != OSPlatform.Windows)
                 InitSymbolHandler(info);
 
             var dalamud = new Dalamud(info, fs, configuration, mainThreadContinueEvent);
-            Log.Information("This is Dalamud - Core: {GitHash}, CS: {CsGitHash} [{CsVersion}]", 
-                            Util.GetScmVersion(), 
-                            Util.GetGitHashClientStructs(), 
+            Log.Information("This is Dalamud - Core: {GitHash}, CS: {CsGitHash} [{CsVersion}]",
+                            Util.GetScmVersion(),
+                            Util.GetGitHashClientStructs(),
                             FFXIVClientStructs.ThisAssembly.Git.Commits);
 
             dalamud.WaitForUnload();
@@ -327,7 +327,7 @@ public sealed class EntryPoint
                     Log.Information("User chose to disable plugins on next launch...");
                     var config = Service<DalamudConfiguration>.Get();
                     config.PluginSafeMode = true;
-                    config.QueueSave();
+                    config.ForceSave();
                 }
 
                 Log.CloseAndFlush();
