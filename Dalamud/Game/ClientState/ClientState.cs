@@ -42,10 +42,10 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
 
     [ServiceManager.ServiceDependency]
     private readonly Framework framework = Service<Framework>.Get();
-    
+
     [ServiceManager.ServiceDependency]
     private readonly NetworkHandlers networkHandlers = Service<NetworkHandlers>.Get();
-    
+
     private bool lastConditionNone = true;
 
     [ServiceManager.ServiceConstructor]
@@ -72,6 +72,12 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
         this.setupTerritoryTypeHook.Enable();
         this.uiModuleHandlePacketHook.Enable();
         this.onLogoutHook.Enable();
+
+        unsafe
+        {
+            var aidAddress = sigScanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 4C 8B CA");
+            this.AccountId = (uint)(aidAddress != nint.Zero ? (*(ulong**)aidAddress)[1] : 0u);
+        }
     }
 
     private unsafe delegate void ProcessPacketPlayerSetupDelegate(nint a1, nint packet);
@@ -105,6 +111,12 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
 
     /// <inheritdoc/>
     public ushort TerritoryType { get; private set; }
+
+
+    /// <summary>
+    /// Gets the account id of player.
+    /// </summary>
+    public uint AccountId { get; private set; }
 
     /// <inheritdoc/>
     public unsafe uint MapId
@@ -176,7 +188,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
         this.uiModuleHandlePacketHook.Dispose();
         this.onLogoutHook.Dispose();
 
-        this.framework.Update -= this.FrameworkOnOnUpdateEvent; 
+        this.framework.Update -= this.FrameworkOnOnUpdateEvent;
         this.networkHandlers.CfPop -= this.NetworkHandlersOnCfPop;
     }
 

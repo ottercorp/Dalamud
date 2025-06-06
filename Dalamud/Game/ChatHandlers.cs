@@ -142,12 +142,7 @@ internal partial class ChatHandlers : IServiceType
 
         if (clientState.LocalPlayer != null && !this.hasSendMeasurement)
         {
-            ulong aid = 0;
-            unsafe
-            {
-                var character = (Character*)clientState.LocalPlayer.Address;
-                aid = character->AccountId;
-            }
+            ulong aid = clientState.AccountId;
 
             Task.Run(async () => await EventTracking.SendMeasurement(
                                      clientState.LocalContentId,
