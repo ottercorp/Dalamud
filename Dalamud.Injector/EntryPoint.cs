@@ -874,7 +874,8 @@ namespace Dalamud.Injector
 
                 gameArguments.InsertRange(0, new string[]
                 {
-                    "DEV.TestSID=0",
+                    "DEV.TestSID=114514",
+                    "XL.SndaId=OTTER",
                     "DEV.UseSqPack=1",
                     "DEV.DataPathType=1",
                     "DEV.LobbyHost01=127.0.0.1",
