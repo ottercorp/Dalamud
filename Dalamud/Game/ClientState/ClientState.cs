@@ -73,11 +73,11 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
         this.uiModuleHandlePacketHook.Enable();
         this.onLogoutHook.Enable();
 
-        unsafe
-        {
-            var aidAddress = sigScanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 4C 8B CA");
-            this.AccountId = (uint)(aidAddress != nint.Zero ? (*(ulong**)aidAddress)[1] : 0u);
-        }
+        //unsafe
+        //{
+        //    var aidAddress = sigScanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 4C 8B CA");
+        //    this.AccountId = (uint)(aidAddress != nint.Zero ? (*(ulong**)aidAddress)[1] : 0u);
+        //}
     }
 
     private unsafe delegate void ProcessPacketPlayerSetupDelegate(nint a1, nint packet);

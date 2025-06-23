@@ -39,6 +39,7 @@ public static class ClientLanguageExtensions
             ClientLanguage.English => "en",
             ClientLanguage.German => "de",
             ClientLanguage.French => "fr",
+            ClientLanguage.ChineseSimplified => "chs",
             _ => throw new ArgumentOutOfRangeException(nameof(value)),
         };
     }
