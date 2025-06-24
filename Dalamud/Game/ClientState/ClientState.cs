@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Threading.Tasks;
 
 using Dalamud.Data;
 using Dalamud.Game.ClientState.Conditions;
@@ -11,6 +12,7 @@ using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Logging.Internal;
 using Dalamud.Plugin.Services;
+using Dalamud.Support;
 using Dalamud.Utility;
 
 using FFXIVClientStructs.FFXIV.Application.Network;
@@ -72,12 +74,6 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
         this.setupTerritoryTypeHook.Enable();
         this.uiModuleHandlePacketHook.Enable();
         this.onLogoutHook.Enable();
-
-        //unsafe
-        //{
-        //    var aidAddress = sigScanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 4C 8B CA");
-        //    this.AccountId = (uint)(aidAddress != nint.Zero ? (*(ulong**)aidAddress)[1] : 0u);
-        //}
     }
 
     private unsafe delegate void ProcessPacketPlayerSetupDelegate(nint a1, nint packet);
@@ -111,12 +107,6 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
 
     /// <inheritdoc/>
     public ushort TerritoryType { get; private set; }
-
-
-    /// <summary>
-    /// Gets the account id of player.
-    /// </summary>
-    public uint AccountId { get; private set; }
 
     /// <inheritdoc/>
     public unsafe uint MapId
@@ -269,7 +259,6 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
                 }
         }
     }
-
     private void FrameworkOnOnUpdateEvent(IFramework framework1)
     {
         var condition = Service<Conditions.Condition>.GetNullable();
@@ -285,8 +274,9 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
             this.lastConditionNone = false;
             this.Login?.InvokeSafely();
             gameGui.ResetUiHideState();
-
             this.lifecycle.ResetLogout();
+            var clientState = Service<ClientState>.Get();
+            EventTracking.SendMeasurement(clientState.LocalContentId, clientState.LocalPlayer.EntityId, clientState.LocalPlayer.HomeWorld.RowId);
         }
     }
 

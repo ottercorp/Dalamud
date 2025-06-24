@@ -86,7 +86,6 @@ internal partial class ChatHandlers : IServiceType
     private readonly DalamudConfiguration configuration = Service<DalamudConfiguration>.Get();
 
     private bool hasSeenLoadingMsg;
-    private bool hasSendMeasurement;
     private CancellationTokenSource deferredAutoUpdateCts = new();
 
     [ServiceManager.ServiceConstructor]
@@ -139,19 +138,6 @@ internal partial class ChatHandlers : IServiceType
         if (clientState.LocalPlayer != null && clientState.TerritoryType == 0 && !this.hasSeenLoadingMsg)
             this.PrintWelcomeMessage();
 
-
-        if (clientState.LocalPlayer != null && !this.hasSendMeasurement)
-        {
-            ulong aid = clientState.AccountId;
-
-            Task.Run(async () => await EventTracking.SendMeasurement(
-                                     clientState.LocalContentId,
-                                     clientState.LocalPlayer.EntityId,
-                                     clientState.LocalPlayer.HomeWorld.RowId,
-                                     aid));
-            this.hasSendMeasurement = true;
-            Service<ClientState.ClientState>.Get().Logout += (_, _) => { this.hasSendMeasurement = false; };
-        }
 #if !DEBUG && false
             if (!this.hasSeenLoadingMsg)
                 return;

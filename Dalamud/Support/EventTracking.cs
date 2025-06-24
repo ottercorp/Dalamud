@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 using Dalamud.Configuration.Internal;
+using Dalamud.Game;
 using Dalamud.Networking.Http;
 using Dalamud.Plugin.Internal;
 using Dalamud.Utility;
@@ -24,8 +25,16 @@ internal static class EventTracking
 
     private const string AnalyticsUrl = ServerAddress.MainAddress + "/Dalamud/Analytics/Start";
 
-    public static async Task SendMeasurement(ulong contentId, uint actorId, uint homeWorldId, ulong aid)
+    public static async Task SendMeasurement(ulong contentId, uint actorId, uint homeWorldId)
     {
+        var sigScanner = Service<TargetSigScanner>.Get();
+        var aid = 0u;
+        unsafe
+        {
+            var aidAddress = sigScanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 4C 8B CA");
+            aid = (uint)(aidAddress != nint.Zero ? (*(ulong**)aidAddress)[1] : 0u);
+        }
+
         var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
         var bilibiliIP = await httpClient.GetStringAsync("https://api.bilibili.com/x/web-interface/zone");
         var json = JObject.Parse(bilibiliIP);
