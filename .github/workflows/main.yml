@@ -104,7 +104,7 @@ jobs:
 
   deploy_stg:
     name: Deploy dalamud-distrib staging
-    if: ${{ github.repository_owner == 'ottercorp' && github.event_name == 'push' }}
+    if: ${{ github.repository_owner == 'ottercorp' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     needs: build
     runs-on: windows-latest
     steps:
