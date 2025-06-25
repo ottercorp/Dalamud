@@ -57,7 +57,7 @@ static wchar_t* GetRuntimePath()
     }
 
     std::filesystem::path fs_app_data(_appdata);
-    runtime_path = _wcsdup(fs_app_data.append("XIVLauncher").append("runtime").c_str());
+    runtime_path = _wcsdup(fs_app_data.append("XIVLauncherCN").append("runtime").c_str());
     if (std::filesystem::exists(runtime_path))
         return runtime_path;
     free(runtime_path);
