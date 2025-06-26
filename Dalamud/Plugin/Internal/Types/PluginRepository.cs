@@ -51,13 +51,9 @@ internal class PluginRepository
     /// <param name="isEnabled">Whether the plugin repo is enabled.</param>
     public PluginRepository(HappyHttpClient happyHttpClient, string pluginMasterUrl, bool isEnabled)
     {
-        this.httpClient = new(new SocketsHttpHandler
+        this.httpClient = new(CacheHandler)
         {
-            AutomaticDecompression = DecompressionMethods.All,
-            ConnectCallback = happyHttpClient.SharedHappyEyeballsCallback.ConnectCallback,
-        })
-        {
-            Timeout = TimeSpan.FromSeconds(20),
+            Timeout = TimeSpan.FromSeconds(5),
             DefaultRequestHeaders =
             {
                 Accept =
