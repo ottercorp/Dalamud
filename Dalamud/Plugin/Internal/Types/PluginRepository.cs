@@ -236,14 +236,12 @@ internal class PluginRepository
 
     private async Task<HttpResponseMessage> GetPluginMaster(string url, int timeout = HttpRequestTimeoutSeconds)
     {
-        var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
-
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
 
         using var requestCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeout));
 
-        return await httpClient.SendAsync(request, requestCts.Token);
+        return await this.httpClient.SendAsync(request, requestCts.Token);
     }
 }
