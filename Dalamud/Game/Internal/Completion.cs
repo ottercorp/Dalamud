@@ -174,8 +174,6 @@ internal sealed unsafe class Completion : IInternalDisposableService
 
         if (textInput->CompletionModule == null) return;
 
-        if ((IntPtr)textInput->CompletionModule->CategoryData.RepresentativePointer == (IntPtr)0xFFFFFFFF) return;
-
         // Before we change _anything_ we need to check the state of the UI- if the completion list is open
         // changes to the underlying data are extremely unsafe, so we'll just wait until the next frame
         // worst case, someone tries to complete a command that _just_ got unloaded so it won't do anything
