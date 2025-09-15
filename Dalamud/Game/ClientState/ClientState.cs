@@ -40,7 +40,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
     private readonly ClientStateAddressResolver address;
     private readonly Hook<EventFramework.Delegates.SetTerritoryTypeId> setupTerritoryTypeHook;
     private readonly Hook<UIModule.Delegates.HandlePacket> uiModuleHandlePacketHook;
-    private readonly Hook<LogoutCallbackInterface.Delegates.OnLogout> onLogoutHook;
+    private Hook<LogoutCallbackInterface.Delegates.OnLogout> onLogoutHook;
 
     [ServiceManager.ServiceDependency]
     private readonly Framework framework = Service<Framework>.Get();
@@ -66,14 +66,14 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
 
         this.setupTerritoryTypeHook = Hook<EventFramework.Delegates.SetTerritoryTypeId>.FromAddress(setTerritoryTypeAddr, this.SetupTerritoryTypeDetour);
         this.uiModuleHandlePacketHook = Hook<UIModule.Delegates.HandlePacket>.FromAddress((nint)UIModule.StaticVirtualTablePointer->HandlePacket, this.UIModuleHandlePacketDetour);
-        this.onLogoutHook = Hook<LogoutCallbackInterface.Delegates.OnLogout>.FromAddress((nint)LogoutCallbackInterface.StaticVirtualTablePointer->OnLogout, this.OnLogoutDetour);
 
         this.framework.Update += this.FrameworkOnOnUpdateEvent;
         this.networkHandlers.CfPop += this.NetworkHandlersOnCfPop;
 
         this.setupTerritoryTypeHook.Enable();
         this.uiModuleHandlePacketHook.Enable();
-        this.onLogoutHook.Enable();
+
+        this.framework.RunOnTick(this.Setup);
     }
 
     private unsafe delegate void ProcessPacketPlayerSetupDelegate(nint a1, nint packet);
@@ -182,8 +182,25 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
         this.networkHandlers.CfPop -= this.NetworkHandlersOnCfPop;
     }
 
+    private unsafe void Setup()
+    {
+        this.onLogoutHook = Hook<LogoutCallbackInterface.Delegates.OnLogout>.FromAddress((nint)AgentLobby.Instance()->LogoutCallbackInterface.VirtualTable->OnLogout, this.OnLogoutDetour);
+        this.onLogoutHook.Enable();
+
+        this.TerritoryType = (ushort)GameMain.Instance()->CurrentTerritoryTypeId;
+    }
+
     private unsafe void SetupTerritoryTypeDetour(EventFramework* eventFramework, ushort territoryType)
     {
+        this.SetTerritoryType(territoryType);
+        this.setupTerritoryTypeHook.Original(eventFramework, territoryType);
+    }
+
+    private unsafe void SetTerritoryType(ushort territoryType)
+    {
+        if (this.TerritoryType == territoryType)
+            return;
+
         Log.Debug("TerritoryType changed: {0}", territoryType);
 
         this.TerritoryType = territoryType;
@@ -209,54 +226,53 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
                 }
             }
         }
-
-        this.setupTerritoryTypeHook.Original(eventFramework, territoryType);
     }
 
-    private unsafe void UIModuleHandlePacketDetour(UIModule* thisPtr, UIModulePacketType type, uint uintParam, void* packet)
+    private unsafe void UIModuleHandlePacketDetour(
+        UIModule* thisPtr, UIModulePacketType type, uint uintParam, void* packet)
     {
         this.uiModuleHandlePacketHook.Original(thisPtr, type, uintParam, packet);
 
         switch (type)
         {
-            case UIModulePacketType.ClassJobChange when this.ClassJobChanged is { } callback:
+            case UIModulePacketType.ClassJobChange:
+            {
+                var classJobId = uintParam;
+
+                foreach (var action in Delegate.EnumerateInvocationList(this.ClassJobChanged))
                 {
-                    var classJobId = uintParam;
-
-                    foreach (var action in callback.GetInvocationList().Cast<IClientState.ClassJobChangeDelegate>())
+                    try
                     {
-                        try
-                        {
-                            action(classJobId);
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error(ex, "Exception during raise of {handler}", action.Method);
-                        }
+                        action(classJobId);
                     }
-
-                    break;
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Exception during raise of {handler}", action.Method);
+                    }
                 }
 
-            case UIModulePacketType.LevelChange when this.LevelChanged is { } callback:
+                break;
+            }
+
+            case UIModulePacketType.LevelChange:
+            {
+                var classJobId = *(uint*)packet;
+                var level = *(ushort*)((nint)packet + 4);
+
+                foreach (var action in Delegate.EnumerateInvocationList(this.LevelChanged))
                 {
-                    var classJobId = *(uint*)packet;
-                    var level = *(ushort*)((nint)packet + 4);
-
-                    foreach (var action in callback.GetInvocationList().Cast<IClientState.LevelChangeDelegate>())
+                    try
                     {
-                        try
-                        {
-                            action(classJobId, level);
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error(ex, "Exception during raise of {handler}", action.Method);
-                        }
+                        action(classJobId, level);
                     }
-
-                    break;
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Exception during raise of {handler}", action.Method);
+                    }
                 }
+
+                break;
+            }
         }
     }
     private void FrameworkOnOnUpdateEvent(IFramework framework1)
@@ -293,18 +309,15 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
 
                 Log.Debug("Logout: Type {type}, Code {code}", type, code);
 
-                if (this.Logout is { } callback)
+                foreach (var action in Delegate.EnumerateInvocationList(this.Logout))
                 {
-                    foreach (var action in callback.GetInvocationList().Cast<IClientState.LogoutDelegate>())
+                    try
                     {
-                        try
-                        {
-                            action(type, code);
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error(ex, "Exception during raise of {handler}", action.Method);
-                        }
+                        action(type, code);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Exception during raise of {handler}", action.Method);
                     }
                 }
 

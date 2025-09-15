@@ -22,6 +22,12 @@
 [submodule "lib/cimguizmo"]
 	path = lib/cimguizmo
 	url = https://github.com/goatcorp/gc-cimguizmo
+[submodule "lib/Hexa.NET.ImGui"]
+	path = lib/Hexa.NET.ImGui
+	url = https://github.com/goatcorp/Hexa.NET.ImGui.git
 [submodule "lib/Lumina"]
 	path = lib/Lumina
 	url = https://github.com/ottercorp/Lumina/
+[submodule "lib/Lumina.Excel"]
+	path = lib/Lumina.Excel
+	url = https://github.com/NotAdam/Lumina.Excel.git
