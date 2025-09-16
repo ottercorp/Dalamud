@@ -27,7 +27,7 @@ internal class PluginRepository
     /// <summary>
     /// The URL of the official main repository.
     /// </summary>
-    public const string MainRepoUrl = ServerAddress.MainAddress + "/Plugin/PluginMaster?apiLevel=12";
+    public const string MainRepoUrl = ServerAddress.MainAddress + "/Plugin/PluginMaster?apiLevel=13";
 
     private const int HttpRequestTimeoutSeconds = 20;
 
