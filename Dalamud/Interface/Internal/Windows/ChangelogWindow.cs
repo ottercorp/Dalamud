@@ -3,7 +3,7 @@ using System.Linq;
 using System.Numerics;
 
 using CheapLoc;
-
+using Dalamud.Bindings.ImGui;
 using Dalamud.Configuration.Internal;
 using Dalamud.Game;
 using Dalamud.Game.Gui;
@@ -23,12 +23,7 @@ using Dalamud.Plugin.Internal.AutoUpdate;
 using Dalamud.Plugin.Services;
 using Dalamud.Storage.Assets;
 using Dalamud.Utility;
-
 using FFXIVClientStructs.FFXIV.Client.UI;
-
-using ImGuiNET;
-using ImGuiScene;
-using Serilog;
 
 namespace Dalamud.Interface.Internal.Windows;
 
@@ -259,7 +254,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
         ImGui.SameLine();
 
         var logoContainerSize = new Vector2(windowSize.X * 0.2f - dummySize, windowSize.Y);
-        using (var child = ImRaii.Child("###logoContainer", logoContainerSize, false))
+        using (var child = ImRaii.Child("###logoContainer"u8, logoContainerSize, false))
         {
             if (!child)
                 return;
@@ -270,7 +265,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
             ImGui.SetCursorPos(new Vector2(logoContainerSize.X / 2 - logoSize.X / 2, logoContainerSize.Y / 2 - logoSize.Y / 2));
 
             using (ImRaii.PushStyle(ImGuiStyleVar.Alpha, Math.Clamp(this.windowFade.EasedPoint.X - 0.5f, 0f, 1f)))
-                ImGui.Image(this.logoTexture.Value.ImGuiHandle, logoSize);
+                ImGui.Image(this.logoTexture.Value.Handle, logoSize);
         }
 
         ImGui.SameLine();
@@ -371,7 +366,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         ImGui.TextWrapped("请点击 Next 以查看更新插件的快速指南。");
 
                         ImGui.Image(
-                            this.fontTipsTexture.Value.ImGuiHandle,
+                            this.fontTipsTexture.Value.Handle,
                             this.fontTipsTexture.Value.Size);
 
                         var interfaceManager = Service<InterfaceManager>.Get();
@@ -406,7 +401,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
                         ImGuiHelpers.CenterCursorFor(this.apiBumpExplainerTexture.Value.Width);
                         ImGui.Image(
-                            this.apiBumpExplainerTexture.Value.ImGuiHandle,
+                            this.apiBumpExplainerTexture.Value.Handle,
                             this.apiBumpExplainerTexture.Value.Size);
 
                         if (!this.currentFtueLevels.TryGetValue(FtueLevels.AutoUpdate.Name, out var autoUpdateLevel) || autoUpdateLevel < FtueLevels.AutoUpdate.AutoUpdateInitial)
@@ -424,11 +419,11 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         break;
 
                     case State.AskAutoUpdate:
-                        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudWhite, "Dalamud 可以自动更新您的插件，确保您始终拥有最新的功能和错误修复。您可以在此处选择何时以及如何运行自动更新。");
+                        ImGui.TextColoredWrapped(ImGuiColors.DalamudWhite, "Dalamud 可以自动更新您的插件，确保您始终拥有最新的功能和错误修复。您可以在此处选择何时以及如何运行自动更新。");
                         ImGuiHelpers.ScaledDummy(2);
 
-                        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, "您始终可以通过单击插件列表中的更新按钮来手动更新插件。您还可以通过右键单击特定插件并选择“始终自动更新”来选择更新特定插件。");
-                        ImGuiHelpers.SafeTextColoredWrapped(ImGuiColors.DalamudGrey, "Dalamud 只会在您处于休闲状态下通知您更新。");
+                        ImGui.TextColoredWrapped(ImGuiColors.DalamudGrey, "您始终可以通过单击插件列表中的更新按钮来手动更新插件。您还可以通过右键单击特定插件并选择“始终自动更新”来选择更新特定插件。");
+                        ImGui.TextColoredWrapped(ImGuiColors.DalamudGrey, "Dalamud 只会在您处于休闲状态下通知您更新。");
 
                         ImGuiHelpers.ScaledDummy(15);
 

@@ -5,12 +5,13 @@ using System.Net.Http;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+
+using Dalamud.Bindings.ImGui;
 using Dalamud.Configuration.Internal;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
-using Dalamud.Utility;
 using Dalamud.Networking.Http;
-using ImGuiNET;
+using Dalamud.Utility;
 using ImGuiScene;
 using Lumina.Excel.Sheets;
 using Newtonsoft.Json;

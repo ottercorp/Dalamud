@@ -12,6 +12,7 @@ using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Logging.Internal;
 using Dalamud.Memory;
+using Dalamud.Plugin.Internal.Types;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 
@@ -50,6 +51,7 @@ internal sealed unsafe class ChatGui : IInternalDisposableService, IChatGui
     private readonly DalamudConfiguration configuration = Service<DalamudConfiguration>.Get();
 
     private ImmutableDictionary<(string PluginName, uint CommandId), Action<uint, SeString>>? dalamudLinkHandlersCopy;
+    private uint dalamudChatHandlerId = 1000;
 
     [ServiceManager.ServiceConstructor]
     private ChatGui()
@@ -161,6 +163,42 @@ internal sealed unsafe class ChatGui : IInternalDisposableService, IChatGui
 
     #endregion
 
+    #region Chat Links
+
+    /// <summary>
+    /// Register a chat link handler.
+    /// </summary>
+    /// <remarks>Internal use only.</remarks>
+    /// <param name="commandAction">The action to be executed.</param>
+    /// <returns>Returns an SeString payload for the link.</returns>
+    public DalamudLinkPayload AddChatLinkHandler(Action<uint, SeString> commandAction)
+    {
+        return this.AddChatLinkHandler("Dalamud", this.dalamudChatHandlerId++, commandAction);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Internal use only.</remarks>
+    public DalamudLinkPayload AddChatLinkHandler(uint commandId, Action<uint, SeString> commandAction)
+    {
+        return this.AddChatLinkHandler("Dalamud", commandId, commandAction);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Internal use only.</remarks>
+    public void RemoveChatLinkHandler(uint commandId)
+    {
+        this.RemoveChatLinkHandler("Dalamud", commandId);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Internal use only.</remarks>
+    public void RemoveChatLinkHandler()
+    {
+        this.RemoveChatLinkHandler("Dalamud");
+    }
+
+    #endregion
+
     /// <summary>
     /// Process a chat queue.
     /// </summary>
@@ -220,7 +258,6 @@ internal sealed unsafe class ChatGui : IInternalDisposableService, IChatGui
     /// <param name="commandId">The ID of the command to run.</param>
     /// <param name="commandAction">The command action itself.</param>
     /// <returns>A payload for handling.</returns>
-    [Api13ToDo("Plugins should not specify their own command IDs here. We should assign them ourselves.")]
     internal DalamudLinkPayload AddChatLinkHandler(string pluginName, uint commandId, Action<uint, SeString> commandAction)
     {
         var payload = new DalamudLinkPayload { Plugin = pluginName, CommandId = commandId };
@@ -346,24 +383,21 @@ internal sealed unsafe class ChatGui : IInternalDisposableService, IChatGui
             // Call events
             var isHandled = false;
 
-            if (this.CheckMessageHandled is { } handledCallback)
+            foreach (var action in Delegate.EnumerateInvocationList(this.CheckMessageHandled))
             {
-                foreach (var action in handledCallback.GetInvocationList().Cast<IChatGui.OnCheckMessageHandledDelegate>())
+                try
                 {
-                    try
-                    {
-                        action(chatType, timestamp, ref parsedSender, ref parsedMessage, ref isHandled);
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error(e, "Could not invoke registered OnCheckMessageHandledDelegate for {Name}", action.Method);
-                    }
+                    action(chatType, timestamp, ref parsedSender, ref parsedMessage, ref isHandled);
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e, "Could not invoke registered OnCheckMessageHandledDelegate for {Name}", action.Method);
                 }
             }
 
-            if (!isHandled && this.ChatMessage is { } callback)
+            if (!isHandled)
             {
-                foreach (var action in callback.GetInvocationList().Cast<IChatGui.OnMessageDelegate>())
+                foreach (var action in Delegate.EnumerateInvocationList(this.ChatMessage))
                 {
                     try
                     {
@@ -381,25 +415,27 @@ internal sealed unsafe class ChatGui : IInternalDisposableService, IChatGui
 
             if (!terminatedSender.SequenceEqual(possiblyModifiedSenderData))
             {
-                Log.Verbose($"HandlePrintMessageDetour Sender modified: {SeString.Parse(terminatedSender)} -> {parsedSender}");
+                Log.Verbose($"HandlePrintMessageDetour Sender modified: {new ReadOnlySeStringSpan(terminatedSender).ToMacroString()} -> {new ReadOnlySeStringSpan(possiblyModifiedSenderData).ToMacroString()}");
                 sender->SetString(possiblyModifiedSenderData);
             }
 
             if (!terminatedMessage.SequenceEqual(possiblyModifiedMessageData))
             {
-                Log.Verbose($"HandlePrintMessageDetour Message modified: {SeString.Parse(terminatedMessage)} -> {parsedMessage}");
+                Log.Verbose($"HandlePrintMessageDetour Message modified: {new ReadOnlySeStringSpan(terminatedMessage).ToMacroString()} -> {new ReadOnlySeStringSpan(possiblyModifiedMessageData).ToMacroString()}");
                 message->SetString(possiblyModifiedMessageData);
             }
 
             // Print the original chat if it's handled.
             if (isHandled)
             {
-                this.ChatMessageHandled?.Invoke(chatType, timestamp, parsedSender, parsedMessage);
+                foreach (var d in Delegate.EnumerateInvocationList(this.ChatMessageHandled))
+                    d(chatType, timestamp, parsedSender, parsedMessage);
             }
             else
             {
                 messageId = this.printMessageHook.Original(manager, chatType, sender, message, timestamp, silent);
-                this.ChatMessageUnhandled?.Invoke(chatType, timestamp, parsedSender, parsedMessage);
+                foreach (var d in Delegate.EnumerateInvocationList(this.ChatMessageUnhandled))
+                    d(chatType, timestamp, parsedSender, parsedMessage);
             }
         }
         catch (Exception ex)
@@ -479,11 +515,15 @@ internal class ChatGuiPluginScoped : IInternalDisposableService, IChatGui
     [ServiceManager.ServiceDependency]
     private readonly ChatGui chatGuiService = Service<ChatGui>.Get();
 
+    private readonly LocalPlugin plugin;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="ChatGuiPluginScoped"/> class.
     /// </summary>
-    internal ChatGuiPluginScoped()
+    /// <param name="plugin">The plugin.</param>
+    internal ChatGuiPluginScoped(LocalPlugin plugin)
     {
+        this.plugin = plugin;
         this.chatGuiService.ChatMessage += this.OnMessageForward;
         this.chatGuiService.CheckMessageHandled += this.OnCheckMessageForward;
         this.chatGuiService.ChatMessageHandled += this.OnMessageHandledForward;
@@ -524,6 +564,18 @@ internal class ChatGuiPluginScoped : IInternalDisposableService, IChatGui
         this.ChatMessageHandled = null;
         this.ChatMessageUnhandled = null;
     }
+
+    /// <inheritdoc/>
+    public DalamudLinkPayload AddChatLinkHandler(uint commandId, Action<uint, SeString> commandAction)
+        => this.chatGuiService.AddChatLinkHandler(this.plugin.InternalName, commandId, commandAction);
+
+    /// <inheritdoc/>
+    public void RemoveChatLinkHandler(uint commandId)
+        => this.chatGuiService.RemoveChatLinkHandler(this.plugin.InternalName, commandId);
+
+    /// <inheritdoc/>
+    public void RemoveChatLinkHandler()
+        => this.chatGuiService.RemoveChatLinkHandler(this.plugin.InternalName);
 
     /// <inheritdoc/>
     public void Print(XivChatEntry chat)
