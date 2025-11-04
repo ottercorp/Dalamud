@@ -12,7 +12,7 @@ using Dalamud.Interface.Utility;
 namespace Dalamud.Interface.Internal.Windows.Settings.Widgets;
 
 [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented", Justification = "Internals")]
-public class ProxySettingsEntry : SettingsEntry
+internal class ProxySettingsEntry : SettingsEntry
 {
     private bool useManualProxy;
     private string proxyProtocol = string.Empty;
@@ -25,7 +25,7 @@ public class ProxySettingsEntry : SettingsEntry
 
     public override void Load()
     {
-        
+
         this.useManualProxy = Service<DalamudConfiguration>.Get().UseManualProxy;
         this.proxyProtocol = Service<DalamudConfiguration>.Get().ProxyProtocol;
         this.proxyHost = Service<DalamudConfiguration>.Get().ProxyHost;
@@ -110,4 +110,3 @@ public class ProxySettingsEntry : SettingsEntry
         ImGui.TextColored(proxyStatusColor, $"代理测试结果: {this.proxyStatus}");
     }
 }
-
