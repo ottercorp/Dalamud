@@ -45,7 +45,7 @@ jobs:
         run: .\CreateHashList.ps1 .\bin\Release
       - name: Attest Build
         if: ${{ github.repository_owner == 'ottercorp' && github.event_name == 'push' }}
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
             bin/Release/hashes.json
