@@ -61,5 +61,12 @@
         <PackageVersion Include="xunit.extensibility.execution" Version="2.4.1"/>
         <PackageVersion Include="xunit.runner.console" Version="2.4.1"/>
         <PackageVersion Include="xunit.runner.visualstudio" Version="2.4.3"/>
+
+        <!-- CN -->
+        <PackageVersion Include="DeviceId" Version="6.8.0" />
+        <PackageVersion Include="DeviceId.Linux" Version="6.8.0" />
+        <PackageVersion Include="DeviceId.Mac" Version="6.8.0" />
+        <PackageVersion Include="HttpClient.Caching" Version="1.6.6" />
+        <PackageVersion Include="System.Management" Version="9.0.10" />
     </ItemGroup>
 </Project>
