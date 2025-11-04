@@ -781,7 +781,7 @@ public static partial class Util
             $"{actor.Address.ToInt64():X}:{actor.GameObjectId:X}[{tag}] - {actor.ObjectKind} - {actor.Name} - X{actor.Position.X} Y{actor.Position.Y} Z{actor.Position.Z} D{actor.YalmDistanceX} R{actor.Rotation} - Target: {actor.TargetObjectId:X}\n";
 
         if (actor is Npc npc)
-            actorString += $"       DataId: {npc.DataId}  NameId:{npc.NameId}\n";
+            actorString += $"       BaseId: {npc.BaseId}  NameId:{npc.NameId}\n";
 
         if (actor is ICharacter chara)
         {
@@ -815,7 +815,7 @@ public static partial class Util
             $"{actor.Address.ToInt64():X}:{actor.GameObjectId:X}[{tag}] - {actor.ObjectKind} - {actor.Name} - X{actor.Position.X} Y{actor.Position.Y} Z{actor.Position.Z} D{actor.YalmDistanceX} R{actor.Rotation} - Target: {actor.TargetObjectId:X}\n";
 
         if (actor is Npc npc)
-            actorString += $"       DataId: {npc.DataId}  NameId:{npc.NameId}\n";
+            actorString += $"       BaseId: {npc.BaseId}  NameId:{npc.NameId}\n";
 
         if (actor is Character chara)
         {
