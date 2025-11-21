@@ -46,13 +46,10 @@ public class BranchSwitcherWindow : Window
             this.branches = await client.GetFromJsonAsync<Dictionary<string, VersionEntry>>(BranchInfoUrl);
             Debug.Assert(this.branches != null, "this.branches != null");
 
-            var config = Service<DalamudConfiguration>.Get();
-            this.selectedBranchIndex = this.branches!.Any(x => x.Key == config.DalamudBetaKind) ?
-                                           this.branches.TakeWhile(x => x.Key != config.DalamudBetaKind).Count()
+            var branch = Util.GetBranch();
+            this.selectedBranchIndex = this.branches!.Any(x => x.Value.Track == branch) ?
+                                           this.branches.TakeWhile(x => x.Value.Track != branch).Count()
                                            : 0;
-
-            if (this.branches.ElementAt(this.selectedBranchIndex).Value.Key != config.DalamudBetaKey)
-                this.selectedBranchIndex = 0;
         });
 
         base.OnOpen();
@@ -85,35 +82,30 @@ public class BranchSwitcherWindow : Window
 
             ImGuiHelpers.ScaledDummy(5);
 
-            void Pick()
+            if (ImGui.Button("Pick & Restart"u8))
             {
                 var config = Service<DalamudConfiguration>.Get();
                 config.DalamudBetaKind = pickedBranch.Key;
-                //config.DalamudBetaKey = pickedBranch.Value.Key;
-                config.QueueSave();
-            }
-
-            if (ImGui.Button("Pick"u8))
-            {
-                Pick();
-                this.IsOpen = false;
-            }
-
-            ImGui.SameLine();
-
-            if (ImGui.Button("Pick & Restart"u8))
-            {
-                Pick();
+                config.DalamudBetaKey = pickedBranch.Value.Key;
 
                 // If we exit immediately, we need to write out the new config now
-                Service<DalamudConfiguration>.Get().ForceSave();
+                config.ForceSave();
 
                 var appData = Service<Dalamud>.Get().StartInfo.LauncherDirectory ?? string.Empty;
                 var xlPath = Path.Combine(appData, "XIVLauncherCN.exe");
 
                 if (File.Exists(xlPath))
                 {
-                    Process.Start(xlPath);
+                    var ps = new ProcessStartInfo
+                    {
+                        FileName = xlPath,
+                        UseShellExecute = false,
+                    };
+
+                    ps.ArgumentList.Add($"--dalamud-beta-kind={config.DalamudBetaKind}");
+                    ps.ArgumentList.Add($"--dalamud-beta-key={config.DalamudBetaKey}");
+
+                    Process.Start(ps);
                     Environment.Exit(0);
                 }
             }
