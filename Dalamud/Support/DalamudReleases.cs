@@ -36,9 +36,13 @@ internal class DalamudReleases : IServiceType
     /// Get the latest version info for the current track.
     /// </summary>
     /// <returns>The version info for the current track.</returns>
-    public async Task<DalamudVersionInfo> GetVersionForCurrentTrack()
+    public async Task<DalamudVersionInfo?> GetVersionForCurrentTrack()
     {
-        var url = string.Format(VersionInfoUrl, [this.config.DalamudBetaKind]);
+        var currentTrack = Util.GetActiveTrack();
+        if (currentTrack.IsNullOrEmpty())
+            return null;
+
+        var url = string.Format(VersionInfoUrl, [currentTrack]);
         var response = await this.httpClient.SharedHttpClient.GetAsync(url);
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();

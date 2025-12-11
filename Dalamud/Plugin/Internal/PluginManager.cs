@@ -367,6 +367,9 @@ internal class PluginManager : IInternalDisposableService
         if (!this.configuration.DoPluginTest)
             return false;
 
+        if (!manifest.TestingDalamudApiLevel.HasValue)
+            return false;
+
         return manifest.IsTestingExclusive || manifest.IsAvailableForTesting;
     }
 
