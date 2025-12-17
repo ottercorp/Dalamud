@@ -1,0 +1,51 @@
+name: Sync Goatcorp
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create PR from Upstream
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          UPSTREAM_OWNER: goatcorp
+          UPSTREAM_BRANCH: master
+          MY_BRANCH: master
+        run: |
+          HEAD_REF="$UPSTREAM_OWNER:$UPSTREAM_BRANCH"
+          
+          echo "检查是否存在从 $HEAD_REF 到 $MY_BRANCH 的 PR..."
+
+          EXISTING_PR=$(gh pr list --state open \
+                                   --base $MY_BRANCH \
+                                   --head $HEAD_REF \
+                                   --json url \
+                                   --jq '.[0].url')
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR 已存在，PR链接: $EXISTING_PR"
+            exit 0
+          fi
+          
+          gh pr create \
+            --repo ${{ github.repository }} \
+            --base $MY_BRANCH \
+            --head $HEAD_REF \
+            --title "🔄 同步上游更新" \
+            --body "@ottercorp/dalamud-maintainer 上游仓库 ($HEAD_REF) 有新提交。这是自动生成的同步请求。" \
+            || echo "没有发现新提交，或者创建 PR 失败。"
