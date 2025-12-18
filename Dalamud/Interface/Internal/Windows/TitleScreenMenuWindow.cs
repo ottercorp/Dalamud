@@ -472,9 +472,9 @@ internal class TitleScreenMenuWindow : Window, IDisposable
 
     private unsafe void OnVersionStringDraw(AddonEvent ev, AddonArgs args)
     {
-        if (args is not AddonDrawArgs drawArgs) return;
+        if (ev is not (AddonEvent.PostDraw or AddonEvent.PreDraw)) return;
 
-        var addon = drawArgs.Addon.Struct;
+        var addon = args.Addon.Struct;
         var textNode = addon->GetTextNodeById(3);
 
         // look and feel init. should be harmless to set.
@@ -503,7 +503,7 @@ internal class TitleScreenMenuWindow : Window, IDisposable
         lssb.PushEdgeColorType(701).PushColorType(539)
             .Append(SeIconChar.BoxedLetterD.ToIconChar())
             .PopColorType().PopEdgeColorType();
-        lssb.Append($" Dalamud: {Util.GetScmVersion()}");
+        lssb.Append($" Dalamud: {Versioning.GetScmVersion()}");
 
         lssb.Append($" - {count} {(count != 1 ? "plugins" : "plugin")} loaded");
 

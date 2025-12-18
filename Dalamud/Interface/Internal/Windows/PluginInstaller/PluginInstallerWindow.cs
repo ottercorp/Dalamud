@@ -303,7 +303,7 @@ internal class PluginInstallerWindow : Window, IDisposable
 
         this.profileManagerWidget.Reset();
 
-        if (this.staleDalamudNewVersion == null && !Util.GetActiveTrack().IsNullOrEmpty())
+        if (this.staleDalamudNewVersion == null && !Versioning.GetActiveTrack().IsNullOrEmpty())
         {
             Service<DalamudReleases>.Get().GetVersionForCurrentTrack().ContinueWith(t =>
             {
@@ -311,7 +311,7 @@ internal class PluginInstallerWindow : Window, IDisposable
                     return;
 
                 var versionInfo = t.Result;
-                if (versionInfo.AssemblyVersion != Util.GetScmVersion())
+                if (versionInfo.AssemblyVersion != Versioning.GetScmVersion())
                 {
                     this.staleDalamudNewVersion = versionInfo.AssemblyVersion;
                 }
@@ -1694,7 +1694,7 @@ internal class PluginInstallerWindow : Window, IDisposable
             DrawWarningIcon();
             DrawLinesCentered("A new version of Dalamud is available.\n" +
                               "Please restart the game to ensure compatibility with updated plugins.\n" +
-                              $"old: {Util.GetScmVersion()} new: {this.staleDalamudNewVersion}");
+                              $"old: {Versioning.GetScmVersion()} new: {this.staleDalamudNewVersion}");
 
             ImGuiHelpers.ScaledDummy(10);
         }
@@ -2485,7 +2485,7 @@ internal class PluginInstallerWindow : Window, IDisposable
         var isOutdated = effectiveApiLevel < PluginManager.DalamudApiLevel;
 
         var isIncompatible = manifest.MinimumDalamudVersion != null &&
-                             manifest.MinimumDalamudVersion > Util.AssemblyVersionParsed;
+                             manifest.MinimumDalamudVersion > Versioning.GetAssemblyVersionParsed();
 
         var enableInstallButton = this.updateStatus != OperationStatus.InProgress &&
                                   this.installStatus != OperationStatus.InProgress &&
