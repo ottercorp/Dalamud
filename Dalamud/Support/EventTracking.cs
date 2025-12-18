@@ -44,7 +44,7 @@ internal static class EventTracking
         var userId = Hash.GetStringSha256Hash($"{contentId:x16}+{actorId:X8}");
         var cheatBannedHash = CheatBannedHash();
         var os = Util.IsWine() ? "Wine" : "Windows";
-        var version = $"{Util.AssemblyVersion}-{Util.GetGitHash()}";
+        //var version = $"{Util.AssemblyVersion}-{Util.GetGitHash()}";
         var pluginManager = Service<PluginManager>.GetNullable();
         var count = pluginManager is null ? -1 : pluginManager.InstalledPlugins.Count(x => x.Manifest.InstalledFromUrl is not "OFFICIAL");
         var installedPlugins = pluginManager is null
@@ -58,7 +58,7 @@ internal static class EventTracking
             ServerId = homeWorldId.ToString(),
             UserId = userId,
             OS = os,
-            DalamudVersion = version,
+            DalamudVersion = "14.0.0.0",
             PluginCount = count.ToString(),
             PluginList = installedPlugins,
             Aid = accountId,
