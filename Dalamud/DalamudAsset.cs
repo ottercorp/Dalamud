@@ -173,6 +173,5 @@ public enum DalamudAsset
     /// </summary>
     [DalamudAsset(DalamudAssetPurpose.Font, required: false)]
     //[DalamudAssetOnlineSource("https://img.finalfantasyxiv.com/lds/pc/global/fonts/FFXIV_Lodestone_SSF.ttf")]
-    [DalamudAssetPath("UIRes", "LodestoneGameSymbol.ttf")]
     LodestoneGameSymbol = 2004,
 }

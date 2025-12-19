@@ -10,7 +10,6 @@ using Dalamud.Game.Gui;
 using Dalamud.Interface.Animation.EasingFunctions;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
-using Dalamud.Interface.FontIdentifier;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ManagedFontAtlas;
 using Dalamud.Interface.ManagedFontAtlas.Internals;
@@ -32,10 +31,13 @@ namespace Dalamud.Interface.Internal.Windows;
 /// </summary>
 internal sealed class ChangelogWindow : Window, IDisposable
 {
-    private const string WarrantsChangelogForMajorMinor = "11.0.0.";
+    private const string WarrantsChangelogForMajorMinor = "10.0.";
 
     private const string ChangeLog =
-        @"• 更新了 Dalamud 以兼容版本 7.11
+        @"• Updated Dalamud for compatibility with Patch 7.0
+• Made a lot of behind-the-scenes changes to make Dalamud and plugins more stable and reliable
+• Added new functionality developers can take advantage of
+• Refreshed the Dalamud/plugin installer UI
 ";
 
     private static readonly TimeSpan TitleScreenWaitTime = TimeSpan.FromSeconds(0.5f);
@@ -49,7 +51,6 @@ internal sealed class ChangelogWindow : Window, IDisposable
     private readonly Lazy<IFontHandle> bannerFont;
     private readonly Lazy<IDalamudTextureWrap> apiBumpExplainerTexture;
     private readonly Lazy<IDalamudTextureWrap> logoTexture;
-    private readonly Lazy<IDalamudTextureWrap> fontTipsTexture;
 
     private readonly InOutCubic windowFade = new(TimeSpan.FromSeconds(2.5f))
     {
@@ -117,8 +118,6 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
         this.apiBumpExplainerTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.ChangelogApiBumpIcon));
         this.logoTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.Logo));
-
-        this.fontTipsTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.MissingFontTips));
 
         // If we are going to show a changelog, make sure we have the font ready, otherwise it will hitch
         if (WarrantsChangelog())
@@ -365,26 +364,6 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         ImGui.TextWrapped("这个更新日志是对本版本中最重要的更改的快速概述");
                         ImGui.TextWrapped("请点击 Next 以查看更新插件的快速指南。");
 
-                        ImGui.Image(
-                            this.fontTipsTexture.Value.Handle,
-                            this.fontTipsTexture.Value.Size);
-
-                        var interfaceManager = Service<InterfaceManager>.Get();
-                        using (interfaceManager.MonoFontHandle?.Push())
-                        {
-                            if (ImGui.Button(Loc.Localize("DalamudSettingResetDefaultFont", "Reset Default Font")))
-                            {
-                                var faf = Service<FontAtlasFactory>.Get();
-                                faf.DefaultFontSpecOverride =
-                                        new SingleFontSpec { FontId = new GameFontAndFamilyId(GameFontFamily.Axis) };
-                                interfaceManager.RebuildFonts();
-
-                                Service<DalamudConfiguration>.Get().DefaultFontSpec = faf.DefaultFontSpecOverride;
-                                Service<DalamudConfiguration>.Get().QueueSave();
-                            }
-                        }
-
-                        ImGuiHelpers.ScaledDummy(10);
                         DrawNextButton(State.ExplainerApiBump);
                         break;
 

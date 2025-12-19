@@ -351,14 +351,14 @@ internal sealed partial class FontAtlasFactory
             switch (asset)
             {
                 case DalamudAsset.LodestoneGameSymbol when this.factory.HasGameSymbolsFontFile:
-                   return this.factory.AddFont(
-                       this,
-                       asset,
-                       fontConfig with
-                       {
-                           FontNo = 0,
-                           SizePx = (fontConfig.SizePx * 3) / 2,
-                       });
+                    return this.factory.AddFont(
+                        this,
+                        asset,
+                        fontConfig with
+                        {
+                            FontNo = 0,
+                            SizePx = (fontConfig.SizePx * 3) / 2,
+                        });
 
                 case DalamudAsset.LodestoneGameSymbol when !this.factory.HasGameSymbolsFontFile:
                     return this.AddGameGlyphs(

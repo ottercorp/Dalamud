@@ -21,7 +21,6 @@ using Dalamud.Plugin.Internal.Profiles;
 using Dalamud.Storage;
 using Dalamud.Utility;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Serilog;
 using Serilog.Events;
 using Windows.Win32.UI.WindowsAndMessaging;
@@ -38,7 +37,6 @@ namespace Dalamud.Configuration.Internal;
 #pragma warning restore SA1015
 internal sealed class DalamudConfiguration : IInternalDisposableService
 {
-
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
         TypeNameHandling = TypeNameHandling.All,
@@ -529,8 +527,7 @@ internal sealed class DalamudConfiguration : IInternalDisposableService
         }
 
         deserialized ??= new DalamudConfiguration();
-        deserialized.configPath = path;
-            
+        deserialized.configPath = path;    
         try
         {
             deserialized.SetDefaults();

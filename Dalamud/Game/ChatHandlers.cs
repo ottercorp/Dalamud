@@ -1,9 +1,5 @@
-using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
 
 using CheapLoc;
 
@@ -16,10 +12,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Internal;
 using Dalamud.Logging.Internal;
 using Dalamud.Plugin.Internal;
-using Dalamud.Support;
 using Dalamud.Utility;
-
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
 
 namespace Dalamud.Game;
 

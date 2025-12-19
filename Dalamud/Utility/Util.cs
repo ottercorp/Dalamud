@@ -4,18 +4,13 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Numerics;
-using System.Net;
-using System.Net.Http;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Dalamud.Configuration;
-using Dalamud.Configuration.Internal;
 
 using Dalamud.Bindings.ImGui;
 using Dalamud.Data;
@@ -31,18 +26,12 @@ using Dalamud.Support;
 using Lumina.Excel.Sheets;
 
 using Serilog;
-using Newtonsoft.Json;
 
 using TerraFX.Interop.Windows;
 
 using Windows.Win32.System.Memory;
 using Windows.Win32.System.Ole;
 using Windows.Win32.UI.WindowsAndMessaging;
-
-using Dalamud.Interface.Internal;
-using Dalamud.Networking.Http;
-
-using static TerraFX.Interop.Windows.Windows;
 
 using FLASHWINFO = Windows.Win32.UI.WindowsAndMessaging.FLASHWINFO;
 using HWND = Windows.Win32.Foundation.HWND;
@@ -56,7 +45,6 @@ namespace Dalamud.Utility;
 /// </summary>
 public static partial class Util
 {
-    internal static string TOSRemoteUrl = ServerAddress.MainAddress + "/Dalamud/ToS";
     private static readonly string[] PageProtectionFlagNames = [
         "PAGE_NOACCESS",
         "PAGE_READONLY",

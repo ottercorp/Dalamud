@@ -85,9 +85,6 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="System.Collections.Immutable" />
-        <PackageReference Include="System.Drawing.Common"  />
-        <PackageReference Include="System.Management" />
         <PackageReference Include="System.Reactive" />
         <PackageReference Include="System.Reflection.MetadataLoadContext" />
         <PackageReference Include="TerraFX.Interop.Windows" />

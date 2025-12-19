@@ -1,3 +1,7 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+
 using Dalamud.Game.Command;
 using Dalamud.Hooking;
 using Dalamud.Utility;
@@ -9,12 +13,6 @@ using FFXIVClientStructs.FFXIV.Component.Completion;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 using Lumina.Text;
-
-using Serilog;
-
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
 
 namespace Dalamud.Game.Internal;
 

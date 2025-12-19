@@ -104,7 +104,7 @@ internal class LocalPlugin : IAsyncDisposable
         }
 
         var pluginManager = Service<PluginManager>.Get();
-        this.IsBanned = pluginManager.IsManifestBanned(this.manifest); // && !this.IsDev;
+        this.IsBanned = pluginManager.IsManifestBanned(this.manifest) && !this.IsDev;
         this.BanReason = pluginManager.GetBanReason(this.manifest);
 
         if (needsSaveDueToLegacyFiles)
@@ -295,9 +295,8 @@ internal class LocalPlugin : IAsyncDisposable
                     throw new ArgumentOutOfRangeException(this.State.ToString());
             }
 
-            // if (pluginManager.IsManifestBanned(this.Manifest) && !this.IsDev)
-            if (pluginManager.IsManifestBanned(this.manifest))
-                    throw new BannedPluginException($"Unable to load {this.Name}, banned");
+            if (pluginManager.IsManifestBanned(this.manifest) && !this.IsDev)
+                throw new BannedPluginException($"Unable to load {this.Name}, banned");
 
             if (this.manifest.ApplicableVersion < dalamud.StartInfo.GameVersion)
                 throw new PluginPreconditionFailedException($"Unable to load {this.Name}, game is newer than applicable version {this.manifest.ApplicableVersion}");

@@ -39,5 +39,4 @@ public enum GameFontFamily
     /// Sans-serif horizontally narrow font used for addon titles. Contains Latin characters.
     /// </summary>
     TrumpGothic,
-
 }

@@ -11,7 +11,6 @@ internal sealed class GameNetworkAddressResolver : BaseAddressResolver
     /// Gets the address of the ProcessZonePacketUp method.
     /// </summary>
     public IntPtr ProcessZonePacketUp { get; private set; }
-    
     /// <inheritdoc/>
     protected override void Setup64Bit(ISigScanner sig)
     {

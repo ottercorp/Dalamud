@@ -1,5 +1,4 @@
 using System.Linq;
-using System.Threading.Tasks;
 
 using Dalamud.Data;
 using Dalamud.Game.ClientState.Conditions;
@@ -13,7 +12,6 @@ using Dalamud.IoC;
 using Dalamud.IoC.Internal;
 using Dalamud.Logging.Internal;
 using Dalamud.Plugin.Services;
-using Dalamud.Support;
 using Dalamud.Utility;
 
 using FFXIVClientStructs.FFXIV.Application.Network;
@@ -384,6 +382,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
             this.lastConditionNone = false;
             this.Login?.InvokeSafely();
             gameGui.ResetUiHideState();
+
             this.lifecycle.ResetLogout();
         }
     }

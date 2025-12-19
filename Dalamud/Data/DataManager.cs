@@ -1,5 +1,4 @@
 using System.IO;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,12 +8,13 @@ using Dalamud.IoC.Internal;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using Dalamud.Utility.Timing;
+
 using Lumina;
 using Lumina.Data;
 using Lumina.Excel;
-using Lumina.Excel.Sheets;
 
 using Newtonsoft.Json;
+
 using Serilog;
 
 namespace Dalamud.Data;
@@ -166,11 +166,19 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
 
     /// <inheritdoc/>
     public SubrowExcelSheet<T> GetSubrowExcelSheet<T>(ClientLanguage? language = null, string? name = null) where T : struct, IExcelSubrow<T>
-        => this.Excel.GetSubrowSheet<T>(ClientLanguage.ChineseSimplified.ToLumina(), name);
+        //=> this.Excel.GetSubrowSheet<T>(ClientLanguage.ChineseSimplified.ToLumina(), name);
+    {
+        if (language != null)
+        {
+            language = ClientLanguage.ChineseSimplified;
+        }
+
+        return this.Excel.GetSubrowSheet<T>(language?.ToLumina(), name);
+    }
 
     /// <inheritdoc/>
     public FileResource? GetFile(string path)
-        => this.GetFile<FileResource>(path);
+            => this.GetFile<FileResource>(path);
 
     /// <inheritdoc/>
     public T? GetFile<T>(string path) where T : FileResource

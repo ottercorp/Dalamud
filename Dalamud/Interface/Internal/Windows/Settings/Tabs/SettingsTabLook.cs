@@ -277,7 +277,6 @@ internal sealed class SettingsTabLook : SettingsTab
                         new SingleFontSpec { FontId = new GameFontAndFamilyId(GameFontFamily.Axis) };
                 interfaceManager.RebuildFonts();
                 Service<InterfaceManager>.Get().InvokeFontChanged();
-                this.Save();
             }
         }
 
