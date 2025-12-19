@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 
@@ -40,7 +40,6 @@ internal class HappyHttpClient : IInternalDisposableService
                 },
             },
         };
-        this.SharedHttpClient.DefaultRequestHeaders.Add("X-Machine-Token", DeviceUtils.GetDeviceId());
     }
 
     /// <summary>

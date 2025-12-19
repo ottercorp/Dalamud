@@ -385,8 +385,6 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
             this.Login?.InvokeSafely();
             gameGui.ResetUiHideState();
             this.lifecycle.ResetLogout();
-            var clientState = Service<ClientState>.Get();
-            EventTracking.SendMeasurement(clientState.LocalContentId, clientState.LocalPlayer.EntityId, clientState.LocalPlayer.HomeWorld.RowId);
         }
     }
 

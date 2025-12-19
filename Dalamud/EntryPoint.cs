@@ -186,17 +186,6 @@ public sealed class EntryPoint
             // Apply common fixes for culture issues
             CultureFixes.Apply();
 
-            // This is due to GitHub not supporting TLS 1.0, so we enable all TLS versions globally
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Tls;
-
-            try
-            {
-                Util.SetProxy(configuration.UseManualProxy, configuration.ProxyProtocol, configuration.ProxyHost, configuration.ProxyPort);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Proxy failed.");
-            }
             // Currently VEH is not fully functional on WINE
             if (info.Platform != OSPlatform.Windows)
                 InitSymbolHandler(info);

@@ -116,16 +116,11 @@ internal class PluginManager : IInternalDisposableService
         this.PluginConfigs = new PluginConfigurations(Path.Combine(Path.GetDirectoryName(this.dalamud.StartInfo.ConfigurationPath) ?? string.Empty, "pluginConfigs"));
 
         var bannedPluginsJson = File.ReadAllText(Path.Combine(this.dalamud.StartInfo.AssetDirectory!, "UIRes", "bannedplugin.json"));
-        var cheatPluginsJson = File.ReadAllText(Path.Combine(this.dalamud.StartInfo.AssetDirectory!, "UIRes", "cheatplugin.json"));
         var bannedPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
-        var cheatPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(cheatPluginsJson);
-        if (bannedPluginsTemp == null || cheatPluginsTemp == null)
+        if (this.bannedPlugins == null)
         {
-            throw new InvalidDataException("Couldn't deserialize banned or cheat plugins manifest.");
+            throw new InvalidDataException("Couldn't deserialize banned plugins manifest.");
         }
-
-
-        this.bannedPlugins = bannedPluginsTemp.Concat(cheatPluginsTemp).ToArray();
 
         this.openInstallerWindowPluginChangelogsLink =
             Service<ChatGui>.GetAsync().ContinueWith(
@@ -1231,8 +1226,8 @@ internal class PluginManager : IInternalDisposableService
     {
         Debug.Assert(this.bannedPlugins != null, "this.bannedPlugins != null");
 
-        ///if (this.LoadBannedPlugins)
-        ///    return true;
+        if (this.LoadBannedPlugins)
+            return false;
 
         var config = Service<DalamudConfiguration>.Get();
 

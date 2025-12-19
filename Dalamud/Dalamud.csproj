@@ -63,9 +63,6 @@
     <ItemGroup>
         <PackageReference Include="BitFaster.Caching" />
         <PackageReference Include="CheapLoc" />
-        <PackageReference Include="DeviceId" />
-        <PackageReference Include="DeviceId.Linux" />
-        <PackageReference Include="DeviceId.Mac"/>
         <PackageReference Include="DotNet.ReproducibleBuilds" PrivateAssets="all" />
         <PackageReference Include="goatcorp.Reloaded.Hooks" />
         <PackageReference Include="goatcorp.Reloaded.Assembler" />

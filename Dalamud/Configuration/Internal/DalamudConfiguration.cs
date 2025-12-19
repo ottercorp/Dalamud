@@ -330,24 +330,6 @@ internal sealed class DalamudConfiguration : IInternalDisposableService
     public bool ProfilesHasSeenTutorial { get; set; } = false;
 
     /// <summary>
-    /// Gets or sets a value whether or not Dalamud use manual proxy settings.
-    /// </summary>
-    public bool UseManualProxy { get; set; }
-
-    /// <summary>
-    /// Gets or sets a value what type proxy Dalamud will use.
-    /// </summary>
-    public string ProxyProtocol { get; set; } = "socks5";
-
-    /// <summary>
-    /// Gets or sets the proxy host address.
-    /// </summary>
-    public string ProxyHost { get; set; } = "127.0.0.1";
-
-    /// <summary>
-    /// Gets or sets the proxy port.
-    /// </summary>
-    public int ProxyPort { get; set; } = 1080;
     /// Gets or sets the default UI preset.
     /// </summary>
     public PresetModel DefaultUiPreset { get; set; } = new();
@@ -390,12 +372,6 @@ internal sealed class DalamudConfiguration : IInternalDisposableService
     /// Gets or sets a value indicating whether market board data should be uploaded.
     /// </summary>
     public bool IsMbCollect { get; set; } = true;
-
-    /// <summary>
-    /// Gets the accepted TOS hash.
-    /// </summary>
-    public string AcceptedTOSHash { get; set; } = string.Empty;
-
 
     /// <summary>
     /// Gets the ISO 639-1 two-letter code for the language of the effective Dalamud display language.
@@ -554,10 +530,6 @@ internal sealed class DalamudConfiguration : IInternalDisposableService
 
         deserialized ??= new DalamudConfiguration();
         deserialized.configPath = path;
-
-        var splitedValue = deserialized.ProxyHost.Split("://");
-        if (splitedValue.Length >= 2)
-            deserialized.ProxyHost = splitedValue[1];
             
         try
         {

@@ -31,62 +31,10 @@ internal partial class ChatHandlers : IServiceType
 {
     private static readonly ModuleLog Log = new("ChatHandlers");
 
-    private readonly Regex rmtRegex = new(
-            @"没打开的[\dwW,]+收|登录领取.*福袋",
-            // @"4KGOLD|We have sufficient stock|VPK\.OM|Gil for free|www\.so9\.com|Fast & Convenient|Cheap & Safety Guarantee|【Code|A O A U E|igfans|4KGOLD\.COM|Cheapest Gil with|pvp and bank on google|Selling Cheap GIL|ff14mogstation\.com|Cheap Gil 1000k|gilsforyou|server 1000K =|gils_selling|E A S Y\.C O M|bonus code|mins delivery guarantee|Sell cheap|Salegm\.com|cheap Mog|Off Code:|FF14Mog.com|使用する5％オ|Off Code( *):|offers Fantasia",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    private readonly Dictionary<ClientLanguage, Regex[]> retainerSaleRegexes = new()
-    {
-        {
-            ClientLanguage.Japanese,
-            new Regex[]
-            {
-                new Regex(@"^(?:.+)マーケットに(?<origValue>[\d,.]+)ギルで出品した(?<item>.*)×(?<count>[\d,.]+)が売れ、(?<value>[\d,.]+)ギルを入手しました。$", RegexOptions.Compiled),
-                new Regex(@"^(?:.+)マーケットに(?<origValue>[\d,.]+)ギルで出品した(?<item>.*)が売れ、(?<value>[\d,.]+)ギルを入手しました。$", RegexOptions.Compiled),
-            }
-        },
-        {
-            ClientLanguage.English,
-            new Regex[]
-            {
-                new Regex(@"^(?<item>.+) you put up for sale in the (?:.+) markets (?:have|has) sold for (?<value>[\d,.]+) gil \(after fees\)\.$", RegexOptions.Compiled),
-            }
-        },
-        {
-            ClientLanguage.German,
-            new Regex[]
-            {
-                new Regex(@"^Dein Gehilfe hat (?<item>.+) auf dem Markt von (?:.+) für (?<value>[\d,.]+) Gil verkauft\.$", RegexOptions.Compiled),
-                new Regex(@"^Dein Gehilfe hat (?<item>.+) auf dem Markt von (?:.+) verkauft und (?<value>[\d,.]+) Gil erhalten\.$", RegexOptions.Compiled),
-            }
-        },
-        {
-            ClientLanguage.French,
-            new Regex[]
-            {
-                new Regex(@"^Un servant a vendu (?<item>.+) pour (?<value>[\d,.]+) gil à (?:.+)\.$", RegexOptions.Compiled),
-            }
-        },
-        {
-            ClientLanguage.ChineseSimplified,
-            new Regex[]
-            {
-                new Regex(@"^在(?:.+)市场以(?<origValue>[\d,.]+)的价格出售的“(?<item>.+)”成功售出，获得了(?<value>[\d,.]+)金币。$", RegexOptions.Compiled),
-            }
-        },
-    };
-
-    private readonly Regex urlRegex = new(@"(http|ftp|https)://([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?", RegexOptions.Compiled);
-
-    [ServiceManager.ServiceDependency]
-    private readonly Dalamud dalamud = Service<Dalamud>.Get();
-
     [ServiceManager.ServiceDependency]
     private readonly DalamudConfiguration configuration = Service<DalamudConfiguration>.Get();
 
     private bool hasSeenLoadingMsg;
-    private CancellationTokenSource deferredAutoUpdateCts = new();
 
     [ServiceManager.ServiceConstructor]
     private ChatHandlers(ChatGui chatGui)
@@ -200,25 +148,5 @@ internal partial class ChatHandlers : IServiceType
         }
 
         this.hasSeenLoadingMsg = true;
-
-        Task.Run(() =>
-        {
-            try
-            {
-                Util.GetRemoteTOSHash().ContinueWith(task =>
-                {
-                    var remoteHash = task.Result;
-                    if (string.IsNullOrEmpty(this.configuration.AcceptedTOSHash) || remoteHash != this.configuration.AcceptedTOSHash)
-                    {
-                        dalamudInterface.OpenToSWindow();
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Remote TOS hash check failed");
-            }
-        });
-
     }
 }

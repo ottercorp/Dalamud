@@ -70,7 +70,6 @@ internal class PluginRepository
                 },
             },
         };
-        this.httpClient.DefaultRequestHeaders.Add("X-Machine-Token", DeviceUtils.GetDeviceId());
         this.PluginMasterUrl = pluginMasterUrl;
         this.IsThirdParty = pluginMasterUrl != MainRepoUrl;
         this.IsEnabled = isEnabled;
