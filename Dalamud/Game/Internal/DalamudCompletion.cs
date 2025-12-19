@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
-
 using Dalamud.Game.Command;
 using Dalamud.Hooking;
 using Dalamud.Utility;
@@ -12,6 +9,12 @@ using FFXIVClientStructs.FFXIV.Component.Completion;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 using Lumina.Text;
+
+using Serilog;
+
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace Dalamud.Game.Internal;
 
@@ -33,10 +36,16 @@ internal sealed unsafe class DalamudCompletion : IInternalDisposableService
 
     private readonly Dictionary<string, EntryStrings> cachedCommands = [];
 
+    private static MyHookDelegate callback;
+
     private EntryStrings? dalamudCategory;
 
-    private Hook<AtkTextInput.Delegates.OpenCompletion> openSuggestionsHook;
+    //private Hook<AtkTextInput.Delegates.OpenCompletion> openSuggestionsHook;
+    private AsmHook openSuggestionsHook;
     private Hook<CompletionModule.Delegates.GetSelection>? getSelectionHook;
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    public delegate void MyHookDelegate();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DalamudCompletion"/> class.
@@ -72,9 +81,21 @@ internal sealed unsafe class DalamudCompletion : IInternalDisposableService
 
         this.dalamudCategory = new EntryStrings("【Dalamud】");
 
-        this.openSuggestionsHook = Hook<AtkTextInput.Delegates.OpenCompletion>.FromAddress(
-            (nint)AtkTextInput.MemberFunctionPointers.OpenCompletion,
-            this.OpenSuggestionsDetour);
+        //this.openSuggestionsHook = Hook<AtkTextInput.Delegates.OpenCompletion>.FromAddress(
+        //    (nint)AtkTextInput.MemberFunctionPointers.OpenCompletion,
+        //    this.OpenSuggestionsDetour);
+
+        var openSuggestionsAddress = Service<TargetSigScanner>.Get().ScanText("4C 8D 86 ?? ?? ?? ?? 48 8B CE 48 8D 96 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 4E");
+        callback = this.UpdateCompletionData;
+        var callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+        this.openSuggestionsHook = new AsmHook(
+            openSuggestionsAddress,
+            [
+                "use64",
+                $"mov rax, 0x{callbackPtr:x8}",
+                "call rax",
+            ],
+            "openSuggestionsAsmHook");
 
         this.getSelectionHook = Hook<CompletionModule.Delegates.GetSelection>.FromAddress(
             (nint)uiModule->CompletionModule.VirtualTable->GetSelection,
@@ -84,11 +105,11 @@ internal sealed unsafe class DalamudCompletion : IInternalDisposableService
         this.getSelectionHook.Enable();
     }
 
-    private void OpenSuggestionsDetour(AtkTextInput* thisPtr)
-    {
-        this.UpdateCompletionData();
-        this.openSuggestionsHook!.Original(thisPtr);
-    }
+    //private void OpenSuggestionsDetour(AtkTextInput* thisPtr)
+    //{
+    //    this.UpdateCompletionData();
+    //    this.openSuggestionsHook!.Original(thisPtr);
+    //}
 
     private int GetSelectionDetour(CompletionModule* thisPtr, CategoryData.CompletionDataStruct* dataStructs, int index, Utf8String* outputString, Utf8String* outputDisplayString)
     {
@@ -179,7 +200,6 @@ internal sealed unsafe class DalamudCompletion : IInternalDisposableService
         var raptureAtkModule = RaptureAtkModule.Instance();
         if (raptureAtkModule == null)
             return false;
-
         var textInputEventInterface = raptureAtkModule->TextInput.TargetTextInputEventInterface;
         if (textInputEventInterface == null)
             return false;

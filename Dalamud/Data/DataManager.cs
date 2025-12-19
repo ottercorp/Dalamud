@@ -37,7 +37,7 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
     private DataManager(Dalamud dalamud)
     {
         this.Language = (ClientLanguage)dalamud.StartInfo.Language;
-
+        this.Language = ClientLanguage.ChineseSimplified;
         this.rsvResolver = new();
 
         try
@@ -154,7 +154,15 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
 
     /// <inheritdoc/>
     public ExcelSheet<T> GetExcelSheet<T>(ClientLanguage? language = null, string? name = null) where T : struct, IExcelRow<T>
-        => this.Excel.GetSheet<T>(ClientLanguage.ChineseSimplified.ToLumina(), name);
+        //=> this.Excel.GetSheet<T>(ClientLanguage.ChineseSimplified.ToLumina(), name);
+    {
+        if (language != null)
+        {
+            language = ClientLanguage.ChineseSimplified;
+        }
+
+        return this.Excel.GetSheet<T>(language?.ToLumina(), name);
+    }
 
     /// <inheritdoc/>
     public SubrowExcelSheet<T> GetSubrowExcelSheet<T>(ClientLanguage? language = null, string? name = null) where T : struct, IExcelSubrow<T>
