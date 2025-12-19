@@ -116,7 +116,7 @@ internal class PluginManager : IInternalDisposableService
         this.PluginConfigs = new PluginConfigurations(Path.Combine(Path.GetDirectoryName(this.dalamud.StartInfo.ConfigurationPath) ?? string.Empty, "pluginConfigs"));
 
         var bannedPluginsJson = File.ReadAllText(Path.Combine(this.dalamud.StartInfo.AssetDirectory!, "UIRes", "bannedplugin.json"));
-        var bannedPluginsTemp = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
+        this.bannedPlugins = JsonConvert.DeserializeObject<BannedPlugin[]>(bannedPluginsJson);
         if (this.bannedPlugins == null)
         {
             throw new InvalidDataException("Couldn't deserialize banned plugins manifest.");
