@@ -629,6 +629,9 @@ internal class PluginImageCache : IInternalDisposableService
         if (isThirdParty)
             return manifest.IconUrl;
 
+        if (manifest.IconUrl.Contains(".ffxiv.wang"))
+            return manifest.IconUrl;
+
         return MainRepoDip17ImageUrl.Format(manifest.Dip17Channel!, manifest.InternalName, "icon.png");
     }
 
