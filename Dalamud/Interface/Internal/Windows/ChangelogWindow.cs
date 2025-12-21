@@ -10,6 +10,7 @@ using Dalamud.Game.Gui;
 using Dalamud.Interface.Animation.EasingFunctions;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
+using Dalamud.Interface.FontIdentifier;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ManagedFontAtlas;
 using Dalamud.Interface.ManagedFontAtlas.Internals;
@@ -31,13 +32,13 @@ namespace Dalamud.Interface.Internal.Windows;
 /// </summary>
 internal sealed class ChangelogWindow : Window, IDisposable
 {
-    private const string WarrantsChangelogForMajorMinor = "10.0.";
+    private const string WarrantsChangelogForMajorMinor = "14.0.";
 
     private const string ChangeLog =
-        @"• Updated Dalamud for compatibility with Patch 7.0
-• Made a lot of behind-the-scenes changes to make Dalamud and plugins more stable and reliable
-• Added new functionality developers can take advantage of
-• Refreshed the Dalamud/plugin installer UI
+        @"• 更新了 Dalamud 以兼容版本 7.4
+• 大多数插件现在已与国际服保持同步更新
+• 欢迎向插件原作者提交反馈或翻译贡献
+• 国服将继续单独维护一些需要特殊修复的插件
 ";
 
     private static readonly TimeSpan TitleScreenWaitTime = TimeSpan.FromSeconds(0.5f);
@@ -51,6 +52,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
     private readonly Lazy<IFontHandle> bannerFont;
     private readonly Lazy<IDalamudTextureWrap> apiBumpExplainerTexture;
     private readonly Lazy<IDalamudTextureWrap> logoTexture;
+    private readonly Lazy<IDalamudTextureWrap> fontTipsTexture;
 
     private readonly InOutCubic windowFade = new(TimeSpan.FromSeconds(2.5f))
     {
@@ -118,6 +120,8 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
         this.apiBumpExplainerTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.ChangelogApiBumpIcon));
         this.logoTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.Logo));
+
+        this.fontTipsTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.MissingFontTips));
 
         // If we are going to show a changelog, make sure we have the font ready, otherwise it will hitch
         if (WarrantsChangelog())
@@ -361,20 +365,40 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         ImGuiHelpers.ScaledDummy(5);
                         ImGui.TextWrapped(ChangeLog);
                         ImGuiHelpers.ScaledDummy(5);
-                        ImGui.TextWrapped("这个更新日志是对本版本中最重要的更改的快速概述");
-                        ImGui.TextWrapped("请点击 Next 以查看更新插件的快速指南。");
+                        ImGui.TextWrapped("这个更新日志是对本版本中最重要的更改的快速概述"u8);
+                        ImGui.TextWrapped("请点击 Next 以查看更新插件的快速指南。"u8);
 
+                        ImGui.Image(
+                            this.fontTipsTexture.Value.Handle,
+                            this.fontTipsTexture.Value.Size);
+
+                        var interfaceManager = Service<InterfaceManager>.Get();
+                        using (interfaceManager.MonoFontHandle?.Push())
+                        {
+                            if (ImGui.Button(Loc.Localize("DalamudSettingResetDefaultFont", "Reset Default Font")))
+                            {
+                                var faf = Service<FontAtlasFactory>.Get();
+                                faf.DefaultFontSpecOverride =
+                                        new SingleFontSpec { FontId = new GameFontAndFamilyId(GameFontFamily.Axis) };
+                                interfaceManager.RebuildFonts();
+
+                                Service<DalamudConfiguration>.Get().DefaultFontSpec = faf.DefaultFontSpecOverride;
+                                Service<DalamudConfiguration>.Get().QueueSave();
+                            }
+                        }
+
+                        ImGuiHelpers.ScaledDummy(10);
                         DrawNextButton(State.ExplainerApiBump);
                         break;
 
                     case State.ExplainerApiBump:
-                        ImGui.TextWrapped("注意了！由于此补丁的更改，所有插件都需要更新，并已自动禁用");
-                        ImGui.TextWrapped("这是正常情况，也是进行重大游戏更新所必需的。");
+                        ImGui.TextWrapped("注意了！由于此补丁的更改，所有插件都需要更新，并已自动禁用"u8);
+                        ImGui.TextWrapped("这是正常情况，也是进行重大游戏更新所必需的。"u8);
                         ImGuiHelpers.ScaledDummy(5);
-                        ImGui.TextWrapped("要更新插件，请打开插件安装程序，然后点击“更新插件”。更新后的插件应会自动更新并重新启用。");
+                        ImGui.TextWrapped("要更新插件，请打开插件安装程序，然后点击“更新插件”。更新后的插件应会自动更新并重新启用。"u8);
                         ImGuiHelpers.ScaledDummy(5);
-                        ImGui.TextWrapped("请记住，并非您所有的插件都可能已经针对新版本进行了更新。");
-                        ImGui.TextWrapped("如果在“已安装插件”选项卡中显示某些插件带有红色叉号，那么它们可能还不可用。");
+                        ImGui.TextWrapped("请记住，并非您所有的插件都可能已经针对新版本进行了更新。"u8);
+                        ImGui.TextWrapped("如果在“已安装插件”选项卡中显示某些插件带有红色叉号，那么它们可能还不可用。"u8);
 
                         ImGuiHelpers.ScaledDummy(15);
 
@@ -441,8 +465,8 @@ internal sealed class ChangelogWindow : Window, IDisposable
                         break;
 
                     case State.Links:
-                        ImGui.TextWrapped("如果您注意到任何问题或需要帮助，请查看常见问题解答，并在需要帮助的情况下在我们的QQ频道上联系我们。");
-                        ImGui.TextWrapped("祝您享受游戏和 Dalamud 的时光！");
+                        ImGui.TextWrapped("如果您注意到任何问题或需要帮助，请查看常见问题解答，并在需要帮助的情况下在我们的QQ频道上联系我们。"u8);
+                        ImGui.TextWrapped("祝您享受游戏和 Dalamud 的时光！"u8);
 
                         ImGuiHelpers.ScaledDummy(45);
 
@@ -524,7 +548,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
             if (ImGui.IsItemHovered())
             {
-                ImGui.SetTooltip("我不关心这个");
+                ImGui.SetTooltip("我不关心这个"u8);
             }
         }
     }
