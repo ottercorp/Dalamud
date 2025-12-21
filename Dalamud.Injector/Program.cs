@@ -817,7 +817,7 @@ namespace Dalamud.Injector
                     if (dalamudStartInfo.Platform == OSPlatform.Windows)
                     {
                         var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                        var xivlauncherDir = Path.Combine(appDataDir, "XIVLauncher");
+                        var xivlauncherDir = Path.Combine(appDataDir, "XIVLauncherCN");
                         var launcherConfigPath = Path.Combine(xivlauncherDir, "launcherConfigV3.json");
                         gamePath = Path.Combine(
                             JsonSerializer.CreateDefault()
