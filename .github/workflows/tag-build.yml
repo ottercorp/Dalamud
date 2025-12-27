@@ -14,8 +14,8 @@ jobs:
       - name: Determine Tag
         id: s1
         run: |
-          version=$(echo "${{github.event.head_commit.message}}" | perl -nle 'm/build:\s*([0-9]+.[0-9]+.[0-9]+.[0-9]+)/; print $1');
-
+          # version=$(echo "${{github.event.head_commit.message}}" | perl -nle 'm/build:\s*([0-9]+.[0-9]+.[0-9]+.[0-9]+)/; print $1');
+          version=$(echo "${{github.event.head_commit.message}}" | perl -nle 'm/build:\s*(\d+\.\d+\.\d+\.\d+(?:-[A-Za-z0-9_.-]+)?)/; print $1')
           if [ -z "$version" ];
           then
                   echo "No build version found";
