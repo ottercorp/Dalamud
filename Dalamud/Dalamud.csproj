@@ -65,8 +65,6 @@
         <PackageReference Include="CheapLoc" />
         <PackageReference Include="DotNet.ReproducibleBuilds" PrivateAssets="all" />
         <PackageReference Include="goatcorp.Reloaded.Hooks" />
-        <PackageReference Include="goatcorp.Reloaded.Assembler" />
-        <PackageReference Include="HttpClient.Caching" />
         <PackageReference Include="JetBrains.Annotations" />
         <PackageReference Include="Lumina" />
         <PackageReference Include="Microsoft.Extensions.ObjectPool" />
@@ -87,6 +85,7 @@
         <PackageReference Include="System.Reactive" />
         <PackageReference Include="System.Reflection.MetadataLoadContext" />
         <PackageReference Include="TerraFX.Interop.Windows" />
+        <PackageReference Include="HttpClient.Caching" />
     </ItemGroup>
 
     <ItemGroup>
