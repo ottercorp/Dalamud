@@ -1,7 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-
 using Dalamud.Game.Command;
 using Dalamud.Hooking;
 using Dalamud.Utility;
@@ -11,6 +7,14 @@ using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.Completion;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+
+using Iced.Intel;
+using static Iced.Intel.AssemblerRegisters;
+
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace Dalamud.Game.Internal;
 
@@ -84,14 +88,16 @@ internal sealed unsafe class DalamudCompletion : IInternalDisposableService
         var openSuggestionsAddress = Service<TargetSigScanner>.Get().ScanText("4C 8D 86 ?? ?? ?? ?? 48 8B CE 48 8D 96 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 4E");
         callback = this.UpdateCompletionData;
         var callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
-        this.openSuggestionsHook = new AsmHook(
-            openSuggestionsAddress,
-            [
-                "use64",
-                $"mov rax, 0x{callbackPtr:x8}",
-                "call rax",
-            ],
-            "openSuggestionsAsmHook");
+
+        var assembler = new Assembler(64);
+        assembler.mov(rax, (ulong)callbackPtr);
+        assembler.call(rax);
+        var stream = new MemoryStream();
+        var writer = new StreamCodeWriter(stream);
+        assembler.Assemble(writer, 0);
+        var bytes = stream.ToArray();
+
+        this.openSuggestionsHook = new AsmHook(openSuggestionsAddress, bytes, "openSuggestionsAsmHook");
 
         this.getSelectionHook = Hook<CompletionModule.Delegates.GetSelection>.FromAddress(
             (nint)uiModule->CompletionModule.VirtualTable->GetSelection,
