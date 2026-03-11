@@ -112,7 +112,7 @@ internal class PluginRepository
     /// </summary>
     /// <param name="skipCache">Skip MemoryCache.</param>
     /// <returns>The new state.</returns>
-    public async Task ReloadPluginMasterAsync(bool skipCache)
+    public async Task ReloadAsync(bool skipCache)
     {
         this.State = PluginRepositoryState.InProgress;
         this.PluginMaster = new List<RemotePluginManifest>().AsReadOnly();

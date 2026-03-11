@@ -15,6 +15,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Configuration.Internal;
 using Dalamud.Console;
 using Dalamud.Game.Command;
+using Dalamud.Game.Player;
 using Dalamud.Interface.Animation.EasingFunctions;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
@@ -286,7 +287,7 @@ internal class PluginInstallerWindow : Window, IDisposable
     {
         var pluginManager = Service<PluginManager>.Get();
 
-        _ = pluginManager.ReloadPluginMastersAsync();
+        _ = pluginManager.ReloadAllReposAsync();
         _ = pluginManager.ScanDevPluginsAsync();
 
         if (!this.isSearchTextPrefilled)
@@ -822,25 +823,6 @@ internal class PluginInstallerWindow : Window, IDisposable
             if (ImGui.Button(Locs.FooterButton_ScanDevPlugins))
             {
                 _ = pluginManager.ScanDevPluginsAsync();
-            }
-        }
-
-        //刷新缓存
-        {
-            ImGui.SameLine();
-            var cooldownFinished = this.lastRefreshTime.AddMinutes(1D).CompareTo(DateTime.Now) < 0;
-
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.CloudDownloadAlt))
-            {
-                if (cooldownFinished)
-                {
-                    _ = pluginManager.ReloadPluginMastersAsync(true, true);
-                    this.lastRefreshTime = DateTime.Now;
-                }
-            }
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip(cooldownFinished ? "更新插件列表缓存" : "少女折寿中...");
             }
         }
 
@@ -2664,7 +2646,6 @@ internal class PluginInstallerWindow : Window, IDisposable
             {
                 configuration.SeenPluginInternalName.AddRange(this.pluginListAvailable.Select(x => x.InternalName));
                 configuration.QueueSave();
-                pluginManager.RefilterPluginMasters();
             }
 
             var isHidden = configuration.HiddenPluginInternalName.Contains(manifest.InternalName);
@@ -2673,12 +2654,10 @@ internal class PluginInstallerWindow : Window, IDisposable
                 case false when ImGui.Selectable(Locs.PluginContext_HidePlugin):
                     configuration.HiddenPluginInternalName.Add(manifest.InternalName);
                     configuration.QueueSave();
-                    pluginManager.RefilterPluginMasters();
                     break;
                 case true when ImGui.Selectable(Locs.PluginContext_UnhidePlugin):
                     configuration.HiddenPluginInternalName.Remove(manifest.InternalName);
                     configuration.QueueSave();
-                    pluginManager.RefilterPluginMasters();
                     break;
             }
 
@@ -3081,7 +3060,7 @@ internal class PluginInstallerWindow : Window, IDisposable
                     }
 
                     configuration.QueueSave();
-                    _ = pluginManager.ReloadPluginMastersAsync();
+                    _ = pluginManager.ReloadAllReposAsync();
                 }
 
                 if (repoManifest?.IsTestingExclusive == true)
@@ -3200,7 +3179,7 @@ internal class PluginInstallerWindow : Window, IDisposable
                         .GetAwaiter().GetResult();
                 }
 
-                Task.Run(profileManager.ApplyAllWantStatesAsync)
+                Task.Run(() => profileManager.ApplyAllWantStatesAsync("Remove from profile"))
                     .ContinueWith(this.DisplayErrorContinuation, Locs.ErrorModal_ProfileApplyFail);
             }
 
@@ -3213,6 +3192,8 @@ internal class PluginInstallerWindow : Window, IDisposable
         var inMultipleProfiles = !isDefaultPlugin && !isInSingleProfile;
         var inSingleNonDefaultProfileWhichIsDisabled =
             isInSingleProfile && !profilesThatWantThisPlugin.First().IsEnabled;
+        var inSingleNonDefaultProfileWhichDoesNotWantActive =
+            isInSingleProfile && !profilesThatWantThisPlugin.First().CheckWantsActiveFromGameState(Service<PlayerState>.Get().ContentId);
 
         if (plugin.State is PluginState.UnloadError or PluginState.LoadError or PluginState.DependencyResolutionFailed && !plugin.IsDev && !plugin.IsOutdated)
         {
@@ -3225,7 +3206,7 @@ internal class PluginInstallerWindow : Window, IDisposable
         {
             ImGuiComponents.DisabledToggleButton(toggleId, this.loadingIndicatorKind == LoadingIndicatorKind.EnablingSingle);
         }
-        else if (disabled || inMultipleProfiles || inSingleNonDefaultProfileWhichIsDisabled || pluginManager.SafeMode)
+        else if (disabled || inMultipleProfiles || inSingleNonDefaultProfileWhichIsDisabled || inSingleNonDefaultProfileWhichDoesNotWantActive || pluginManager.SafeMode)
         {
             ImGuiComponents.DisabledToggleButton(toggleId, isLoadedAndUnloadable);
 
@@ -3235,6 +3216,8 @@ internal class PluginInstallerWindow : Window, IDisposable
                 ImGui.SetTooltip(Locs.PluginButtonToolTip_NeedsToBeInSingleProfile);
             else if (inSingleNonDefaultProfileWhichIsDisabled && ImGui.IsItemHovered())
                 ImGui.SetTooltip(Locs.PluginButtonToolTip_SingleProfileDisabled(profilesThatWantThisPlugin.First().Name));
+            else if (inSingleNonDefaultProfileWhichDoesNotWantActive && ImGui.IsItemHovered())
+                ImGui.SetTooltip(Locs.PluginButtonToolTip_SingleProfileDoesNotWantActive(profilesThatWantThisPlugin.First().Name));
         }
         else
         {
@@ -4335,6 +4318,8 @@ internal class PluginInstallerWindow : Window, IDisposable
         public static string PluginButtonToolTip_SafeMode => Loc.Localize("InstallerButtonSafeModeTooltip", "Cannot enable plugins in safe mode.");
 
         public static string PluginButtonToolTip_SingleProfileDisabled(string name) => Loc.Localize("InstallerSingleProfileDisabled", "The collection '{0}' which contains this plugin is disabled.\nPlease enable it in the collections manager to toggle the plugin individually.").Format(name);
+
+        public static string PluginButtonToolTip_SingleProfileDoesNotWantActive(string name) => Loc.Localize("InstallerSingleProfileDoesNotWantActive", "The collection '{0}' which contains this plugin is active, but is not set to activate on this character.\nPlease change the collection's settings or remove the plugin from that collection to toggle the plugin individually.").Format(name);
 
         #endregion
 
