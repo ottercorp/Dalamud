@@ -131,7 +131,7 @@ jobs:
             CS_STATUS="diverged"
           fi
 
-          if [ "$CS_STATUS" = "identical" ] || [ "$CS_STATUS" = "behind" ]; then
+          if [ "$CS_STATUS" = "identical" ] || [ "$CS_STATUS" = "ahead" ]; then
             echo "$OTTER_CS_OWNER/$OTTER_CS_REPO 的 $OTTER_CS_BRANCH 分支已包含该提交。"
           else
             echo "需要同步 FFXIVClientStructs..."
