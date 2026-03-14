@@ -1,0 +1,85 @@
+name: Sync Upstream Tag
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Check and sync upstream tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          UPSTREAM_OWNER: goatcorp
+          UPSTREAM_REPO: Dalamud
+          MY_BRANCH: master
+        run: |
+          echo "获取上游最新 tag..."
+          UPSTREAM_LATEST_TAG=$(gh api "repos/$UPSTREAM_OWNER/$UPSTREAM_REPO/tags?per_page=1" --jq '.[0].name')
+
+          if [ -z "$UPSTREAM_LATEST_TAG" ]; then
+            echo "无法获取上游 tag，退出。"
+            exit 0
+          fi
+
+          echo "上游最新 tag: $UPSTREAM_LATEST_TAG"
+
+          echo "检查本地是否已存在该 tag..."
+          LOCAL_TAG=$(git tag -l "$UPSTREAM_LATEST_TAG")
+
+          if [ -n "$LOCAL_TAG" ]; then
+            echo "本地已存在 tag $UPSTREAM_LATEST_TAG，无需同步。"
+            exit 0
+          fi
+
+          echo "发现新 tag: $UPSTREAM_LATEST_TAG，准备创建同步 PR..."
+
+          SYNC_BRANCH="sync-upstream-tag/$UPSTREAM_LATEST_TAG"
+
+          echo "检查是否已存在同步分支..."
+          if git ls-remote --heads origin "$SYNC_BRANCH" | grep -q "$SYNC_BRANCH"; then
+            echo "同步分支 $SYNC_BRANCH 已存在，检查是否有关联的 PR..."
+            EXISTING_PR=$(gh pr list --state open \
+                                     --base "$MY_BRANCH" \
+                                     --head "$SYNC_BRANCH" \
+                                     --json url \
+                                     --jq '.[0].url')
+            if [ -n "$EXISTING_PR" ]; then
+              echo "PR 已存在，PR链接: $EXISTING_PR"
+              exit 0
+            fi
+          fi
+
+          echo "从上游获取 tag $UPSTREAM_LATEST_TAG..."
+          git remote add upstream "https://github.com/$UPSTREAM_OWNER/$UPSTREAM_REPO.git" || true
+          git fetch upstream "refs/tags/$UPSTREAM_LATEST_TAG:refs/tags/upstream/$UPSTREAM_LATEST_TAG"
+
+          echo "基于上游 tag 创建同步分支 $SYNC_BRANCH..."
+          git checkout -b "$SYNC_BRANCH" "tags/upstream/$UPSTREAM_LATEST_TAG"
+
+          echo "推送同步分支到 origin..."
+          git push origin "$SYNC_BRANCH"
+
+          echo "创建 PR..."
+          gh pr create \
+            --repo ${{ github.repository }} \
+            --base "$MY_BRANCH" \
+            --head "$SYNC_BRANCH" \
+            --title "🏷️ 同步上游 tag $UPSTREAM_LATEST_TAG" \
+            --body "@ottercorp/dalamud-maintainer 上游仓库 ($UPSTREAM_OWNER/$UPSTREAM_REPO) 发布了新 tag \`$UPSTREAM_LATEST_TAG\`。这是自动生成的同步请求。"
