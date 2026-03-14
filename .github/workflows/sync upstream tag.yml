@@ -187,7 +187,7 @@ jobs:
               --merge \
               --auto || true
 
-            # Wait for merge to complete
+            # Wait for merge to complete (12 attempts × 5s = ~60s timeout)
             for i in $(seq 1 12); do
               sleep 5
               CS_PR_STATE=$(gh pr view "$CS_PR_NUMBER" \
@@ -250,6 +250,7 @@ jobs:
             if echo "$CONFLICT_FILES" | grep -q "^lib/FFXIVClientStructs$"; then
               echo "解决 FFXIVClientStructs 子模块冲突"
               if [ -n "$OTTER_CS_LATEST" ]; then
+                # 160000 is the git object mode for submodule entries
                 git update-index --force-remove lib/FFXIVClientStructs 2>/dev/null || true
                 git update-index --add --cacheinfo 160000,"$OTTER_CS_LATEST",lib/FFXIVClientStructs
               else
