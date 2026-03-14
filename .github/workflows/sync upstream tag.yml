@@ -23,7 +23,8 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Check and sync upstream tag
+      - name: Check for new upstream tag
+        id: check-tag
         env:
           GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN }}
           UPSTREAM_OWNER: goatcorp
@@ -35,6 +36,7 @@ jobs:
 
           if [ -z "$UPSTREAM_LATEST_TAG" ]; then
             echo "无法获取上游 tag，退出。"
+            echo "new_tag=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -45,16 +47,14 @@ jobs:
 
           if [ -n "$LOCAL_TAG" ]; then
             echo "本地已存在 tag $UPSTREAM_LATEST_TAG，无需同步。"
+            echo "new_tag=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "发现新 tag: $UPSTREAM_LATEST_TAG，准备创建同步 PR..."
-
           SYNC_BRANCH="sync-upstream-tag/$UPSTREAM_LATEST_TAG"
 
-          echo "检查是否已存在同步分支..."
+          echo "检查是否已存在同步分支和 PR..."
           if git ls-remote --heads origin "$SYNC_BRANCH" | grep -q "$SYNC_BRANCH"; then
-            echo "同步分支 $SYNC_BRANCH 已存在，检查是否有关联的 PR..."
             EXISTING_PR=$(gh pr list --state open \
                                      --base "$MY_BRANCH" \
                                      --head "$SYNC_BRANCH" \
@@ -62,24 +62,238 @@ jobs:
                                      --jq '.[0].url')
             if [ -n "$EXISTING_PR" ]; then
               echo "PR 已存在，PR链接: $EXISTING_PR"
+              echo "new_tag=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           fi
 
-          echo "从上游获取 tag $UPSTREAM_LATEST_TAG..."
-          git remote add upstream "https://github.com/$UPSTREAM_OWNER/$UPSTREAM_REPO.git" || true
-          git fetch upstream "refs/tags/$UPSTREAM_LATEST_TAG:refs/tags/upstream/$UPSTREAM_LATEST_TAG"
+          echo "发现新 tag: $UPSTREAM_LATEST_TAG"
+          echo "new_tag=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$UPSTREAM_LATEST_TAG" >> "$GITHUB_OUTPUT"
+          echo "sync_branch=$SYNC_BRANCH" >> "$GITHUB_OUTPUT"
 
-          echo "基于上游 tag 创建同步分支 $SYNC_BRANCH..."
-          git checkout -b "$SYNC_BRANCH" "tags/upstream/$UPSTREAM_LATEST_TAG"
+      - name: Get upstream FFXIVClientStructs version
+        if: steps.check-tag.outputs.new_tag == 'true'
+        id: get-cs-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          UPSTREAM_OWNER: goatcorp
+          UPSTREAM_REPO: Dalamud
+          UPSTREAM_TAG: ${{ steps.check-tag.outputs.tag }}
+        run: |
+          echo "获取上游 tag $UPSTREAM_TAG 中 FFXIVClientStructs 的子模块版本..."
+
+          # Get the commit SHA the tag points to (handle both lightweight and annotated tags)
+          TAG_OBJ=$(gh api "repos/$UPSTREAM_OWNER/$UPSTREAM_REPO/git/ref/tags/$UPSTREAM_TAG" --jq '.object')
+          TAG_OBJ_SHA=$(echo "$TAG_OBJ" | jq -r '.sha')
+          TAG_OBJ_TYPE=$(echo "$TAG_OBJ" | jq -r '.type')
+
+          if [ "$TAG_OBJ_TYPE" = "tag" ]; then
+            COMMIT_SHA=$(gh api "repos/$UPSTREAM_OWNER/$UPSTREAM_REPO/git/tags/$TAG_OBJ_SHA" --jq '.object.sha')
+          else
+            COMMIT_SHA=$TAG_OBJ_SHA
+          fi
+
+          echo "上游 tag 指向的提交: $COMMIT_SHA"
+
+          # Get the submodule commit from the tree
+          CS_COMMIT=$(gh api "repos/$UPSTREAM_OWNER/$UPSTREAM_REPO/git/trees/$COMMIT_SHA?recursive=true" \
+            --jq '.tree[] | select(.path == "lib/FFXIVClientStructs" and .type == "commit") | .sha')
+
+          if [ -z "$CS_COMMIT" ]; then
+            echo "::warning::无法获取上游 FFXIVClientStructs 子模块版本，将跳过子模块同步。"
+          else
+            echo "上游 FFXIVClientStructs 版本: $CS_COMMIT"
+          fi
+
+          echo "cs_commit=$CS_COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Sync FFXIVClientStructs
+        if: steps.check-tag.outputs.new_tag == 'true' && steps.get-cs-version.outputs.cs_commit != ''
+        id: sync-cs
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          UPSTREAM_CS_OWNER: aers
+          UPSTREAM_CS_REPO: FFXIVClientStructs
+          OTTER_CS_OWNER: ottercorp
+          OTTER_CS_REPO: FFXIVClientStructs
+          OTTER_CS_BRANCH: cn
+          CS_COMMIT: ${{ steps.get-cs-version.outputs.cs_commit }}
+          UPSTREAM_TAG: ${{ steps.check-tag.outputs.tag }}
+        run: |
+          echo "检查 $OTTER_CS_OWNER/$OTTER_CS_REPO 是否已包含提交 $CS_COMMIT..."
+
+          CS_STATUS=$(gh api "repos/$OTTER_CS_OWNER/$OTTER_CS_REPO/compare/$OTTER_CS_BRANCH...$CS_COMMIT" \
+            --jq '.status' 2>/dev/null || echo "error")
+
+          if [ "$CS_STATUS" = "error" ]; then
+            echo "::warning::无法比较 $OTTER_CS_OWNER/$OTTER_CS_REPO 的提交状态 (可能是 API 限流或网络问题)，将尝试同步。"
+            CS_STATUS="diverged"
+          fi
+
+          if [ "$CS_STATUS" = "identical" ] || [ "$CS_STATUS" = "behind" ]; then
+            echo "$OTTER_CS_OWNER/$OTTER_CS_REPO 的 $OTTER_CS_BRANCH 分支已包含该提交。"
+          else
+            echo "需要同步 FFXIVClientStructs..."
+
+            CS_SYNC_BRANCH="sync-upstream/$UPSTREAM_TAG"
+
+            # Check for existing PR
+            CS_EXISTING_PR=$(gh pr list --repo "$OTTER_CS_OWNER/$OTTER_CS_REPO" \
+                                        --state open \
+                                        --base "$OTTER_CS_BRANCH" \
+                                        --head "$CS_SYNC_BRANCH" \
+                                        --json number \
+                                        --jq '.[0].number' 2>/dev/null || echo "")
+
+            if [ -z "$CS_EXISTING_PR" ]; then
+              echo "克隆 $OTTER_CS_OWNER/$OTTER_CS_REPO..."
+              git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/$OTTER_CS_OWNER/$OTTER_CS_REPO.git" /tmp/cs-repo -b "$OTTER_CS_BRANCH"
+              cd /tmp/cs-repo
+
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+              git remote add upstream "https://github.com/$UPSTREAM_CS_OWNER/$UPSTREAM_CS_REPO.git"
+              git fetch upstream
+
+              git checkout -b "$CS_SYNC_BRANCH"
+              git merge "$CS_COMMIT" --no-edit -m "合并上游 FFXIVClientStructs 用于 Dalamud tag $UPSTREAM_TAG" || {
+                echo "::error::FFXIVClientStructs 合并存在冲突，需要手动处理。"
+                git merge --abort
+                cd -
+                exit 1
+              }
+
+              git push origin "$CS_SYNC_BRANCH"
+              cd -
+
+              echo "创建 FFXIVClientStructs 同步 PR..."
+              CS_PR_URL=$(gh pr create \
+                --repo "$OTTER_CS_OWNER/$OTTER_CS_REPO" \
+                --base "$OTTER_CS_BRANCH" \
+                --head "$CS_SYNC_BRANCH" \
+                --title "🔄 同步上游 FFXIVClientStructs (Dalamud $UPSTREAM_TAG)" \
+                --body "上游 Dalamud tag \`$UPSTREAM_TAG\` 使用了新版本的 FFXIVClientStructs (\`$CS_COMMIT\`)。这是自动生成的同步请求。")
+              CS_PR_NUMBER=$(echo "$CS_PR_URL" | grep -o '[0-9]*$')
+            else
+              CS_PR_NUMBER=$CS_EXISTING_PR
+              echo "FFXIVClientStructs 同步 PR 已存在: #$CS_PR_NUMBER"
+            fi
+
+            echo "尝试合并 FFXIVClientStructs PR #$CS_PR_NUMBER..."
+            gh pr merge "$CS_PR_NUMBER" \
+              --repo "$OTTER_CS_OWNER/$OTTER_CS_REPO" \
+              --merge \
+              --auto || true
+
+            # Wait for merge to complete
+            for i in $(seq 1 12); do
+              sleep 5
+              CS_PR_STATE=$(gh pr view "$CS_PR_NUMBER" \
+                --repo "$OTTER_CS_OWNER/$OTTER_CS_REPO" \
+                --json state --jq '.state')
+              if [ "$CS_PR_STATE" = "MERGED" ]; then
+                echo "FFXIVClientStructs PR 已合并。"
+                break
+              fi
+              echo "等待 FFXIVClientStructs PR 合并... (尝试 $i/12, 状态: $CS_PR_STATE)"
+            done
+
+            if [ "$CS_PR_STATE" != "MERGED" ]; then
+              echo "::warning::FFXIVClientStructs PR 尚未合并 (状态: $CS_PR_STATE)，请先手动合并后再触发此工作流。"
+              exit 0
+            fi
+          fi
+
+          # Get the latest commit on ottercorp/FFXIVClientStructs cn branch
+          OTTER_CS_LATEST=$(gh api "repos/$OTTER_CS_OWNER/$OTTER_CS_REPO/commits/$OTTER_CS_BRANCH" --jq '.sha')
+          echo "ottercorp/FFXIVClientStructs 最新提交: $OTTER_CS_LATEST"
+          echo "otter_cs_latest=$OTTER_CS_LATEST" >> "$GITHUB_OUTPUT"
+
+      - name: Create Dalamud sync PR
+        if: steps.check-tag.outputs.new_tag == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          UPSTREAM_OWNER: goatcorp
+          UPSTREAM_REPO: Dalamud
+          UPSTREAM_TAG: ${{ steps.check-tag.outputs.tag }}
+          SYNC_BRANCH: ${{ steps.check-tag.outputs.sync_branch }}
+          OTTER_CS_LATEST: ${{ steps.sync-cs.outputs.otter_cs_latest }}
+          MY_BRANCH: master
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          echo "从上游获取 tag $UPSTREAM_TAG..."
+          git remote add upstream "https://github.com/$UPSTREAM_OWNER/$UPSTREAM_REPO.git" || true
+          git fetch upstream "refs/tags/$UPSTREAM_TAG:refs/tags/upstream/$UPSTREAM_TAG"
+
+          echo "基于 $MY_BRANCH 创建同步分支 $SYNC_BRANCH..."
+          git checkout "$MY_BRANCH"
+          git checkout -b "$SYNC_BRANCH"
+
+          echo "合并上游 tag..."
+          if ! git merge "tags/upstream/$UPSTREAM_TAG" --no-edit; then
+            echo "存在合并冲突，尝试自动解决子模块相关冲突..."
+
+            CONFLICT_FILES=$(git diff --name-only --diff-filter=U || true)
+
+            # Resolve .gitmodules conflict - keep ours (ottercorp version)
+            if echo "$CONFLICT_FILES" | grep -q "^\.gitmodules$"; then
+              echo "解决 .gitmodules 冲突：保留 ottercorp 版本"
+              git checkout --ours .gitmodules
+              git add .gitmodules
+            fi
+
+            # Resolve FFXIVClientStructs submodule conflict
+            if echo "$CONFLICT_FILES" | grep -q "^lib/FFXIVClientStructs$"; then
+              echo "解决 FFXIVClientStructs 子模块冲突"
+              if [ -n "$OTTER_CS_LATEST" ]; then
+                git update-index --force-remove lib/FFXIVClientStructs 2>/dev/null || true
+                git update-index --add --cacheinfo 160000,"$OTTER_CS_LATEST",lib/FFXIVClientStructs
+              else
+                git checkout --ours lib/FFXIVClientStructs
+                git add lib/FFXIVClientStructs
+              fi
+            fi
+
+            # Check for remaining unresolved conflicts
+            REMAINING=$(git diff --name-only --diff-filter=U || true)
+            if [ -n "$REMAINING" ]; then
+              echo "::error::存在无法自动解决的合并冲突:"
+              echo "$REMAINING"
+              git merge --abort
+              exit 1
+            fi
+
+            git commit --no-edit
+          fi
+
+          # Always ensure submodule points to ottercorp version after merge
+          if [ -n "$OTTER_CS_LATEST" ]; then
+            echo "确保 FFXIVClientStructs 子模块指向 ottercorp 版本..."
+            CURRENT_CS=$(git ls-tree HEAD lib/FFXIVClientStructs | awk '{print $3}')
+            if [ "$CURRENT_CS" != "$OTTER_CS_LATEST" ]; then
+              echo "更新子模块引用: $CURRENT_CS -> $OTTER_CS_LATEST"
+              git update-index --force-remove lib/FFXIVClientStructs 2>/dev/null || true
+              git update-index --add --cacheinfo 160000,"$OTTER_CS_LATEST",lib/FFXIVClientStructs
+              git diff --cached --quiet || git commit -m "更新 FFXIVClientStructs 子模块到 ottercorp 版本"
+            fi
+          fi
 
           echo "推送同步分支到 origin..."
           git push origin "$SYNC_BRANCH"
+
+          CS_NOTE=""
+          if [ -n "$OTTER_CS_LATEST" ]; then
+            CS_NOTE=$'\n\nFFXIVClientStructs 已同步到 ottercorp 版本 (`'"$OTTER_CS_LATEST"'`)。'
+          fi
 
           echo "创建 PR..."
           gh pr create \
             --repo ${{ github.repository }} \
             --base "$MY_BRANCH" \
             --head "$SYNC_BRANCH" \
-            --title "🏷️ 同步上游 tag $UPSTREAM_LATEST_TAG" \
-            --body "@ottercorp/dalamud-maintainer 上游仓库 ($UPSTREAM_OWNER/$UPSTREAM_REPO) 发布了新 tag \`$UPSTREAM_LATEST_TAG\`。这是自动生成的同步请求。"
+            --title "🏷️ 同步上游 tag $UPSTREAM_TAG" \
+            --body "@ottercorp/dalamud-maintainer 上游仓库 ($UPSTREAM_OWNER/$UPSTREAM_REPO) 发布了新 tag \`$UPSTREAM_TAG\`。这是自动生成的同步请求。$CS_NOTE"
