@@ -152,7 +152,7 @@ Blooym
 Valk
 
 
-We use these awesome libraries:
+We use code and/or assets from these awesome projects:
 
 FFXIVClientStructs ({2})
 Copyright (c) 2021 aers
@@ -184,6 +184,14 @@ Copyright (c) 2012-2022, Nozomu Katoo
 
 STB Libraries
 Copyright (c) 2017 Sean Barrett
+Licensed under the MIT License
+
+WinUI 3
+Copyright (c) Microsoft Corporation
+Licensed under the MIT License
+
+Dual-Kawase-Blur-Demo
+Copyright (c) 2023 Baedrick
 Licensed under the MIT License
 
 Please see licenses.txt for more information.
