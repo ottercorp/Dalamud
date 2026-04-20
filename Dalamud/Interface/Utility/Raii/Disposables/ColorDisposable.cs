@@ -90,6 +90,7 @@ public static partial class ImRaii
 
         /// <summary> Pop a number of colors. </summary>
         /// <param name="num"> The number of colors to pop. This is clamped to the number of colors pushed by this object. </param>
+        /// <returns> A disposable object that can be used to push further colors and pops those colors after leaving scope. Use with using. </returns>
         public ColorDisposable Pop(int num = 1)
         {
             num = Math.Min(num, this.Count);
@@ -110,10 +111,12 @@ public static partial class ImRaii
             this.Count = 0;
         }
 
+#pragma warning disable SA1204
         /// <summary> Pop a number of colors. </summary>
         /// <param name="num"> The number of colors to pop. The number is not checked against the color stack. </param>
         /// <remarks> Avoid using this function, and colors across scopes, as much as possible. </remarks>
         public static void PopUnsafe(int num = 1)
             => ImGui.PopStyleColor(num);
+#pragma warning restore SA1204
     }
 }

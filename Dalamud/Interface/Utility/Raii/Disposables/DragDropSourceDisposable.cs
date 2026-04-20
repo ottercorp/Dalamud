@@ -31,27 +31,21 @@ public static partial class ImRaii
             this.Alive   = true;
         }
 
-        /// <summary> Conversion to bool. </summary>
         public static implicit operator bool(DragDropSourceDisposable value)
             => value.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator true(DragDropSourceDisposable i)
             => i.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator false(DragDropSourceDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on NOT operators. </summary>
         public static bool operator !(DragDropSourceDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on AND operators. </summary>
         public static bool operator &(DragDropSourceDisposable i, bool value)
             => i.Success && value;
 
-        /// <summary> Conversion to bool on OR operators. </summary>
         public static bool operator |(DragDropSourceDisposable i, bool value)
             => i.Success || value;
 
@@ -66,8 +60,10 @@ public static partial class ImRaii
             this.Alive = false;
         }
 
+#pragma warning disable SA1204
         /// <summary> End a drag and drop source without using an IDisposable.</summary>
         public static void EndUnsafe()
             => ImGui.EndDragDropSource();
+#pragma warning restore SA1204
     }
 }

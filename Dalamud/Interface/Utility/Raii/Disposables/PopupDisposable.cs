@@ -57,27 +57,21 @@ public static partial class ImRaii
             this.Alive   = true;
         }
 
-        /// <summary> Conversion to bool. </summary>
         public static implicit operator bool(PopupDisposable value)
             => value.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator true(PopupDisposable i)
             => i.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator false(PopupDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on NOT operators. </summary>
         public static bool operator !(PopupDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on AND operators. </summary>
         public static bool operator &(PopupDisposable i, bool value)
             => i.Success && value;
 
-        /// <summary> Conversion to bool on OR operators. </summary>
         public static bool operator |(PopupDisposable i, bool value)
             => i.Success || value;
 
@@ -93,8 +87,10 @@ public static partial class ImRaii
             this.Alive = false;
         }
 
+#pragma warning disable SA1204
         /// <summary> End a popup without using an IDisposable. </summary>
         public static void EndUnsafe()
             => ImGui.EndPopup();
+#pragma warning restore SA1204
     }
 }

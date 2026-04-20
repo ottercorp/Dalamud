@@ -112,14 +112,15 @@ public static partial class ImRaii
             this.Count = 0;
         }
 
+#pragma warning disable SA1204
         /// <summary> Pop a number of colors. </summary>
         /// <param name="num"> The number of colors to pop. The number is not checked against the color stack. </param>
         /// <remarks> Avoid using this function, and colors across scopes, as much as possible. </remarks>
         public static void PopUnsafe(int num = 1)
             => ImPlot.PopStyleColor(num);
+#pragma warning restore SA1204
 
-        // Reimplementation of https://github.com/ocornut/imgui/blob/868facff9ded2d61425c67deeba354eb24275bd1/imgui.cpp#L3035
-        // for ImPlot
+        // Reimplementation for ImPlot of https://github.com/ocornut/imgui/blob/868facff9ded2d61425c67deeba354eb24275bd1/imgui.cpp#L3035
         private static uint GetColorU32(ImPlotCol idx)
             => ImGui.GetColorU32(ImPlot.GetStyle().Colors[(int)idx]);
     }

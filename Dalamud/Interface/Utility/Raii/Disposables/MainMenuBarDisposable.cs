@@ -16,34 +16,28 @@ public static partial class ImRaii
 
         /// <summary>Initializes a new instance of the <see cref="MainMenuBarDisposable"/> struct. </summary>
         /// <returns> A disposable object that evaluates to true if the main menu bar was created. Use with using. </returns>
-        /// <remarks> Can create or append to a full screen menu bar at the top of the screen. </remarks>
+        /// <remarks> Can create or append to a full-screen menu bar at the top of the screen. </remarks>
         public MainMenuBarDisposable()
         {
             this.Success = ImGui.BeginMainMenuBar();
             this.Alive   = true;
         }
 
-        /// <summary> Conversion to bool. </summary>
         public static implicit operator bool(MainMenuBarDisposable value)
             => value.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator true(MainMenuBarDisposable i)
             => i.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator false(MainMenuBarDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on NOT operators. </summary>
         public static bool operator !(MainMenuBarDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on AND operators. </summary>
         public static bool operator &(MainMenuBarDisposable i, bool value)
             => i.Success && value;
 
-        /// <summary> Conversion to bool on OR operators. </summary>
         public static bool operator |(MainMenuBarDisposable i, bool value)
             => i.Success || value;
 
@@ -58,8 +52,10 @@ public static partial class ImRaii
             this.Alive = false;
         }
 
+#pragma warning disable SA1204
         /// <summary> End a main menu bar without using an IDisposable. </summary>
         public static void EndUnsafe()
             => ImGui.EndMainMenuBar();
+#pragma warning restore SA1204
     }
 }

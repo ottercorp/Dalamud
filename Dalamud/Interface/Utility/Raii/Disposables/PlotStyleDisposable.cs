@@ -30,6 +30,7 @@ public static partial class ImRaii
         public PlotStyleDisposable Push(ImPlotStyleVar type, Vector2 value, bool condition)
             => condition ? this.Push(type, value) : this;
 
+        /// <inheritdoc cref="Push(ImPlotStyleVar,float,bool)"/>
         public PlotStyleDisposable Push(ImPlotStyleVar type, float value)
         {
             CheckStyleIdx(type, typeof(float));
@@ -53,6 +54,7 @@ public static partial class ImRaii
 
         /// <summary> Push styles that revert all current style changes made temporarily. </summary>
         /// <returns> A disposable object that can be used to push further style variables and pops those style variables after leaving scope. Use with using. </returns>
+#pragma warning disable SA1204
         public static PlotStyleDisposable PlotDefaultStyle()
         {
             var ret = new PlotStyleDisposable();
@@ -69,6 +71,7 @@ public static partial class ImRaii
 
             return ret;
         }
+#pragma warning restore SA1204
 
         /// <summary> Push the default value, i.e. the value as if nothing was ever pushed to this, of a style variable to the style stack. </summary>
         /// <param name="type"> The type of style variable to return to its default value. </param>
@@ -77,7 +80,7 @@ public static partial class ImRaii
         public PlotStyleDisposable PlotPushDefault(ImPlotStyleVar type)
         {
             foreach (var styleMod in Stack.Where(m => m.Type == type))
-                return Push(type, styleMod.Value);
+                return this.Push(type, styleMod.Value);
 
             return this;
         }
@@ -105,11 +108,13 @@ public static partial class ImRaii
             this.Count = 0;
         }
 
+#pragma warning disable SA1204
         /// <summary> Pop a number of style variables. </summary>
         /// <param name="num"> The number of style variables to pop. The number is not checked against the style stack. </param>
         /// <remarks> Avoid using this function, and styles across scopes, as much as possible. </remarks>
         public static void PopUnsafe(int num = 1)
             => ImPlot.PopStyleVar(num);
+#pragma warning restore SA1204
 
         private static void CheckStyleIdx(ImPlotStyleVar idx, Type type)
         {

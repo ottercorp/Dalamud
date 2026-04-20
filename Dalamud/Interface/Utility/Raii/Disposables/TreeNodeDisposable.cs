@@ -25,7 +25,7 @@ public static partial class ImRaii
 
         /// <summary>Initializes a new instance of the <see cref="TreeNodeDisposable"/> struct. </summary>
         /// <param name="label"> The node label as text. </param>
-        /// <param name="flags"> Additional flags to control the tree's behaviour. </param>
+        /// <param name="flags"> Additional flags to control the tree's behavior. </param>
         /// <returns> A disposable object that evaluates to true if the begun tree node is currently expanded. Use with using. </returns>
         internal TreeNodeDisposable(ImU8String label, ImGuiTreeNodeFlags flags)
         {
@@ -33,27 +33,21 @@ public static partial class ImRaii
             this.Alive   = !flags.HasFlag(ImGuiTreeNodeFlags.NoTreePushOnOpen);
         }
 
-        /// <summary> Conversion to bool. </summary>
         public static implicit operator bool(TreeNodeDisposable value)
             => value.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator true(TreeNodeDisposable i)
             => i.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator false(TreeNodeDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on NOT operators. </summary>
         public static bool operator !(TreeNodeDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on AND operators. </summary>
         public static bool operator &(TreeNodeDisposable i, bool value)
             => i.Success && value;
 
-        /// <summary> Conversion to bool on OR operators. </summary>
         public static bool operator |(TreeNodeDisposable i, bool value)
             => i.Success || value;
 
@@ -68,8 +62,10 @@ public static partial class ImRaii
             this.Alive = false;
         }
 
+#pragma warning disable SA1204
         /// <summary> Pop a tree node without using an IDisposable. </summary>
         public static void PopUnsafe()
             => ImGui.TreePop();
+#pragma warning restore SA1204
     }
 }

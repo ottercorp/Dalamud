@@ -66,12 +66,15 @@ public static partial class ImRaii
         public void Dispose()
             => this.Pop(this.Count);
 
+#pragma warning disable SA1204
         /// <summary> Pop a number of IDs from the ID stack without using an IDisposable. </summary>
+        /// <param name="num"> The number of item widths to pop. The number is not checked against the item width stack. </param>
         /// <remarks> Avoid using this function, and IDs across scopes, as much as possible. </remarks>
         public static void PopUnsafe(int num = 1)
         {
             while (num-- > 0)
                 ImGui.PopID();
         }
+#pragma warning restore SA1204
     }
 }

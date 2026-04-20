@@ -6,13 +6,13 @@ namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
 {
-    /// <summary> A wrapper around ImGui tables. </summary>
+    /// <summary> A wrapper around ImPlots legend. </summary>
     public ref struct PlotLegendDisposable : IDisposable
     {
-        /// <summary> Whether creating the table succeeded. This needs to be checked before calling any of the member methods. </summary>
+        /// <summary> Whether creating the legend succeeded. This needs to be checked before calling any of the member methods. </summary>
         public readonly bool Success;
 
-        /// <summary> Gets a value indicating whether the table is already ended. </summary>
+        /// <summary> Gets a value indicating whether the legend is already ended. </summary>
         public bool Alive { get; private set; }
 
         /// <summary>Initializes a new instance of the <see cref="PlotLegendDisposable"/> struct. </summary>
@@ -31,31 +31,25 @@ public static partial class ImRaii
             this.Alive   = true;
         }
 
-        /// <summary> Conversion to bool. </summary>
         public static implicit operator bool(PlotLegendDisposable value)
             => value.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator true(PlotLegendDisposable i)
             => i.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator false(PlotLegendDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on NOT operators. </summary>
         public static bool operator !(PlotLegendDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on AND operators. </summary>
         public static bool operator &(PlotLegendDisposable i, bool value)
             => i.Success && value;
 
-        /// <summary> Conversion to bool on OR operators. </summary>
         public static bool operator |(PlotLegendDisposable i, bool value)
             => i.Success || value;
 
-        /// <summary> End the Table on leaving scope. </summary>
+        /// <summary> End the legend on leaving scope. </summary>
         public void Dispose()
         {
             if (!this.Alive)
@@ -66,8 +60,10 @@ public static partial class ImRaii
             this.Alive = false;
         }
 
-        /// <summary> End a Table without using an IDisposable. </summary>
+#pragma warning disable SA1204
+        /// <summary> End a legend without using an IDisposable. </summary>
         public static void EndUnsafe()
             => ImPlot.EndLegendPopup();
+#pragma warning restore SA1204
     }
 }

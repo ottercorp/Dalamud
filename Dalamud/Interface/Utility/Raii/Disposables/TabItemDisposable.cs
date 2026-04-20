@@ -6,7 +6,7 @@ namespace Dalamud.Interface.Utility.Raii;
 public static partial class ImRaii
 {
     /// <summary> A wrapper around ImGui tab items. </summary>
-    public unsafe ref struct TabItemDisposable : IDisposable
+    public ref struct TabItemDisposable : IDisposable
     {
         /// <summary> Whether creating the tab item succeeded, and it is currently selected. </summary>
         public readonly bool Success;
@@ -46,27 +46,21 @@ public static partial class ImRaii
             this.Alive   = true;
         }
 
-        /// <summary> Conversion to bool. </summary>
         public static implicit operator bool(TabItemDisposable value)
             => value.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator true(TabItemDisposable i)
             => i.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator false(TabItemDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on NOT operators. </summary>
         public static bool operator !(TabItemDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on AND operators. </summary>
         public static bool operator &(TabItemDisposable i, bool value)
             => i.Success && value;
 
-        /// <summary> Conversion to bool on OR operators. </summary>
         public static bool operator |(TabItemDisposable i, bool value)
             => i.Success || value;
 
@@ -81,8 +75,10 @@ public static partial class ImRaii
             this.Alive = false;
         }
 
+#pragma warning disable SA1204
         /// <summary> End a tab item without using an IDisposable. </summary>
         public static void EndUnsafe()
             => ImGui.EndTabItem();
+#pragma warning restore SA1204
     }
 }

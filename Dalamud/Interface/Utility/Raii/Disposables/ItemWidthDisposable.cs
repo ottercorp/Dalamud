@@ -8,7 +8,7 @@ public static partial class ImRaii
     /// <summary> A wrapper around pushing item widths. </summary>
     public sealed class ItemWidthDisposable : IDisposable
     {
-        /// <summary> The number of item widths currently pushed using this disposable. </summary>
+        /// <summary> Gets the number of item widths currently pushed using this disposable. </summary>
         public int Count { get; private set; }
 
         /// <summary> Push an item width to the item width stack. </summary>
@@ -41,6 +41,7 @@ public static partial class ImRaii
         public void Dispose()
             => this.Pop(this.Count);
 
+#pragma warning disable SA1204
         /// <summary> Pop a number of item widths. </summary>
         /// <param name="num"> The number of item widths to pop. The number is not checked against the item width stack. </param>
         /// <remarks> Avoid using this function, and item widths across scopes, as much as possible. </remarks>
@@ -49,5 +50,6 @@ public static partial class ImRaii
             while (num-- > 0)
                 ImGui.PopItemWidth();
         }
+#pragma warning restore SA1204
     }
 }

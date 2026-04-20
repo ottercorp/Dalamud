@@ -30,12 +30,9 @@ public static partial class ImRaii
             set => ImGui.SetColumnOffset(this.Current, value);
         }
 
-        /// <summary> Get the offset of a column by index. </summary>
-        /// <returns> Column offset value. </returns>
         public float GetOffset(int index)
             => ImGui.GetColumnOffset(index);
 
-        /// <summary> Set the offset of a column by index. </summary>
         public void SetOffset(int index, float value)
             => ImGui.SetColumnOffset(index, value);
 
@@ -46,12 +43,9 @@ public static partial class ImRaii
             set => ImGui.SetColumnWidth(this.Current, value);
         }
 
-        /// <summary> Get the width of a column by index. </summary>
-        /// <returns> Column width value. </returns>
         public float GetWidth(int index)
             => ImGui.GetColumnWidth(index);
 
-        /// <summary> Set the width of a column by index. </summary>
         public void SetWidth(int index, float width)
             => ImGui.SetColumnWidth(index, width);
 

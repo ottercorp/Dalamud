@@ -16,7 +16,7 @@ public static partial class ImRaii
 
         /// <summary>Initializes a new instance of the <see cref="HeaderDisposable"/> struct. </summary>
         /// <param name="label"> The header label and ID as text. </param>
-        /// <param name="flags"> Additional flags to control the header's behaviour. </param>
+        /// <param name="flags"> Additional flags to control the header's behavior. </param>
         /// <returns> A disposable object that evaluates to true if the collapsing header is currently open. Use with using. </returns>
         internal HeaderDisposable(ImU8String label, ImGuiTreeNodeFlags flags)
         {
@@ -38,31 +38,25 @@ public static partial class ImRaii
                 ImGui.PushID(label);
         }
 
-        /// <summary> Conversion to bool. </summary>
         public static implicit operator bool(HeaderDisposable value)
             => value.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator true(HeaderDisposable i)
             => i.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator false(HeaderDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on NOT operators. </summary>
         public static bool operator !(HeaderDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on AND operators. </summary>
         public static bool operator &(HeaderDisposable i, bool value)
             => i.Success && value;
 
-        /// <summary> Conversion to bool on OR operators. </summary>
         public static bool operator |(HeaderDisposable i, bool value)
             => i.Success || value;
 
-        /// <summary> Pop the tree node on leaving scope. </summary>
+        /// <summary> Pop the pushed ID on leaving scope. </summary>
         public void Dispose()
         {
             if (!this.Alive)

@@ -30,8 +30,10 @@ public static partial class ImRaii
             this.Alive = false;
         }
 
+#pragma warning disable SA1204
         /// <summary> End a Group without using an IDisposable. </summary>
         public static void EndUnsafe()
             => ImGui.EndGroup();
+#pragma warning restore SA1204
     }
 }

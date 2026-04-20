@@ -45,6 +45,7 @@ public static partial class ImRaii
         public void Dispose()
             => this.Pop(this.Count);
 
+#pragma warning disable SA1204
         /// <summary> Pop a number of disabled states. </summary>
         /// <param name="num"> The number of disabled states to pop. The number is not checked against the disabled stack. </param>
         /// <remarks> Avoid using this function, and disabled states across scopes, as much as possible. </remarks>
@@ -53,5 +54,6 @@ public static partial class ImRaii
             while (num-- > 0)
                 ImGui.EndDisabled();
         }
+#pragma warning restore SA1204
     }
 }

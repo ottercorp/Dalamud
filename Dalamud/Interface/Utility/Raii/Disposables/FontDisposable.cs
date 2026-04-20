@@ -52,6 +52,7 @@ public static partial class ImRaii
         public void Dispose()
             => this.Pop(this.Count);
 
+#pragma warning disable SA1204
         /// <summary> Pop a number of fonts. </summary>
         /// <param name="num"> The number of fonts to pop. The number is not checked against the font stack. </param>
         /// <remarks> Avoid using this function, and fonts across scopes, as much as possible. </remarks>
@@ -60,5 +61,6 @@ public static partial class ImRaii
             while (num-- > 0)
                 ImGui.PopFont();
         }
+#pragma warning restore SA1204
     }
 }

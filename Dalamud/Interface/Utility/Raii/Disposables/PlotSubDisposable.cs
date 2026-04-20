@@ -7,7 +7,7 @@ namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
 {
-    /// <summary> A wrapper around ImGui tables. </summary>
+    /// <summary> A wrapper around ImPlots plot sub. </summary>
     public ref struct PlotSubDisposable : IDisposable
     {
         /// <summary> Whether creating the table succeeded. This needs to be checked before calling any of the member methods. </summary>
@@ -56,31 +56,25 @@ public static partial class ImRaii
             this.Alive   = true;
         }
 
-        /// <summary> Conversion to bool. </summary>
         public static implicit operator bool(PlotSubDisposable value)
             => value.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator true(PlotSubDisposable i)
             => i.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator false(PlotSubDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on NOT operators. </summary>
         public static bool operator !(PlotSubDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on AND operators. </summary>
         public static bool operator &(PlotSubDisposable i, bool value)
             => i.Success && value;
 
-        /// <summary> Conversion to bool on OR operators. </summary>
         public static bool operator |(PlotSubDisposable i, bool value)
             => i.Success || value;
 
-        /// <summary> End the Table on leaving scope. </summary>
+        /// <summary> End the plot sub on leaving scope. </summary>
         public void Dispose()
         {
             if (!this.Alive)
@@ -91,8 +85,10 @@ public static partial class ImRaii
             this.Alive = false;
         }
 
-        /// <summary> End a Table without using an IDisposable. </summary>
+#pragma warning disable SA1204
+        /// <summary> End a plot sub without using an IDisposable. </summary>
         public static void EndUnsafe()
             => ImPlot.EndSubplots();
+#pragma warning restore SA1204
     }
 }

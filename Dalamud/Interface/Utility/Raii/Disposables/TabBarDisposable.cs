@@ -25,7 +25,7 @@ public static partial class ImRaii
 
         /// <summary>Initializes a new instance of the <see cref="TabBarDisposable"/> struct. </summary>
         /// <param name="label"> The tab bar label as text. </param>
-        /// <param name="flags"> Additional flags to control the tab bar's behaviour. </param>
+        /// <param name="flags"> Additional flags to control the tab bar's behavior. </param>
         /// <returns> A disposable object that evaluates to true if any part of the begun tab bar is currently visible. Use with using. </returns>
         internal TabBarDisposable(ImU8String label, ImGuiTabBarFlags flags)
         {
@@ -33,27 +33,21 @@ public static partial class ImRaii
             this.Alive   = true;
         }
 
-        /// <summary> Conversion to bool. </summary>
         public static implicit operator bool(TabBarDisposable value)
             => value.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator true(TabBarDisposable i)
             => i.Success;
 
-        /// <summary> Conversion to bool. </summary>
         public static bool operator false(TabBarDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on NOT operators. </summary>
         public static bool operator !(TabBarDisposable i)
             => !i.Success;
 
-        /// <summary> Conversion to bool on AND operators. </summary>
         public static bool operator &(TabBarDisposable i, bool value)
             => i.Success && value;
 
-        /// <summary> Conversion to bool on OR operators. </summary>
         public static bool operator |(TabBarDisposable i, bool value)
             => i.Success || value;
 
@@ -68,8 +62,10 @@ public static partial class ImRaii
             this.Alive = false;
         }
 
+#pragma warning disable SA1204
         /// <summary> End a tab bar without using an IDisposable. </summary>
         public static void EndUnsafe()
             => ImGui.EndTabBar();
+#pragma warning restore SA1204
     }
 }
