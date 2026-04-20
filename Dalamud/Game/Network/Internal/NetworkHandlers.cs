@@ -242,7 +242,7 @@ internal unsafe class NetworkHandlers : IInternalDisposableService
 
         this.mbPurchaseHook.Dispose();
         this.mbHistoryHook.Dispose();
-        this.customTalkHook.Dispose();
+        this.eventYieldHook.Dispose();
         this.mbItemRequestStartHook.Dispose();
         this.mbOfferingsHook.Dispose();
         this.mbSendPurchaseRequestHook.Dispose();
