@@ -15,7 +15,6 @@ public static partial class ImRaii
         /// <param name="localX"> The window-local X coordinate at which to wrap text. If this is negative, no wrapping, if it is 0, wrap from here to the end of the available content region, and if it is positive, wrap from here. </param>
         /// <param name="condition"> If this is false, the position is not pushed. </param>
         /// <returns> A disposable object that can be used to push further text wrap positions and pops those positions after leaving scope. Use with using. </returns>
-        /// <remarks> If you need to keep text wrap positions pushed longer than the current scope, use without using and use <seealso cref="Im.PopTextWrapPositionUnsafe"/>. </remarks>
         public TextWrapDisposable Push(float localX, bool condition)
             => condition ? this.Push(localX) : this;
 

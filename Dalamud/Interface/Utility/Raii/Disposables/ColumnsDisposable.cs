@@ -11,11 +11,11 @@ public static partial class ImRaii
         /// <summary> The columns before pushing this to revert to. </summary>
         public readonly int LastColumns;
 
-        /// <summary> Get the current number of columns. </summary>
+        /// <summary> Gets the current number of columns. </summary>
         public int Count
             => ImGui.GetColumnsCount();
 
-        /// <summary> Get the index of the current column. </summary>
+        /// <summary> Gets the index of the current column. </summary>
         public int Current
             => ImGui.GetColumnIndex();
 
@@ -23,14 +23,15 @@ public static partial class ImRaii
         public void Next()
             => ImGui.NextColumn();
 
-        /// <summary> Get or set the offset of the current column. </summary>
+        /// <summary> Gets or sets the offset of the current column. </summary>
         public float Offset
         {
-            get => ImGui.GetColumnOffset(Current);
-            set => ImGui.SetColumnOffset(Current, value);
+            get => ImGui.GetColumnOffset(this.Current);
+            set => ImGui.SetColumnOffset(this.Current, value);
         }
 
         /// <summary> Get the offset of a column by index. </summary>
+        /// <returns> Column offset value. </returns>
         public float GetOffset(int index)
             => ImGui.GetColumnOffset(index);
 
@@ -38,14 +39,15 @@ public static partial class ImRaii
         public void SetOffset(int index, float value)
             => ImGui.SetColumnOffset(index, value);
 
-        /// <summary> Get or set the width of the current column. </summary>
+        /// <summary> Gets or sets the width of the current column. </summary>
         public float Width
         {
-            get => ImGui.GetColumnWidth(Current);
-            set => ImGui.SetColumnWidth(Current, value);
+            get => ImGui.GetColumnWidth(this.Current);
+            set => ImGui.SetColumnWidth(this.Current, value);
         }
 
         /// <summary> Get the width of a column by index. </summary>
+        /// <returns> Column width value. </returns>
         public float GetWidth(int index)
             => ImGui.GetColumnWidth(index);
 

@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+
 using Dalamud.Bindings.ImGui;
 
 // ReSharper disable once CheckNamespace
