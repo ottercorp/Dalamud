@@ -17,6 +17,7 @@ using Dalamud.Networking.Http;
 using Dalamud.Utility;
 
 using FFXIVClientStructs.FFXIV.Client.Enums;
+using FFXIVClientStructs.FFXIV.Client.Game.Event;
 using FFXIVClientStructs.FFXIV.Client.Game.Network;
 using FFXIVClientStructs.FFXIV.Client.Network;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
@@ -39,12 +40,10 @@ internal unsafe class NetworkHandlers : IInternalDisposableService
     private readonly IDisposable handleMarketTaxRates;
     private readonly IDisposable handleMarketBoardPurchaseHandler;
 
-    private readonly NetworkHandlersAddressResolver addressResolver;
-
     private readonly Hook<PacketDispatcher.Delegates.HandleContentsFinderNotificationPacket> cfPopHook;
     private readonly Hook<PacketDispatcher.Delegates.HandleMarketBoardPurchasePacket> mbPurchaseHook;
     private readonly Hook<InfoProxyItemSearch.Delegates.ProcessItemHistory> mbHistoryHook;
-    private readonly Hook<CustomTalkReceiveResponse> customTalkHook; // used for marketboard taxes
+    private readonly Hook<PacketDispatcher.Delegates.HandleEventYieldPacket> eventYieldHook; // used for marketboard taxes
     private readonly Hook<PacketDispatcher.Delegates.HandleMarketBoardItemRequestStartPacket> mbItemRequestStartHook;
     private readonly Hook<InfoProxyItemSearch.Delegates.AddPage> mbOfferingsHook;
     private readonly Hook<InfoProxyItemSearch.Delegates.SendPurchaseRequestPacket> mbSendPurchaseRequestHook;
@@ -55,12 +54,9 @@ internal unsafe class NetworkHandlers : IInternalDisposableService
     private bool disposing;
 
     [ServiceManager.ServiceConstructor]
-    private NetworkHandlers(TargetSigScanner sigScanner, HappyHttpClient happyHttpClient)
+    private NetworkHandlers(HappyHttpClient happyHttpClient)
     {
         this.uploader = new UniversalisMarketBoardUploader(happyHttpClient);
-
-        this.addressResolver = new NetworkHandlersAddressResolver();
-        this.addressResolver.Setup(sigScanner);
 
         this.CfPop = _ => { };
 
@@ -148,11 +144,11 @@ internal unsafe class NetworkHandlers : IInternalDisposableService
                 this.MarketHistoryPacketDetour);
         this.mbHistoryHook.Enable();
 
-        this.customTalkHook =
-            Hook<CustomTalkReceiveResponse>.FromAddress(
-                this.addressResolver.CustomTalkEventResponsePacketHandler,
-                this.CustomTalkReceiveResponseDetour);
-        this.customTalkHook.Enable();
+        this.eventYieldHook =
+            Hook<PacketDispatcher.Delegates.HandleEventYieldPacket>.FromAddress(
+                PacketDispatcher.Addresses.HandleEventYieldPacket.Value,
+                this.HandleEventYieldPacketDetour);
+        this.eventYieldHook.Enable();
 
         this.mbItemRequestStartHook = Hook<PacketDispatcher.Delegates.HandleMarketBoardItemRequestStartPacket>.FromAddress(
             PacketDispatcher.Addresses.HandleMarketBoardItemRequestStartPacket.Value,
@@ -174,9 +170,6 @@ internal unsafe class NetworkHandlers : IInternalDisposableService
             this.HandleContentsFinderNotificationPacketDetour);
         this.cfPopHook.Enable();
     }
-
-    private delegate void CustomTalkReceiveResponse(
-        nuint a1, ushort eventId, byte responseId, uint* args, byte argCount);
 
     /// <summary>
     /// Event which gets fired when a duty is ready.
@@ -553,20 +546,30 @@ internal unsafe class NetworkHandlers : IInternalDisposableService
         this.mbHistoryHook.OriginalDisposeSafe(a1, packetData);
     }
 
-    private void CustomTalkReceiveResponseDetour(nuint a1, ushort eventId, byte responseId, uint* args, byte argCount)
+    private void HandleEventYieldPacketDetour(EventId eventId, short scene, byte yieldId, int* intData, byte intDataCount)
     {
         try
         {
-            // Event ID 0 covers the crystarium, 7 covers all other cities
-            if (eventId is 7 or 0 && responseId == 8)
-                this.MarketBoardTaxesReceived?.InvokeSafely((nint)args);
+            // Parnell in Old Gridania
+            // Chachabi in Ul'dah - Steps of Thal
+            // Frydwyb in Limsa Lominsa Lower Decks
+            // Prunilla in The Pillars
+            // Kazashi in Kugane
+            // Tanine in Old Sharlayan
+            // Wuk Ty'ukuk in Tuliyollal
+            if (eventId is { ContentId: EventHandlerContent.CustomTalk, EntryId: 9 } && scene == 7 && yieldId == 8)
+                this.MarketBoardTaxesReceived?.InvokeSafely((nint)intData);
+
+            // Misfrith in The Crystarium
+            if (eventId is { ContentId: EventHandlerContent.CustomTalk, EntryId: 581 } && scene == 0 && yieldId == 8)
+                this.MarketBoardTaxesReceived?.InvokeSafely((nint)intData);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "CustomTalkReceiveResponseDetour threw an exception");
+            Log.Error(ex, "HandleEventYieldPacketDetour threw an exception");
         }
 
-        this.customTalkHook.OriginalDisposeSafe(a1, eventId, responseId, args, argCount);
+        this.eventYieldHook.OriginalDisposeSafe(eventId, scene, yieldId, intData, intDataCount);
     }
 
     private void MarketItemRequestStartDetour(uint targetId, nint packetRef)
