@@ -1,8 +1,8 @@
-﻿// ReSharper disable once CheckNamespace
+﻿using System.Numerics;
 
-using System.Numerics;
 using Dalamud.Bindings.ImGui;
 
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
@@ -13,7 +13,7 @@ public static partial class ImRaii
         /// <summary> Whether creating the list box succeeded and it is expanded. </summary>
         public readonly bool Success;
 
-        /// <summary> Whether the list box is already ended. </summary>
+        /// <summary> Gets a value indicating whether the list box is already ended. </summary>
         public bool Alive { get; private set; }
 
         /// <summary>Initializes a new instance of the <see cref="ListBoxDisposable"/> struct. </summary>

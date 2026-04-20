@@ -1,7 +1,6 @@
-﻿// ReSharper disable once CheckNamespace
+﻿using Dalamud.Bindings.ImGui;
 
-using Dalamud.Bindings.ImGui;
-
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
@@ -12,7 +11,7 @@ public static partial class ImRaii
         /// <summary> Whether creating the main menu bar succeeded. </summary>
         public readonly bool Success;
 
-        /// <summary> Whether the main menu bar is already ended. </summary>
+        /// <summary> Gets a value indicating whether the main menu bar is already ended. </summary>
         public bool Alive { get; private set; }
 
         /// <summary>Initializes a new instance of the <see cref="MainMenuBarDisposable"/> struct. </summary>

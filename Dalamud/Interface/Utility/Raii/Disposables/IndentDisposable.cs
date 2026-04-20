@@ -1,6 +1,6 @@
-﻿// ReSharper disable once CheckNamespace
-using Dalamud.Bindings.ImGui;
+﻿using Dalamud.Bindings.ImGui;
 
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
@@ -8,7 +8,7 @@ public static partial class ImRaii
     /// <summary> A wrapper around indentation. </summary>
     public sealed class IndentDisposable : IDisposable
     {
-        /// <summary> The current indentation pushed by this object. </summary>
+        /// <summary> Gets the current indentation pushed by this object. </summary>
         public float CurrentIndent { get; private set; }
 
         /// <summary> Add to the current indentation. </summary>

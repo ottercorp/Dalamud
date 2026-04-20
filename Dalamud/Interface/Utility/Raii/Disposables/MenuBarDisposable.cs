@@ -1,7 +1,6 @@
-﻿// ReSharper disable once CheckNamespace
+﻿using Dalamud.Bindings.ImGui;
 
-using Dalamud.Bindings.ImGui;
-
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
@@ -12,16 +11,16 @@ public static partial class ImRaii
         /// <summary> Whether creating the menu bar succeeded. </summary>
         public readonly bool Success;
 
-        /// <summary> Whether the menu bar is already ended. </summary>
+        /// <summary> Gets a value indicating whether the menu bar is already ended. </summary>
         public bool Alive { get; private set; }
 
         /// <summary>Initializes a new instance of the <see cref="MenuBarDisposable"/> struct. </summary>
         /// <returns> A disposable object that evaluates to true if the main menu bar was created. Use with using. </returns>
-        /// <remarks> Can create or append to a window that has <seealso cref="WindowFlags.MenuBar"/> set. </remarks>
+        /// <remarks> Can create or append to a window that has <seealso cref="ImGuiWindowFlags.MenuBar"/> set. </remarks>
         public MenuBarDisposable()
         {
-            Success = ImGui.BeginMenuBar();
-            Alive   = true;
+            this.Success = ImGui.BeginMenuBar();
+            this.Alive   = true;
         }
 
         /// <summary> Conversion to bool. </summary>
@@ -51,12 +50,12 @@ public static partial class ImRaii
         /// <summary> End the menu bar on leaving scope. </summary>
         public void Dispose()
         {
-            if (!Alive)
+            if (!this.Alive)
                 return;
 
-            if (Success)
+            if (this.Success)
                 ImGui.EndMenuBar();
-            Alive = false;
+            this.Alive = false;
         }
 
         /// <summary> End a menu bar without using an IDisposable. </summary>

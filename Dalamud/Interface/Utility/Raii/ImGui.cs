@@ -30,7 +30,7 @@ public static partial class ImRaii
         => new ColorDisposable().Push(idx, color, condition);
 
     public static ColorDisposable DefaultColors()
-        => ColorDisposable.DefaultColors();
+        => ColorDisposable.PushDefaultColors();
 
     public static StyleDisposable PushStyle(ImGuiStyleVar idx, float value, bool condition = true)
         => new StyleDisposable().Push(idx, value, condition);
@@ -39,7 +39,7 @@ public static partial class ImRaii
         => new StyleDisposable().Push(idx, value, condition);
 
     public static StyleDisposable DefaultStyle()
-        => StyleDisposable.DefaultStyle();
+        => StyleDisposable.PushDefaultStyle();
 
     public static FontDisposable PushFont(ImFontPtr font, bool condition = true)
         => new FontDisposable().Push(font, condition);

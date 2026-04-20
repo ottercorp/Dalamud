@@ -1,7 +1,6 @@
-﻿// ReSharper disable once CheckNamespace
+﻿using Dalamud.Bindings.ImGui;
 
-using Dalamud.Bindings.ImGui;
-
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
@@ -9,7 +8,7 @@ public static partial class ImRaii
     /// <summary> A wrapper around ImGui tooltips. </summary>
     public ref struct TooltipDisposable : IDisposable
     {
-        /// <summary> Whether the tooltip is still open. </summary>
+        /// <summary> Gets a value indicating whether the tooltip is still open. </summary>
         public bool Alive { get; private set; }
 
         /// <summary>Initializes a new instance of the <see cref="TooltipDisposable"/> struct. </summary>

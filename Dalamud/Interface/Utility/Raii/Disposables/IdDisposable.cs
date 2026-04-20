@@ -1,8 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
-
-// ReSharper disable once CheckNamespace
 using Dalamud.Bindings.ImGui;
 
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii

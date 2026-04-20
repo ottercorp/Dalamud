@@ -66,7 +66,7 @@ public static partial class ImRaii
         /// <summary> Reverts all pushed colors to their previous values temporarily. </summary>
         /// <returns> A disposable object that can be used to push further colors and pops those colors after leaving scope. Use with using. </returns>
         /// <remarks> If you need to keep colors pushed longer than the current scope, use without using and use <seealso cref="PopUnsafe"/>. </remarks>
-        public static ColorDisposable DefaultColors()
+        public static ColorDisposable PushDefaultColors()
         {
             var ret = new ColorDisposable();
             var reverseStack = Stack.GroupBy(p => p.Type).Select(p => (p.Key, p.First().BackupColor)).ToArray();

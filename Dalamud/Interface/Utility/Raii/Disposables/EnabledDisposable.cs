@@ -1,7 +1,6 @@
-﻿// ReSharper disable once CheckNamespace
+﻿using Dalamud.Bindings.ImGui;
 
-using Dalamud.Bindings.ImGui;
-
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
@@ -9,10 +8,10 @@ public static partial class ImRaii
     /// <summary> A wrapper around re-enabling the state. </summary>
     public sealed class EnabledDisposable : IDisposable
     {
-        /// <summary> The stored number of ended disposables as a workaround. </summary>
+        /// <summary> Gets the stored number of ended disposables as a workaround. </summary>
         public int Count { get; private set; }
 
-        /// <summary> Enforce an enabled state by popping the global number of disabled states. </summary>
+        /// <summary>Initializes a new instance of the <see cref="EnabledDisposable"/> class. </summary>
         /// <param name="condition"> Whether to force the enabled state. </param>
         /// <returns> A disposable object that will push the prior number of enabled states after leaving scope. Use with using. </returns>
         /// <remarks> This is a workaround for the problem that you can not force the state to be enabled without knowing the disabled stack's size. </remarks>

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+
 using Dalamud.Bindings.ImGui;
 using Dalamud.Bindings.ImPlot;
 
@@ -90,6 +91,7 @@ public static partial class ImRaii
 
         /// <summary> Pop a number of colors. </summary>
         /// <param name="num"> The number of colors to pop. This is clamped to the number of colors pushed by this object. </param>
+        /// <returns> A disposable object that can be used to push further colors and pops those colors after leaving scope. Use with using. </returns>
         public PlotColorDisposable Pop(int num = 1)
         {
             num = Math.Min(num, this.Count);

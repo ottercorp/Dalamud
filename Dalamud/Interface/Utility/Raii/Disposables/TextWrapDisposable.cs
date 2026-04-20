@@ -1,7 +1,6 @@
-﻿// ReSharper disable once CheckNamespace
+﻿using Dalamud.Bindings.ImGui;
 
-using Dalamud.Bindings.ImGui;
-
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
@@ -9,7 +8,7 @@ public static partial class ImRaii
     /// <summary> A wrapper around pushing text wrap positions. </summary>
     public sealed class TextWrapDisposable : IDisposable
     {
-        /// <summary> The number of text wrap positions currently pushed using this disposable. </summary>
+        /// <summary> Gets the number of text wrap positions currently pushed using this disposable. </summary>
         public int Count { get; private set; }
 
         /// <summary> Push a text wrap position to the text wrap stack. </summary>

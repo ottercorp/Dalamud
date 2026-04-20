@@ -1,8 +1,7 @@
-﻿// ReSharper disable once CheckNamespace
-
-using Dalamud.Bindings.ImGui;
+﻿using Dalamud.Bindings.ImGui;
 using Dalamud.Bindings.ImPlot;
 
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
@@ -13,7 +12,7 @@ public static partial class ImRaii
         /// <summary> Whether creating the table succeeded. This needs to be checked before calling any of the member methods. </summary>
         public readonly bool Success;
 
-        /// <summary> Whether the table is already ended. </summary>
+        /// <summary> Gets a value indicating whether the table is already ended. </summary>
         public bool Alive { get; private set; }
 
         /// <summary>Initializes a new instance of the <see cref="PlotDragDropSourceDisposable"/> struct. </summary>

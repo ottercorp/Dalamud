@@ -1,12 +1,10 @@
-﻿// ReSharper disable once CheckNamespace
-
-using System.Numerics;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 
-using Dalamud.Bindings.ImGui;
 using Dalamud.Bindings.ImPlot;
 
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
@@ -16,7 +14,7 @@ public static partial class ImRaii
     {
         internal static readonly List<(ImPlotStyleVar Type, Vector2 Value)> Stack = [];
 
-        /// <summary> The number of styles currently pushed using this disposable. </summary>
+        /// <summary> Gets the number of styles currently pushed using this disposable. </summary>
         public int Count { get; private set; }
 
         /// <summary> Push a style variable to the style stack. </summary>
@@ -28,7 +26,7 @@ public static partial class ImRaii
         public PlotStyleDisposable Push(ImPlotStyleVar type, float value, bool condition)
             => condition ? this.Push(type, value) : this;
 
-        /// <inheritdoc cref="Push(ImGuiStyleVar,float,bool)"/>
+        /// <inheritdoc cref="Push(ImPlotStyleVar,float,bool)"/>
         public PlotStyleDisposable Push(ImPlotStyleVar type, Vector2 value, bool condition)
             => condition ? this.Push(type, value) : this;
 
@@ -42,7 +40,7 @@ public static partial class ImRaii
             return this;
         }
 
-        /// <inheritdoc cref="Push(ImGuiStyleVar,float,bool)"/>
+        /// <inheritdoc cref="Push(ImPlotStyleVar,float,bool)"/>
         public PlotStyleDisposable Push(ImPlotStyleVar type, Vector2 value)
         {
             CheckStyleIdx(type, typeof(Vector2));
@@ -54,6 +52,7 @@ public static partial class ImRaii
         }
 
         /// <summary> Push styles that revert all current style changes made temporarily. </summary>
+        /// <returns> A disposable object that can be used to push further style variables and pops those style variables after leaving scope. Use with using. </returns>
         public static PlotStyleDisposable PlotDefaultStyle()
         {
             var ret = new PlotStyleDisposable();
@@ -85,6 +84,7 @@ public static partial class ImRaii
 
         /// <summary> Pop a number of style variables. </summary>
         /// <param name="num"> The number of style variables to pop. This is clamped to the number of style variables pushed by this object. </param>
+        /// <returns> A disposable object that can be used to push further style variables and pops those style variables after leaving scope. Use with using. </returns>
         public PlotStyleDisposable Pop(int num = 1)
         {
             num   =  Math.Min(num, this.Count);

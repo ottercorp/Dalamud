@@ -1,11 +1,10 @@
-﻿// ReSharper disable once CheckNamespace
-
-using System.Numerics;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 
 using Dalamud.Bindings.ImGui;
 
+// ReSharper disable once CheckNamespace
 namespace Dalamud.Interface.Utility.Raii;
 
 public static partial class ImRaii
@@ -15,7 +14,7 @@ public static partial class ImRaii
     {
         internal static readonly List<(ImGuiStyleVar Type, Vector2 Value)> Stack = [];
 
-        /// <summary> The number of styles currently pushed using this disposable. </summary>
+        /// <summary> Gets the number of styles currently pushed using this disposable. </summary>
         public int Count { get; private set; }
 
         /// <summary> Push a style variable to the style stack. </summary>
@@ -53,7 +52,8 @@ public static partial class ImRaii
         }
 
         /// <summary> Push styles that revert all current style changes made temporarily. </summary>
-        public static StyleDisposable DefaultStyle()
+        /// <returns> A disposable object that can be used to push further style variables and pops those style variables after leaving scope. Use with using. </returns>
+        public static StyleDisposable PushDefaultStyle()
         {
             var ret = new StyleDisposable();
             var reverseStack = Stack.GroupBy(p => p.Type).Select(p => (p.Key, p.First().Value)).ToArray();
@@ -82,6 +82,7 @@ public static partial class ImRaii
 
         /// <summary> Pop a number of style variables. </summary>
         /// <param name="num"> The number of style variables to pop. This is clamped to the number of style variables pushed by this object. </param>
+        /// <returns> A disposable object that can be used to push further style variables and pops those style variables after leaving scope. Use with using. </returns>
         public StyleDisposable Pop(int num = 1)
         {
             num   =  Math.Min(num, this.Count);
