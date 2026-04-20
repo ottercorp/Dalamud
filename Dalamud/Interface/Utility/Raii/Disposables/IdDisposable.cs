@@ -10,11 +10,12 @@ public static partial class ImRaii
     /// <summary> A wrapper around ID pushing. </summary>
     public sealed class IdDisposable : IDisposable
     {
-        /// <summary> The number of IDs currently pushed using this disposable. </summary>
+        /// <summary> Gets the number of IDs currently pushed using this disposable. </summary>
         public int Count { get; private set; }
 
         /// <summary> Push a numerical ID to the ID stack and pop it on leaving scope. </summary>
         /// <param name="id"> The ID. </param>
+        /// <param name="enabled"> If this is false, the id is not pushed. </param>
         /// <returns> A disposable object that counts the number of pushes and can be used to push further IDs. Use with using. </returns>
         /// <remarks> If you need to keep IDs pushed longer than the current scope, use without using and use <seealso cref="PopUnsafe"/>. </remarks>
         [OverloadResolutionPriority(100)]
@@ -28,7 +29,7 @@ public static partial class ImRaii
             return this;
         }
 
-        /// <inheritdoc cref="Push(ImU8String)"/>
+        /// <inheritdoc cref="Push(ImU8String, bool)"/>
         public IdDisposable Push(int id, bool enabled = true)
         {
             if (!enabled)
@@ -39,7 +40,7 @@ public static partial class ImRaii
             return this;
         }
 
-        /// <inheritdoc cref="Push(ImU8String)"/>
+        /// <inheritdoc cref="Push(ImU8String, bool)"/>
         public unsafe IdDisposable Push(nint id, bool enabled = true)
         {
             if (!enabled)

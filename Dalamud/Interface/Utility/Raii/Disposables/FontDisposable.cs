@@ -12,8 +12,13 @@ public static partial class ImRaii
         internal static int FontPushCounter;
         internal static ImFontPtr DefaultPushed;
 
-        /// <summary> The number of fonts currently pushed using this disposable. </summary>
+        /// <summary> Gets the number of fonts currently pushed using this disposable. </summary>
         public int Count { get; private set; }
+
+        /// <summary> Push the default font if any other font is currently pushed. </summary>
+        /// <returns> A disposable object that can be used to push further fonts and pops those fonts after leaving scope. Use with using. </returns>
+        public static FontDisposable DefaultFont()
+            => new FontDisposable().Push(DefaultPushed, FontPushCounter > 0);
 
         /// <summary> Push a font to the font stack. </summary>
         /// <param name="font"> The font to push. </param>
@@ -23,12 +28,6 @@ public static partial class ImRaii
         public FontDisposable Push(ImFontPtr font, bool condition = true)
             => condition ? this.InternalPush(font) : this;
 
-        // Push the default font if any other font is currently pushed.
-        /// <summary> Push the default font if any other font is currently pushed. </summary>
-        public static FontDisposable DefaultFont()
-            => new FontDisposable().Push(DefaultPushed, FontPushCounter > 0);
-
-        /// <inheritdoc cref="Push(ImSharp.Im.Font,bool)"/>
         private FontDisposable InternalPush(ImFontPtr font)
         {
             if (FontPushCounter++ == 0)
