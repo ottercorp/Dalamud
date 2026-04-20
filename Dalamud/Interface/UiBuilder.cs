@@ -286,7 +286,6 @@ public interface IUiBuilder
 /// </summary>
 public sealed class UiBuilder : IDisposable, IUiBuilder
 {
-
     private readonly LocalPlugin plugin;
     private readonly HitchDetector hitchDetector;
     private readonly string namespaceName;

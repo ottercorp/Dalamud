@@ -141,7 +141,7 @@ internal class PluginStatWindow : Window
                             ImGui.TableNextColumn();
                             ImGui.Text(plugin.Manifest.Name);
 
-                            if (plugin.DalamudInterface?.LocalUiBuilder.PluginDrawStatistics is {} stats)
+                            if (plugin.DalamudInterface?.LocalUiBuilder.PluginDrawStatistics is { } stats)
                             {
                                 ImGui.TableNextColumn();
                                 ImGui.Text($"{stats.LastDrawTime / 10000f:F4}ms");
