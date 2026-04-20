@@ -119,9 +119,9 @@ public interface IPartyFinderListing
     ushort SecondsRemaining { get; }
 
     /// <summary>
-    /// Gets the average item level of the party.
+    /// Gets the minimum item level required to join this listing.
     /// </summary>
-    ushort AverageItemLevel { get; }
+    ushort MinimumItemLevel { get; }
 
     /// <summary>
     /// Gets the number of parties this listing is recruiting for.
@@ -231,7 +231,7 @@ internal class PartyFinderListing : IPartyFinderListing
         this.DutyType = (DutyType)listing.DutyType;
         this.BeginnersWelcome = listing.BeginnersWelcome == 1;
         this.SecondsRemaining = listing.TimeLeft;
-        this.AverageItemLevel = listing.AvgItemLv;
+        this.MinimumItemLevel = listing.AvgItemLv;
         this.Parties = listing.NumberOfParties;
         this.SlotsAvailable = listing.TotalSlots;
         this.SlotsFilled = listing.SlotsFilled;
@@ -282,7 +282,7 @@ internal class PartyFinderListing : IPartyFinderListing
     public ushort SecondsRemaining { get; }
 
     /// <inheritdoc/>
-    public ushort AverageItemLevel { get; }
+    public ushort MinimumItemLevel { get; }
 
     /// <inheritdoc/>
     public byte Parties { get; }
