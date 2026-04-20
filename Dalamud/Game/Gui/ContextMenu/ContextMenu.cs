@@ -21,8 +21,6 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 
 using InteropGenerator.Runtime;
 
-using ValueType = FFXIVClientStructs.FFXIV.Component.GUI.ValueType;
-
 namespace Dalamud.Game.Gui.ContextMenu;
 
 /// <summary>
@@ -181,22 +179,14 @@ internal sealed unsafe class ContextMenu : IInternalDisposableService, IContextM
 
         valueCount = 8;
         var values = this.ExpandContextMenuArray([], valueCount);
-        values[0].ChangeType(ValueType.UInt);
-        values[0].UInt = 0;
-        values[1].ChangeType(ValueType.String);
+        values[0].SetUInt(0);
         values[1].SetManagedString(name.EncodeWithNullTerminator());
-        values[2].ChangeType(ValueType.Int);
-        values[2].Int = x;
-        values[3].ChangeType(ValueType.Int);
-        values[3].Int = y;
-        values[4].ChangeType(ValueType.Bool);
-        values[4].Byte = 0;
-        values[5].ChangeType(ValueType.UInt);
-        values[5].UInt = 0;
-        values[6].ChangeType(ValueType.UInt);
-        values[6].UInt = 0;
-        values[7].ChangeType(ValueType.UInt);
-        values[7].UInt = 1;
+        values[2].SetInt(x);
+        values[3].SetInt(y);
+        values[4].SetBool(false);
+        values[5].SetUInt(0);
+        values[6].SetUInt(0);
+        values[7].SetUInt(1);
         return values;
     }
 
@@ -239,8 +229,7 @@ internal sealed unsafe class ContextMenu : IInternalDisposableService, IContextM
                 // enable all
                 for (var i = prefixMenuSize; i < prefixMenuSize + nativeMenuSize; ++i)
                 {
-                    disabledData[i].ChangeType(ValueType.Int);
-                    disabledData[i].Int = 0;
+                    disabledData[i].SetInt(0);
                 }
             }
         }
@@ -254,8 +243,7 @@ internal sealed unsafe class ContextMenu : IInternalDisposableService, IContextM
 
             if (hasAnyDisabled)
             {
-                disabledData[i].ChangeType(ValueType.Int);
-                disabledData[i].Int = item.IsEnabled ? 0 : 1;
+                disabledData[i].SetInt(item.IsEnabled ? 0 : 1);
             }
 
             if (item.IsReturn)
@@ -263,7 +251,6 @@ internal sealed unsafe class ContextMenu : IInternalDisposableService, IContextM
             if (item.IsSubmenu)
                 submenuMask |= 1u << i;
 
-            nameData[i].ChangeType(ValueType.String);
             nameData[i].SetManagedString(this.GetPrefixedName(item).EncodeWithNullTerminator());
         }
 

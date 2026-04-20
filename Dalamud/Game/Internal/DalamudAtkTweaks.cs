@@ -9,7 +9,6 @@ using Dalamud.Game.Agent;
 using Dalamud.Game.Agent.AgentArgTypes;
 using Dalamud.Game.Gui;
 using Dalamud.Game.Text;
-using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Hooking;
 using Dalamud.Interface.Internal;
 using Dalamud.Interface.Windowing;
@@ -20,8 +19,6 @@ using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-
-using ValueType = FFXIVClientStructs.FFXIV.Component.GUI.ValueType;
 
 namespace Dalamud.Game.Internal;
 
@@ -186,7 +183,7 @@ internal sealed unsafe class DalamudAtkTweaks : IInternalDisposableService
 
             addonSelectYesno->YesButton->SetEnabledState(false);
             addonSelectYesno->NoButton->SetEnabledState(false);
-            addonSelectYesno->DisableUserClose = true;
+            addonSelectYesno->ShouldFireCallbackAndHideOrClose = true;
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(60000);
@@ -197,18 +194,20 @@ internal sealed unsafe class DalamudAtkTweaks : IInternalDisposableService
             {
                 Service<Framework>.Get().Run(() =>
                 {
-                    addonSelectYesno->DisableUserClose = false;
+                    addonSelectYesno->ShouldFireCallbackAndHideOrClose = false;
                     addonSelectYesno->YesButton->SetEnabledState(true);
                     addonSelectYesno->NoButton->SetEnabledState(true);
                     addonSelectYesno->Close(false);
 
                     var dummyRet = stackalloc AtkValue[1];
-                    dummyRet->Type = ValueType.Undefined;
+                    dummyRet->Type = AtkValueType.Undefined;
                     dummyRet->Int = recursionSentinel;
 
                     var okAtkValue = stackalloc AtkValue[2];
-                    okAtkValue[0].SetInt(0);
-                    okAtkValue[1].SetInt(recursionSentinel);
+                    okAtkValue[0].Type = AtkValueType.Int;
+                    okAtkValue[0].Int = 0;
+                    okAtkValue[1].Type = AtkValueType.Int;
+                    okAtkValue[1].Int = recursionSentinel;
 
                     AgentLobby.Instance()->ReceiveEvent(
                         dummyRet,

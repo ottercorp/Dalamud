@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
@@ -17,7 +16,8 @@ using Dalamud.Hooking;
 using Dalamud.Networking.Http;
 using Dalamud.Utility;
 
-using FFXIVClientStructs.FFXIV.Client.Game.InstanceContent;
+using FFXIVClientStructs.FFXIV.Client.Enums;
+using FFXIVClientStructs.FFXIV.Client.Game.Network;
 using FFXIVClientStructs.FFXIV.Client.Network;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
 
@@ -41,7 +41,7 @@ internal unsafe class NetworkHandlers : IInternalDisposableService
 
     private readonly NetworkHandlersAddressResolver addressResolver;
 
-    private readonly Hook<PublicContentDirector.Delegates.HandleEnterContentInfoPacket> cfPopHook;
+    private readonly Hook<PacketDispatcher.Delegates.HandleContentsFinderNotificationPacket> cfPopHook;
     private readonly Hook<PacketDispatcher.Delegates.HandleMarketBoardPurchasePacket> mbPurchaseHook;
     private readonly Hook<InfoProxyItemSearch.Delegates.ProcessItemHistory> mbHistoryHook;
     private readonly Hook<CustomTalkReceiveResponse> customTalkHook; // used for marketboard taxes
@@ -169,7 +169,9 @@ internal unsafe class NetworkHandlers : IInternalDisposableService
             this.MarketBoardSendPurchaseRequestDetour);
         this.mbSendPurchaseRequestHook.Enable();
 
-        this.cfPopHook = Hook<PublicContentDirector.Delegates.HandleEnterContentInfoPacket>.FromAddress(PublicContentDirector.Addresses.HandleEnterContentInfoPacket.Value, this.CfPopDetour);
+        this.cfPopHook = Hook<PacketDispatcher.Delegates.HandleContentsFinderNotificationPacket>.FromAddress(
+            PacketDispatcher.Addresses.HandleContentsFinderNotificationPacket.Value,
+            this.HandleContentsFinderNotificationPacketDetour);
         this.cfPopHook.Enable();
     }
 
@@ -260,31 +262,25 @@ internal unsafe class NetworkHandlers : IInternalDisposableService
         return (playerState.ContentId, playerState.CurrentWorld.RowId);
     }
 
-    private unsafe nint CfPopDetour(PublicContentDirector.EnterContentInfoPacket* packetData)
+    private void HandleContentsFinderNotificationPacketDetour(ContentsFinderNotificationPacket* packet)
     {
-        var result = this.cfPopHook.OriginalDisposeSafe(packetData);
+        this.cfPopHook.OriginalDisposeSafe(packet);
 
         try
         {
-            using var stream = new UnmanagedMemoryStream((byte*)packetData, 64);
-            using var reader = new BinaryReader(stream);
-
-            var notifyType = reader.ReadByte();
-            stream.Position += 0x1B;
-            var conditionId = reader.ReadUInt16();
-
-            if (notifyType != 3)
-                return result;
+            if (packet->QueueState != ContentsFinderQueueState.Ready)
+                return;
 
             if (this.configuration.DutyFinderTaskbarFlash)
                 Util.FlashWindow();
 
+            var conditionId = packet->ContentFinderConditionId;
             var cfCondition = LuminaUtils.CreateRef<ContentFinderCondition>(conditionId);
 
             if (!cfCondition.IsValid)
             {
                 Log.Error("CFC key {ConditionId} not in Lumina data", conditionId);
-                return result;
+                return;
             }
 
             var cfcName = cfCondition.Value.Name.ToDalamudString();
@@ -310,8 +306,6 @@ internal unsafe class NetworkHandlers : IInternalDisposableService
         {
             Log.Error(ex, "CfPopDetour threw an exception");
         }
-
-        return result;
     }
 
     private IObservable<List<MarketBoardCurrentOfferings.MarketBoardItemListing>> OnMarketBoardListingsBatch(
