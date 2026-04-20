@@ -523,7 +523,7 @@ public abstract class Window
         // Determine window background alpha
         float effectiveWindowBgAlpha;
         {
-            var nextWindowData = ImGuiP.ImGuiNextWindowData();
+            ref var nextWindowData = ref ImGui.GetCurrentContext().NextWindowData;
             effectiveWindowBgAlpha = ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg].W;
             if (nextWindowData.Flags.HasFlag(ImGuiNextWindowDataFlags.HasBgAlpha))
             {
