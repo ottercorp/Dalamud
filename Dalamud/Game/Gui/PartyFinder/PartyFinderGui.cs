@@ -56,7 +56,6 @@ internal sealed unsafe class PartyFinderGui : IInternalDisposableService, IParty
         this.receiveListingHook.Original(infoProxy, packet);
     }
 
-    // TODO: rework this to use CrossRealmListingSegmentPacket
     private void HandleListingEvents(ServerIpcSegment<CrossRealmListingSegmentPacket>* packet)
     {
         for (var i = 0; i < packet->Payload.Entries.Length; i++)
