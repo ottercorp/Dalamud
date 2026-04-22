@@ -111,7 +111,7 @@ internal sealed unsafe class GameGui : IInternalDisposableService, IGameGui
         => RaptureAtkModule.Instance()->OpenMapWithMapLink(mapLink.DataString);
 
     /// <inheritdoc/>
-    public bool OpenMapWithMapLink(uint territory, uint map, Vector3 worldPos);
+    public bool OpenMapWithMapLink(uint territory, uint map, Vector3 worldPos)
         => RaptureAtkModule.Instance()->OpenMapWithMapLink($"m:{territory},{map},{(int)worldPos.X * 1000},{(int)worldPos.Z * 1000}");
 
     /// <inheritdoc/>
@@ -452,7 +452,7 @@ internal class GameGuiPluginScoped : IInternalDisposableService, IGameGui
         => this.gameGuiService.OpenMapWithMapLink(mapLink);
 
     /// <inheritdoc/>
-    public bool OpenMapWithMapLink(uint territory, uint map, Vector3 worldPos);
+    public bool OpenMapWithMapLink(uint territory, uint map, Vector3 worldPos)
         => this.gameGuiService.OpenMapWithMapLink(territory, map, worldPos);
 
     /// <inheritdoc/>
