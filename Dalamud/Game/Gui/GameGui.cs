@@ -453,7 +453,7 @@ internal class GameGuiPluginScoped : IInternalDisposableService, IGameGui
 
     /// <inheritdoc/>
     public bool OpenMapWithMapLink(uint territory, uint map, Vector3 worldPos);
-        => RaptureAtkModule.Instance()->OpenMapWithMapLink($"m:{territory},{map},{(int)worldPos.X * 1000},{(int)worldPos.Z * 1000}");
+        => this.gameGuiService.OpenMapWithMapLink(territory, map, worldPos);
 
     /// <inheritdoc/>
     public bool WorldToScreen(Vector3 worldPos, out Vector2 screenPos)
