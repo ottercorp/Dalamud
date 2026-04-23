@@ -39,7 +39,7 @@ public interface IClientState : IDalamudService
     /// <summary>
     /// Event that gets fired when the current Territory changes.
     /// </summary>
-    public event Action<ushort> TerritoryChanged;
+    public event Action<uint> TerritoryChanged;
 
     /// <summary>
     /// Event that gets fired when the current Map changes.
@@ -95,7 +95,7 @@ public interface IClientState : IDalamudService
     /// <summary>
     /// Gets the current Territory the player resides in.
     /// </summary>
-    public ushort TerritoryType { get; }
+    public uint TerritoryType { get; }
 
     /// <summary>
     /// Gets the current Map the player resides in.

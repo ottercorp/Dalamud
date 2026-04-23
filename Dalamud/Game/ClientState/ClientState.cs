@@ -54,7 +54,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
 
     private Hook<LogoutCallbackInterface.Delegates.OnLogout> onLogoutHook;
     private bool initialized;
-    private ushort territoryTypeId;
+    private uint territoryTypeId;
     private bool isPvP;
     private uint mapId;
     private uint instance;
@@ -88,7 +88,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
     public event Action<ZoneInitEventArgs> ZoneInit;
 
     /// <inheritdoc/>
-    public event Action<ushort>? TerritoryChanged;
+    public event Action<uint>? TerritoryChanged;
 
     /// <inheritdoc/>
     public event Action<uint>? MapIdChanged;
@@ -121,7 +121,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
     public ClientLanguage ClientLanguage { get; }
 
     /// <inheritdoc/>
-    public ushort TerritoryType
+    public uint TerritoryType
     {
         get => this.territoryTypeId;
         private set
@@ -277,7 +277,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
         this.onLogoutHook = Hook<LogoutCallbackInterface.Delegates.OnLogout>.FromAddress((nint)AgentLobby.Instance()->LogoutCallbackInterface.VirtualTable->OnLogout, this.OnLogoutDetour);
         this.onLogoutHook.Enable();
 
-        this.TerritoryType = (ushort)GameMain.Instance()->CurrentTerritoryTypeId;
+        this.TerritoryType = GameMain.Instance()->CurrentTerritoryTypeId;
         this.MapId = AgentMap.Instance()->CurrentMapId;
         this.Instance = CSUIState.Instance()->PublicInstance.InstanceId;
 
@@ -337,7 +337,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
                 var eventArgs = ZoneInitEventArgs.Read((nint)packet);
                 Log.Debug($"ZoneInit: {eventArgs}");
                 this.ZoneInit?.InvokeSafely(eventArgs);
-                this.TerritoryType = (ushort)eventArgs.TerritoryType.RowId;
+                this.TerritoryType = eventArgs.TerritoryType.RowId;
                 break;
             }
         }
@@ -451,7 +451,7 @@ internal class ClientStatePluginScoped : IInternalDisposableService, IClientStat
     public event Action<ZoneInitEventArgs> ZoneInit;
 
     /// <inheritdoc/>
-    public event Action<ushort>? TerritoryChanged;
+    public event Action<uint>? TerritoryChanged;
 
     /// <inheritdoc/>
     public event Action<uint>? MapIdChanged;
@@ -484,7 +484,7 @@ internal class ClientStatePluginScoped : IInternalDisposableService, IClientStat
     public ClientLanguage ClientLanguage => this.clientStateService.ClientLanguage;
 
     /// <inheritdoc/>
-    public ushort TerritoryType => this.clientStateService.TerritoryType;
+    public uint TerritoryType => this.clientStateService.TerritoryType;
 
     /// <inheritdoc/>
     public uint MapId => this.clientStateService.MapId;
@@ -546,7 +546,7 @@ internal class ClientStatePluginScoped : IInternalDisposableService, IClientStat
 
     private void ZoneInitForward(ZoneInitEventArgs eventArgs) => this.ZoneInit?.Invoke(eventArgs);
 
-    private void TerritoryChangedForward(ushort territoryId) => this.TerritoryChanged?.Invoke(territoryId);
+    private void TerritoryChangedForward(uint territoryId) => this.TerritoryChanged?.Invoke(territoryId);
 
     private void MapIdChangedForward(uint mapId) => this.MapIdChanged?.Invoke(mapId);
 
