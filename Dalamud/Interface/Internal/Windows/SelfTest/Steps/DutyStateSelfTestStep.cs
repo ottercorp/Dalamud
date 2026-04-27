@@ -46,7 +46,7 @@ internal class DutyStateSelfTestStep : ISelfTestStep
         dutyState.DutyStarted -= this.DutyStateOnDutyStarted;
     }
 
-    private void DutyStateOnDutyStarted(DutyStateEventArgs args)
+    private void DutyStateOnDutyStarted(IDutyStateEventArgs args)
     {
         this.hasPassed = true;
     }
