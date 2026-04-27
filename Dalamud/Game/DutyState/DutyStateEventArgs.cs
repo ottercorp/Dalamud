@@ -6,9 +6,30 @@ using Lumina.Excel.Sheets;
 namespace Dalamud.Game.DutyState;
 
 /// <summary>
+/// Interface for providing event data when the duty state changed.
+/// </summary>
+public interface IDutyStateEventArgs
+{
+    /// <summary>
+    /// Gets a RowRef for the TerritoryType at the time the event was fired.
+    /// </summary>
+    public RowRef<TerritoryType> TerritoryType { get; }
+
+    /// <summary>
+    /// Gets a RowRef for the ContentFinderCondition at the time the event was fired.
+    /// </summary>
+    public RowRef<ContentFinderCondition> ContentFinderCondition { get; }
+
+    /// <summary>
+    /// Gets the EventHandler id for which this event was fired.
+    /// </summary>
+    public uint EventHandlerId { get; }
+}
+
+/// <summary>
 /// Provides event data for when the duty state changed.
 /// </summary>
-public class DutyStateEventArgs : EventArgs
+internal class DutyStateEventArgs : IDutyStateEventArgs
 {
     /// <summary>
     /// Gets a RowRef for the TerritoryType at the time the event was fired.
