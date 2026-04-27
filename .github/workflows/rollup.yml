@@ -8,10 +8,10 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        branches:
-          - api15
+#    strategy:
+#      matrix:
+#        branches:
+#          - api15
 
     defaults:
       run:
