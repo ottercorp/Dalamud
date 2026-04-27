@@ -16,6 +16,7 @@ using Dalamud.Utility;
 
 using FFXIVClientStructs.FFXIV.Application.Network;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.Game.Network;
 using FFXIVClientStructs.FFXIV.Client.Network;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
@@ -334,7 +335,7 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
 
             case UIModulePacketType.ZoneInit:
             {
-                var eventArgs = ZoneInitEventArgs.Read((nint)packet);
+                var eventArgs = ZoneInitEventArgs.Read((ZoneInitPacket*)packet);
                 Log.Debug($"ZoneInit: {eventArgs}");
                 this.ZoneInit?.InvokeSafely(eventArgs);
                 this.TerritoryType = eventArgs.TerritoryType.RowId;
