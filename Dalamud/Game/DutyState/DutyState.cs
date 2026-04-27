@@ -126,7 +126,7 @@ internal unsafe class DutyState : IInternalDisposableService, IDutyState
         };
     }
 
-    private void TerritoryOnChangedEvent(ushort territoryId)
+    private void TerritoryOnChangedEvent(uint territoryId)
     {
         if (this.IsDutyStarted)
         {
