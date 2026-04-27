@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -92,7 +92,7 @@ internal unsafe class AgentVirtualTable : IDisposable
         this.ModifiedVirtualTable->Show = (delegate* unmanaged<AgentInterface*, void>)Marshal.GetFunctionPointerForDelegate(this.showFunction);
         this.ModifiedVirtualTable->Hide = (delegate* unmanaged<AgentInterface*, void>)Marshal.GetFunctionPointerForDelegate(this.hideFunction);
         this.ModifiedVirtualTable->Update = (delegate* unmanaged<AgentInterface*, uint, void>)Marshal.GetFunctionPointerForDelegate(this.updateFunction);
-        this.ModifiedVirtualTable->OnGameEvent = (delegate* unmanaged<AgentInterface*, AgentInterface.GameEvent, void>)Marshal.GetFunctionPointerForDelegate(this.gameEventFunction);
+        this.ModifiedVirtualTable->OnGameEvent = (delegate* unmanaged<AgentInterface*, AgentGameEvent, void>)Marshal.GetFunctionPointerForDelegate(this.gameEventFunction);
         this.ModifiedVirtualTable->OnLevelChange = (delegate* unmanaged<AgentInterface*, byte, ushort, void>)Marshal.GetFunctionPointerForDelegate(this.levelChangeFunction);
         this.ModifiedVirtualTable->OnClassJobChange = (delegate* unmanaged<AgentInterface*, byte, void>)Marshal.GetFunctionPointerForDelegate(this.classJobChangeFunction);
     }
@@ -309,7 +309,7 @@ internal unsafe class AgentVirtualTable : IDisposable
         }
     }
 
-    private void OnAgentGameEvent(AgentInterface* thisPtr, AgentInterface.GameEvent gameEvent)
+    private void OnAgentGameEvent(AgentInterface* thisPtr, AgentGameEvent gameEvent)
     {
         try
         {
@@ -322,7 +322,7 @@ internal unsafe class AgentVirtualTable : IDisposable
 
             this.lifecycleService.InvokeListenersSafely(AgentEvent.PreGameEvent, this.gameEventArgs);
 
-            gameEvent = (AgentInterface.GameEvent)this.gameEventArgs.GameEvent;
+            gameEvent = (AgentGameEvent)this.gameEventArgs.GameEvent;
 
             try
             {
