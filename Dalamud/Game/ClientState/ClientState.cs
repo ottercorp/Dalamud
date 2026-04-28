@@ -185,12 +185,6 @@ internal sealed class ClientState : IInternalDisposableService, IClientState
     }
 
     /// <inheritdoc/>
-    public IPlayerCharacter? LocalPlayer => this.objectTable.LocalPlayer;
-
-    /// <inheritdoc/>
-    public unsafe ulong LocalContentId => this.playerState.ContentId;
-
-    /// <inheritdoc/>
     public unsafe bool IsLoggedIn
     {
         get
@@ -492,12 +486,6 @@ internal class ClientStatePluginScoped : IInternalDisposableService, IClientStat
 
     /// <inheritdoc/>
     public uint Instance => this.clientStateService.Instance;
-
-    /// <inheritdoc/>
-    public IPlayerCharacter? LocalPlayer => this.clientStateService.LocalPlayer;
-
-    /// <inheritdoc/>
-    public ulong LocalContentId => this.clientStateService.LocalContentId;
 
     /// <inheritdoc/>
     public bool IsLoggedIn => this.clientStateService.IsLoggedIn;
