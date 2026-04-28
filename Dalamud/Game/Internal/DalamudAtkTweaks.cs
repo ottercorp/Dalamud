@@ -30,7 +30,7 @@ internal sealed unsafe class DalamudAtkTweaks : IInternalDisposableService
 {
     private static readonly ModuleLog Log = ModuleLog.Create<DalamudAtkTweaks>();
 
-    private readonly Hook<AgentHUD.Delegates.OpenSystemMenu> hookAgentHudOpenSystemMenu;
+    // private readonly Hook<AgentHUD.Delegates.OpenSystemMenu> hookAgentHudOpenSystemMenu;
 
     // TODO: Make this into events in Framework.Gui
     private readonly Hook<UIModule.Delegates.ExecuteMainCommand> hookUiModuleExecuteMainCommand;
@@ -54,7 +54,8 @@ internal sealed unsafe class DalamudAtkTweaks : IInternalDisposableService
     [ServiceManager.ServiceConstructor]
     private DalamudAtkTweaks(TargetSigScanner sigScanner)
     {
-        this.hookAgentHudOpenSystemMenu = Hook<AgentHUD.Delegates.OpenSystemMenu>.FromAddress(AgentHUD.Addresses.OpenSystemMenu.Value, this.AgentHudOpenSystemMenuDetour);
+        // NOTE: Disabled in 7.5, too many entries in the original menu
+        // this.hookAgentHudOpenSystemMenu = Hook<AgentHUD.Delegates.OpenSystemMenu>.FromAddress(AgentHUD.Addresses.OpenSystemMenu.Value, this.AgentHudOpenSystemMenuDetour);
         this.hookUiModuleExecuteMainCommand = Hook<UIModule.Delegates.ExecuteMainCommand>.FromAddress((nint)UIModule.StaticVirtualTablePointer->ExecuteMainCommand, this.UiModuleExecuteMainCommandDetour);
         this.hookAtkUnitBaseReceiveGlobalEvent = Hook<AtkUnitBase.Delegates.ReceiveGlobalEvent>.FromAddress((nint)AtkUnitBase.StaticVirtualTablePointer->ReceiveGlobalEvent, this.AtkUnitBaseReceiveGlobalEventDetour);
 
@@ -64,7 +65,7 @@ internal sealed unsafe class DalamudAtkTweaks : IInternalDisposableService
 
         this.agentLifecycle.RegisterListener(this.agentLobbyPreEventListener);
 
-        this.hookAgentHudOpenSystemMenu.Enable();
+        // this.hookAgentHudOpenSystemMenu.Enable();
         this.hookUiModuleExecuteMainCommand.Enable();
         this.hookAtkUnitBaseReceiveGlobalEvent.Enable();
     }
@@ -90,7 +91,7 @@ internal sealed unsafe class DalamudAtkTweaks : IInternalDisposableService
         {
             this.agentLifecycle.UnregisterListener(this.agentLobbyPreEventListener);
 
-            this.hookAgentHudOpenSystemMenu.Dispose();
+            // this.hookAgentHudOpenSystemMenu.Dispose();
             this.hookUiModuleExecuteMainCommand.Dispose();
             this.hookAtkUnitBaseReceiveGlobalEvent.Dispose();
 
@@ -231,6 +232,7 @@ internal sealed unsafe class DalamudAtkTweaks : IInternalDisposableService
         this.hookAtkUnitBaseReceiveGlobalEvent.Original(thisPtr, eventType, eventParam, atkEvent, atkEventData);
     }
 
+    /*
     private void AgentHudOpenSystemMenuDetour(AgentHUD* thisPtr, AtkValue* atkValueArgs, uint menuSize)
     {
         if (WindowSystem.ShouldInhibitAtkCloseEvents && this.configuration.IsFocusManagementEnabled)
@@ -301,6 +303,7 @@ internal sealed unsafe class DalamudAtkTweaks : IInternalDisposableService
 
         this.hookAgentHudOpenSystemMenu.Original(thisPtr, atkValueArgs, menuSize + 2);
     }
+    */
 
     private void UiModuleExecuteMainCommandDetour(UIModule* thisPtr, uint commandId)
     {
