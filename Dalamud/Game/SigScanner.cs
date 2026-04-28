@@ -57,7 +57,6 @@ public class SigScanner : IDisposable, ISigScanner
     {
         this.cacheFile = cacheFile;
         this.Module = module;
-        this.Is32BitProcess = !Environment.Is64BitProcess;
         this.IsCopy = doCopy;
 
         if (this.IsCopy)
@@ -79,10 +78,6 @@ public class SigScanner : IDisposable, ISigScanner
 
     /// <inheritdoc/>
     public bool IsCopy { get; }
-
-    /// <inheritdoc/>
-    [Api15ToDo("Remove this property. In the interface too.")]
-    public bool Is32BitProcess { get; }
 
     /// <inheritdoc/>
     public nint SearchBase => this.IsCopy ? this.moduleCopyPtr : this.Module.BaseAddress;
@@ -120,8 +115,6 @@ public class SigScanner : IDisposable, ISigScanner
     /// <summary>Gets or sets a value indicating whether this instance of <see cref="SigScanner"/> is meant to be a
     /// Dalamud service.</summary>
     private protected bool IsService { get; set; }
-
-    private nint TextSectionTop => this.TextSectionBase + this.TextSectionSize;
 
     /// <summary>
     /// Scan memory for a signature.
@@ -275,7 +268,6 @@ public class SigScanner : IDisposable, ISigScanner
     /// <inheritdoc/>
     public nint ResolveRelativeAddress(nint nextInstAddr, int relOffset)
     {
-        if (this.Is32BitProcess) throw new NotSupportedException("32 bit is not supported.");
         return nextInstAddr + relOffset;
     }
 
