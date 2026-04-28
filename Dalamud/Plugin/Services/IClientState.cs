@@ -108,20 +108,6 @@ public interface IClientState : IDalamudService
     public uint Instance { get; }
 
     /// <summary>
-    /// Gets the local player character, if one is present.
-    /// </summary>
-    [Api15ToDo("Remove")]
-    [Obsolete($"Use {nameof(IPlayerState)} or {nameof(IObjectTable)}.{nameof(IObjectTable.LocalPlayer)} if necessary.")]
-    public IPlayerCharacter? LocalPlayer { get; }
-
-    /// <summary>
-    /// Gets the content ID of the local character.
-    /// </summary>
-    [Api15ToDo("Remove")]
-    [Obsolete($"Use {nameof(IPlayerState)}.{nameof(IPlayerState.ContentId)}")]
-    public ulong LocalContentId { get; }
-
-    /// <summary>
     /// Gets a value indicating whether a character is logged in.
     /// </summary>
     public bool IsLoggedIn { get; }
