@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 
+using Dalamud.Game.Addon.Events;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Logging.Internal;
 
@@ -391,7 +392,7 @@ internal unsafe class AddonVirtualTable : IDisposable
 
             this.receiveEventArgs.PreventOriginalRequested = false;
             this.receiveEventArgs.Addon = (nint)addon;
-            this.receiveEventArgs.AtkEventType = (byte)eventType;
+            this.receiveEventArgs.AtkEventType = (AddonEventType)eventType;
             this.receiveEventArgs.EventParam = eventParam;
             this.receiveEventArgs.AtkEvent = (IntPtr)atkEvent;
             this.receiveEventArgs.AtkEventData = (nint)atkEventData;
