@@ -99,7 +99,7 @@ namespace Dalamud.CorePlugin
         internal IDalamudPluginInterface Interface { get; private set; }
 
         /// <inheritdoc />
-        public async ValueTask LoadAsync(CancellationToken cancellationToken)
+        public async Task LoadAsync(CancellationToken cancellationToken)
         {
             await Task.Delay(10000, cancellationToken);
             this.pluginLog.Information("LoadAsync completed!");
