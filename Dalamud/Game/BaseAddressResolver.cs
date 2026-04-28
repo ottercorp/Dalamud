@@ -75,17 +75,6 @@ public abstract class BaseAddressResolver
     /// Setup the resolver by finding any necessary memory addresses.
     /// </summary>
     /// <param name="scanner">The SigScanner instance.</param>
-    [Api15ToDo("Remove")]
-    [Obsolete("32 bit is no longer supported.")]
-    protected virtual void Setup32Bit(ISigScanner scanner)
-    {
-        throw new NotSupportedException("32 bit version is not supported.");
-    }
-
-    /// <summary>
-    /// Setup the resolver by finding any necessary memory addresses.
-    /// </summary>
-    /// <param name="scanner">The SigScanner instance.</param>
     protected virtual void Setup64Bit(ISigScanner scanner)
     {
         throw new NotSupportedException("64 bit version is not supported.");
