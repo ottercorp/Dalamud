@@ -1,7 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -34,7 +33,7 @@ internal static partial class HookVerifier
 
     private static readonly string ClientStructsInteropNamespacePrefix = string.Join(".", nameof(FFXIVClientStructs), nameof(FFXIVClientStructs.Interop));
 
-    private static FrozenDictionary<nint, VerificationEntry> allToVerify;
+    private static FrozenDictionary<nint, VerificationEntry[]> allToVerify = FrozenDictionary<nint, VerificationEntry[]>.Empty;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HookVerifier"/> class.
@@ -108,7 +107,7 @@ internal static partial class HookVerifier
             entry.Address = module.BaseAddress + outLocation;
         }
 
-        allToVerify = verifyContainer.ToFrozenDictionary(v => v.Address, v => v);
+        allToVerify = verifyContainer.GroupBy(v => v.Address).ToFrozenDictionary(v => v.Key, v => v.ToArray());
 
         verifyContainer.Clear();
     }
@@ -118,88 +117,90 @@ internal static partial class HookVerifier
     /// </summary>
     /// <param name="address">The address of the function we are hooking.</param>
     /// <param name="hookCaller">The caller that is trying to create the hook.</param>
-    /// <param name="exception">The exception when we think the hook is not correctly declared.</param>
+    /// <param name="exceptions">The exceptions when we think one of the hooks for this address is not correctly declared.</param>
     /// <typeparam name="T">The delegate type passed by the creator of the hook.</typeparam>
     /// <returns> <see langword="true"/> when we think the hook is not correctly declared, otherwise <see langword="false"/>. </returns>
-    public static bool TryVerify<T>(IntPtr address, Assembly hookCaller, [NotNullWhen(returnValue: true)] out HookVerificationException? exception) where T : Delegate
+    public static bool TryVerify<T>(IntPtr address, Assembly hookCaller, out HookVerificationException[] exceptions) where T : Delegate
     {
-        exception = null;
+        exceptions = [];
 
         // Nothing to verify for this hook?
-        if (!allToVerify.TryGetValue(address, out var entry))
+        if (!allToVerify.TryGetValue(address, out var entries))
         {
             return true;
         }
 
         var passedType = typeof(T);
         var isAssemblyMarshaled = !Attribute.IsDefined(passedType.Assembly, typeof(DisableRuntimeMarshallingAttribute));
-        bool mismatch;
         string? failContext = null;
 
         var passedInvoke = passedType.GetMethod("Invoke")!;
         var passedParams = passedInvoke.GetParameters();
-        ParameterInfo[] enforcedParams;
 
-        // Check if entry is a delegate or method check
-        if (entry.TargetDelegateType != null)
+        var ret = true;
+        foreach (var entry in entries)
         {
-            // Directly compare delegates
-            if (passedType == entry.TargetDelegateType)
+            // Check if entry is a delegate or method check
+            ParameterInfo[] enforcedParams;
+            bool mismatch;
+            if (entry.TargetDelegateType != null)
             {
-                return true;
+                // Directly compare delegates
+                if (passedType == entry.TargetDelegateType)
+                    continue;
+
+                var enforcedInvoke = entry.TargetDelegateType.GetMethod("Invoke")!;
+
+                // Compare Return Type
+                mismatch = !CheckParam(passedInvoke.ReturnType, enforcedInvoke.ReturnType, isAssemblyMarshaled);
+
+                // Compare Parameter Count
+                enforcedParams = enforcedInvoke.GetParameters();
+            }
+            else
+            {
+                // Compare Return Type
+                mismatch = !CheckParam(passedInvoke.ReturnType, entry.ReturnType!, isAssemblyMarshaled);
+
+                // Compare Parameter Count
+                enforcedParams = entry.Parameters!;
             }
 
-            var enforcedInvoke = entry.TargetDelegateType.GetMethod("Invoke")!;
-
-            // Compare Return Type
-            mismatch = !CheckParam(passedInvoke.ReturnType, enforcedInvoke.ReturnType, isAssemblyMarshaled);
-
-            // Compare Parameter Count
-            enforcedParams = enforcedInvoke.GetParameters();
-        }
-        else
-        {
-            // Compare Return Type
-            mismatch = !CheckParam(passedInvoke.ReturnType, entry.ReturnType!, isAssemblyMarshaled);
-
-            // Compare Parameter Count
-            enforcedParams = entry.Parameters!;
-        }
-
-        if (passedParams.Length != enforcedParams.Length)
-        {
-            mismatch = true;
-            failContext = "Param count check.";
-        }
-        else if (!mismatch)
-        {
-            // Compare Parameter Types
-            for (var i = 0; i < passedParams.Length; i++)
+            if (passedParams.Length != enforcedParams.Length)
             {
-                if (!CheckParam(passedParams[i].ParameterType, enforcedParams[i].ParameterType, isAssemblyMarshaled))
+                mismatch = true;
+                failContext = "Param count check.";
+            }
+            else if (!mismatch)
+            {
+                // Compare Parameter Types
+                for (var i = 0; i < passedParams.Length; i++)
                 {
-                    mismatch = true;
-                    failContext = "Param type check.";
-                    break;
+                    if (!CheckParam(passedParams[i].ParameterType, enforcedParams[i].ParameterType, isAssemblyMarshaled))
+                    {
+                        mismatch = true;
+                        failContext = "Param type check.";
+                        break;
+                    }
                 }
             }
-        }
-        else
-        {
-            failContext = "Return type check.";
+            else
+            {
+                failContext = "Return type check.";
+            }
+
+            if (mismatch)
+            {
+                var enforcedDelegate = entry.TargetDelegateType != null ?
+                    HookVerificationException.GetSignature(entry.TargetDelegateType) :
+                    $"{entry.ReturnType!.Name} ({string.Join(", ", entry.Parameters!.Select(p => p.ParameterType.Name))})";
+
+                exceptions = [HookVerificationException.Create(address, passedType, enforcedDelegate, entry.Message, entry.Name, failContext, hookCaller), .. exceptions];
+                ret = false;
+            }
         }
 
-        if (mismatch)
-        {
-            var enforcedDelegate = entry.TargetDelegateType != null ?
-                HookVerificationException.GetSignature(entry.TargetDelegateType) :
-                $"{entry.ReturnType!.Name} ({string.Join(", ", entry.Parameters!.Select(p => p.ParameterType.Name))})";
-
-            exception = HookVerificationException.Create(address, passedType, enforcedDelegate, entry.Message, entry.Name, failContext, hookCaller);
-            return false;
-        }
-
-        return true;
+        return ret;
     }
 
     [GeneratedRegex($@"^{nameof(FFXIVClientStructs)}\.({nameof(FFXIVClientStructs.FFXIV)}|{nameof(FFXIVClientStructs.Havok)}|{nameof(FFXIVClientStructs.Interop)}|{nameof(FFXIVClientStructs.STD)})\.", RegexOptions.Singleline)]
@@ -241,9 +242,7 @@ internal static partial class HookVerifier
     }
 
     private static bool IsStruct(Type type)
-    {
-        return type != typeof(decimal) && type is { IsValueType: true, IsPrimitive: false, IsEnum: false };
-    }
+        => type != typeof(decimal) && type is { IsValueType: true, IsPrimitive: false, IsEnum: false };
 
     private record VerificationEntry(string Name, string Signature, ushort[] RelativeFollowOffsets, Type? TargetDelegateType = null, ParameterInfo[]? Parameters = null, Type? ReturnType = null, string Message = "Failed match against expected documentation.")
     {
