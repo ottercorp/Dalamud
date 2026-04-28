@@ -21,5 +21,5 @@ public interface IAsyncDalamudPlugin : IAsyncDisposable
     /// <see cref="IAsyncDisposable.DisposeAsync"/> will still be called.
     /// </param>
     /// <returns>A task that represents the asynchronous load operation.</returns>
-    ValueTask LoadAsync(CancellationToken cancellationToken);
+    Task LoadAsync(CancellationToken cancellationToken);
 }
