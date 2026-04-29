@@ -409,7 +409,7 @@ public class StyleModelV1 : StyleModel
             AttentionBackground = new Vector4(0.75f, 0.65f, 0.3f, 0.4f),
         },
 
-        WindowBlurStrength = 5f,
+        WindowBlurStrength = 0.5f,
     };
 
     /// <summary>
