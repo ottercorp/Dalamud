@@ -36,8 +36,8 @@ using Lumina.Text.Payloads;
 using Lumina.Text.ReadOnly;
 
 using AddonSheet = Lumina.Excel.Sheets.Addon;
-using StatusSheet = Lumina.Excel.Sheets.Status;
 using CSFramework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework;
+using StatusSheet = Lumina.Excel.Sheets.Status;
 
 namespace Dalamud.Game.Text.Evaluator;
 
