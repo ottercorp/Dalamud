@@ -7,7 +7,7 @@ namespace Dalamud.Game.ClientState.JobGauge.Types;
 /// <summary>
 /// In-memory BRD job gauge.
 /// </summary>
-public unsafe class BRDGauge : JobGaugeBase<FFXIVClientStructs.FFXIV.Client.Game.Gauge.BardGauge>
+public unsafe class BRDGauge : JobGaugeBase<BardGauge>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="BRDGauge"/> class.
@@ -41,13 +41,13 @@ public unsafe class BRDGauge : JobGaugeBase<FFXIVClientStructs.FFXIV.Client.Game
         get
         {
             if (this.Struct->SongFlags.HasFlag(SongFlags.WanderersMinuet))
-                return Song.Wanderer;
+                return Song.WanderersMinuet;
 
             if (this.Struct->SongFlags.HasFlag(SongFlags.ArmysPaeon))
-                return Song.Army;
+                return Song.ArmysPaeon;
 
             if (this.Struct->SongFlags.HasFlag(SongFlags.MagesBallad))
-                return Song.Mage;
+                return Song.MagesBallad;
 
             return Song.None;
         }
@@ -61,13 +61,13 @@ public unsafe class BRDGauge : JobGaugeBase<FFXIVClientStructs.FFXIV.Client.Game
         get
         {
             if (this.Struct->SongFlags.HasFlag(SongFlags.WanderersMinuetLastPlayed))
-                return Song.Wanderer;
+                return Song.WanderersMinuet;
 
             if (this.Struct->SongFlags.HasFlag(SongFlags.ArmysPaeonLastPlayed))
-                return Song.Army;
+                return Song.ArmysPaeon;
 
             if (this.Struct->SongFlags.HasFlag(SongFlags.MagesBalladLastPlayed))
-                return Song.Mage;
+                return Song.MagesBallad;
 
             return Song.None;
         }
@@ -79,16 +79,10 @@ public unsafe class BRDGauge : JobGaugeBase<FFXIVClientStructs.FFXIV.Client.Game
     /// <remarks>
     /// This will always return an array of size 3, inactive Coda are represented by <see cref="Enums.Song.None"/>.
     /// </remarks>
-    public Song[] Coda
-    {
-        get
-        {
-            return
-            [
-                this.Struct->SongFlags.HasFlag(SongFlags.MagesBalladCoda) ? Song.Mage : Song.None,
-                this.Struct->SongFlags.HasFlag(SongFlags.ArmysPaeonCoda) ? Song.Army : Song.None,
-                this.Struct->SongFlags.HasFlag(SongFlags.WanderersMinuetCoda) ? Song.Wanderer : Song.None,
-            ];
-        }
-    }
+    public Song[] Coda =>
+    [
+        this.Struct->SongFlags.HasFlag(SongFlags.MagesBalladCoda) ? Song.MagesBallad : Song.None,
+        this.Struct->SongFlags.HasFlag(SongFlags.ArmysPaeonCoda) ? Song.ArmysPaeon : Song.None,
+        this.Struct->SongFlags.HasFlag(SongFlags.WanderersMinuetCoda) ? Song.WanderersMinuet : Song.None,
+    ];
 }

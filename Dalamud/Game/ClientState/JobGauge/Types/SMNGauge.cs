@@ -106,19 +106,19 @@ public unsafe class SMNGauge : JobGaugeBase<SummonerGauge>
     /// Gets a value indicating whether if Ifrit is currently attuned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsIfritAttuned => this.AttunementType == SummonAttunement.Ifrit;
+    public bool IsIfritAttuned => this.AttunementType == SummonAttunement.IfritAttuned;
 
     /// <summary>
     /// Gets a value indicating whether if Titan is currently attuned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsTitanAttuned => this.AttunementType == SummonAttunement.Titan;
+    public bool IsTitanAttuned => this.AttunementType == SummonAttunement.TitanAttuned;
 
     /// <summary>
     /// Gets a value indicating whether if Garuda is currently attuned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsGarudaAttuned => this.AttunementType == SummonAttunement.Garuda;
+    public bool IsGarudaAttuned => this.AttunementType == SummonAttunement.GarudaAttuned;
 
     /// <summary>
     /// Gets a value indicating whether there are any Aetherflow stacks available.
