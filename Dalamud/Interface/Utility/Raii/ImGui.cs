@@ -20,6 +20,12 @@ public static partial class ImRaii
     public static ChildDisposable Child(ImU8String strId, Vector2 size, bool border, ImGuiWindowFlags flags)
         => new(strId, size, border, flags);
 
+    public static ChildFrameDisposable ChildFrame(uint id, Vector2 size)
+        => new(id, size);
+
+    public static ChildFrameDisposable ChildFrame(uint id, Vector2 size, ImGuiWindowFlags flags)
+        => new(id, size, flags);
+
     public static ColorDisposable PushColor(ImGuiCol idx, uint color, bool condition = true)
         => new ColorDisposable().Push(idx, color, condition);
 
