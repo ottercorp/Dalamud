@@ -149,13 +149,13 @@ internal sealed partial class ObjectTable : IServiceType, IObjectTable
         var objKind = (ObjectKind)obj->ObjectKind;
         return objKind switch
         {
-            ObjectKind.Player => new PlayerCharacter(address),
+            ObjectKind.Pc => new PlayerCharacter(address),
             ObjectKind.BattleNpc => new BattleNpc(address),
             ObjectKind.EventNpc => new Npc(address),
             ObjectKind.Retainer => new Npc(address),
             ObjectKind.EventObj => new EventObj(address),
             ObjectKind.Companion => new Npc(address),
-            ObjectKind.MountType => new Npc(address),
+            ObjectKind.Mount => new Npc(address),
             ObjectKind.Ornament => new Npc(address),
             _ => new GameObject(address),
         };
@@ -165,7 +165,7 @@ internal sealed partial class ObjectTable : IServiceType, IObjectTable
     {
         for (var index = 0; index < 200; index += 2)
         {
-            if (this[index] is IBattleChara { ObjectKind: ObjectKind.Player } gameObject)
+            if (this[index] is IBattleChara { ObjectKind: ObjectKind.Pc } gameObject)
             {
                 yield return gameObject;
             }
@@ -211,13 +211,13 @@ internal sealed partial class ObjectTable : IServiceType, IObjectTable
 
             var activeObject = (ObjectKind)address->ObjectKind switch
             {
-                ObjectKind.Player => this.playerCharacter,
+                ObjectKind.Pc => this.playerCharacter,
                 ObjectKind.BattleNpc => this.battleNpc,
                 ObjectKind.EventNpc => this.npc,
                 ObjectKind.Retainer => this.npc,
                 ObjectKind.EventObj => this.eventObj,
                 ObjectKind.Companion => this.npc,
-                ObjectKind.MountType => this.npc,
+                ObjectKind.Mount => this.npc,
                 ObjectKind.Ornament => this.npc,
                 _ => this.gameObject,
             };

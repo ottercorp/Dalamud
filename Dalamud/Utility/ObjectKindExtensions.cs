@@ -24,7 +24,7 @@ public static class ObjectKindExtensions
             ObjectKind.Aetheryte or
             ObjectKind.GatheringPoint or
             ObjectKind.Companion or
-            ObjectKind.Housing => id + (1000000 * (uint)objectKind) - 2000000,
+            ObjectKind.HousingEventObject => id + (1000000 * (uint)objectKind) - 2000000,
             ObjectKind.EventObj => id + (1000000 * (uint)objectKind) - 4000000,
             ObjectKind.CardStand => id + 3000000,
             _ => 0,

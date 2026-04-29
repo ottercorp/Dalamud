@@ -310,12 +310,12 @@ internal sealed unsafe class GameGui : IInternalDisposableService, IGameGui
         return ret;
     }
 
-    private void HandleActionHoverDetour(AgentActionDetail* hoverState, DetailKind actionKind, uint actionId, int a4, bool a5, int a6, int a7)
+    private void HandleActionHoverDetour(AgentActionDetail* hoverState, FFXIVClientStructs.FFXIV.Client.Enums.DetailKind detailKind, uint actionId, int a4, bool a5, int a6, int a7)
     {
-        this.handleActionHoverHook.Original(hoverState, actionKind, actionId, a4, a5, a6, a7);
-        this.HoveredAction.ActionKind = (HoverActionKind)actionKind;
-        this.HoveredAction.BaseActionID = actionId;
-        this.HoveredAction.ActionID = hoverState->ActionId;
+        this.handleActionHoverHook.Original(hoverState, detailKind, actionId, a4, a5, a6, a7);
+        this.HoveredAction.DetailKind = (DetailKind)detailKind;
+        this.HoveredAction.BaseActionId = actionId;
+        this.HoveredAction.ActionId = hoverState->ActionId;
         this.HoveredActionChanged?.InvokeSafely(this, this.HoveredAction);
     }
 
@@ -329,9 +329,9 @@ internal sealed unsafe class GameGui : IInternalDisposableService, IGameGui
 
             if (a3Val == 255)
             {
-                this.HoveredAction.ActionKind = HoverActionKind.None;
-                this.HoveredAction.BaseActionID = 0;
-                this.HoveredAction.ActionID = 0;
+                this.HoveredAction.DetailKind = DetailKind.None;
+                this.HoveredAction.BaseActionId = 0;
+                this.HoveredAction.ActionId = 0;
                 this.HoveredActionChanged?.InvokeSafely(this, this.HoveredAction);
             }
         }
