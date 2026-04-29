@@ -2,7 +2,6 @@
 # Example: Generate a local enum MyGeneratedEnum in namespace Sample.Gen mapped to SourceEnums.SampleSourceEnum
 Dalamud.Game.Agent.AgentId = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentId
 Dalamud.Game.Addon.Events.AddonEventType = FFXIVClientStructs.FFXIV.Component.GUI.AtkEventType
-Dalamud.Game.Gui.HoverActionKind = FFXIVClientStructs.FFXIV.Client.Enums.DetailKind
 Dalamud.Game.ClientState.Objects.Enums.ObjectKind = FFXIVClientStructs.FFXIV.Client.Game.Object.ObjectKind
 Dalamud.Game.ClientState.Objects.Enums.BattleNpcSubKind = FFXIVClientStructs.FFXIV.Client.Game.Object.BattleNpcSubKind
 Dalamud.Game.ClientState.Fates.FateState = FFXIVClientStructs.FFXIV.Client.Game.Fate.FateState
@@ -26,11 +25,11 @@ Dalamud.Game.Gui.PartyFinder.Types.LootRuleFlags = FFXIVClientStructs.FFXIV.Clie
 Dalamud.Game.Gui.PartyFinder.Types.ObjectiveFlags = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentLookingForGroup.Objective
 Dalamud.Game.Gui.PartyFinder.Types.SearchAreaFlags = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentLookingForGroup.JoinCondition
 Dalamud.Game.Gui.AgentUpdateFlag = FFXIVClientStructs.FFXIV.Client.UI.RaptureAtkModule.AgentUpdateFlags
-Dalamud.Game.Inventory = FFXIVClientStructs.FFXIV.Client.Game.InventoryType
-Dalamud.Game.NativeWrapper = FFXIVClientStructs.FFXIV.Component.GUI.AtkValueType
-Dalamud.Game.Network.Structure.InfoProxy.DisplayGroup = FFXIVClientStructs.FFXIV.Client.UI.Info.InfoProxyCommonList.DisplayGroup
+Dalamud.Game.Inventory.GameInventoryType = FFXIVClientStructs.FFXIV.Client.Game.InventoryType
+Dalamud.Game.NativeWrapper.AtkValueType = FFXIVClientStructs.FFXIV.Component.GUI.AtkValueType
+Dalamud.Game.Network.Structures.InfoProxy.DisplayGroup = FFXIVClientStructs.FFXIV.Client.UI.Info.InfoProxyCommonList.DisplayGroup
 Dalamud.Game.Player.PlayerAttribute = FFXIVClientStructs.FFXIV.Client.Game.UI.PlayerAttribute
 Dalamud.Game.Text.Evaluator.Internal.SheetRedirectFlags = FFXIVClientStructs.FFXIV.Client.UI.Misc.RaptureTextModule.SheetRedirectFlags
 Dalamud.Game.Text.XivChatRelationKind = FFXIVClientStructs.FFXIV.Client.UI.Misc.EntityRelationKind
-Dalamud.Game.ActionKind = FFXIVClientStructs.FFXIV.Client.Enums.DetailKind
+Dalamud.Game.Gui.DetailKind = FFXIVClientStructs.FFXIV.Client.Enums.DetailKind
 

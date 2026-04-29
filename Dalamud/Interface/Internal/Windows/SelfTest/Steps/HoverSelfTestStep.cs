@@ -35,8 +35,8 @@ internal class HoverSelfTestStep : ISelfTestStep
             ImGui.Text("Hover \"Open Linkshells\" action...");
 
             if (gameGui.HoveredAction != null &&
-                gameGui.HoveredAction.ActionKind == HoverActionKind.MainCommand &&
-                gameGui.HoveredAction.ActionID == 28)
+                gameGui.HoveredAction.DetailKind == DetailKind.MainCommand &&
+                gameGui.HoveredAction.ActionId == 28)
             {
                 this.clearedAction = true;
             }
