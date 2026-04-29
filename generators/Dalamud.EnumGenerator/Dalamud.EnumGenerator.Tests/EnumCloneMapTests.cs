@@ -46,4 +46,23 @@ Another.Target = Some.Source";
         var generated = newCompilation.SyntaxTrees.Select(t => t.FilePath).Where(p => p.EndsWith("TargetEnum.CloneEnum.g.cs")).ToArray();
         Assert.Single(generated);
     }
+
+    [Fact]
+    public void Generator_TestNestedEnum()
+    {
+        var sourceEnum = @"namespace Test; public static class Nest { public enum Source { A = 1, B = 2} }";
+        var mapText = "GeneratedNs.Target = Test.Nest.Source\nGeneratedNs.Target2 = Test.Nest+Source";
+        var generator = new EnumCloneGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator)
+                                          .AddAdditionalTexts([new Utils.TestAdditionalFile("EnumCloneMap.txt", mapText)]);
+
+        var compilation = CSharpCompilation.Create("TestGen",
+                                                   [CSharpSyntaxTree.ParseText(sourceEnum, cancellationToken: TestContext.Current.CancellationToken)],
+                                                   [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var newCompilation, out var diagnostics, TestContext.Current.CancellationToken);
+
+        var generated = newCompilation.SyntaxTrees.Select(t => t.FilePath).Count(p => p.EndsWith("Target.CloneEnum.g.cs") || p.EndsWith("Target2.CloneEnum.g.cs"));
+        Assert.Equal(2, generated);
+    }
 }
