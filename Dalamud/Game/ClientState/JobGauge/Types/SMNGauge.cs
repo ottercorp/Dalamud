@@ -64,13 +64,11 @@ public unsafe class SMNGauge : JobGaugeBase<SummonerGauge>
 
     /// <summary>
     /// Gets the type of attunement available.
-    /// Use the summon attuned accessors instead.
     /// </summary>
     public SummonAttunement AttunementType => (SummonAttunement)this.Struct->AttunementType;
 
     /// <summary>
     /// Gets the current aether flags.
-    /// Use the summon accessors instead.
     /// </summary>
     public AetherFlags AetherFlags => (AetherFlags)this.Struct->AetherFlags;
 
