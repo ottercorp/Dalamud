@@ -128,9 +128,14 @@ internal class ChatMessage : IHandleableChatMessage
     {
         get
         {
-            var encoded = this.Sender.Encode();
-            return new ReadOnlySeStringSpan(encoded) != this.OriginalSender;
+            if (!field)
+            {
+                var encoded = this.Sender.Encode();
+                field = new ReadOnlySeStringSpan(encoded) != this.OriginalSender;
+            }
+            return field;
         }
+        private set;
     }
 
     /// <inheritdoc />
@@ -138,9 +143,14 @@ internal class ChatMessage : IHandleableChatMessage
     {
         get
         {
-            var encoded = this.Message.Encode();
-            return new ReadOnlySeStringSpan(encoded) != this.OriginalMessage;
+            if (!field)
+            {
+                var encoded = this.Message.Encode();
+                return new ReadOnlySeStringSpan(encoded) != this.OriginalMessage;
+            }
+            return field;
         }
+        private set;
     }
 
     /// <inheritdoc />
@@ -170,6 +180,8 @@ internal class ChatMessage : IHandleableChatMessage
         this.OriginalMessage = message;
         this.Sender = sender.ToDalamudString();
         this.Message = message.ToDalamudString();
+        this.SenderModified = false;
+        this.MessageModified = false;
         this.Timestamp = timestamp;
         this.IsHandled = false;
     }
@@ -184,6 +196,8 @@ internal class ChatMessage : IHandleableChatMessage
         this.TargetKind = 0;
         this.Sender = null;
         this.Message = null;
+        this.SenderModified = false;
+        this.MessageModified = false;
         this.Timestamp = 0;
         this.IsHandled = false;
     }
