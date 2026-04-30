@@ -4,8 +4,8 @@ using System.Linq;
 
 using CheapLoc;
 
-using Dalamud.Plugin.Internal;
 using Dalamud.Plugin.Internal.Types;
+using Dalamud.Plugin.Internal.Types.Manifest;
 
 namespace Dalamud.Interface.Internal;
 
@@ -100,52 +100,52 @@ internal class PluginCategoryManager
         /// All plugins.
         /// </summary>
         All = 0,
-        
+
         /// <summary>
         /// Plugins currently being tested.
         /// </summary>
         IsTesting = 1,
-        
+
         /// <summary>
         /// Plugins available for testing.
         /// </summary>
         AvailableForTesting = 2,
-        
+
         /// <summary>
         /// Plugins that were hidden.
         /// </summary>
         Hidden = 3,
-        
+
         /// <summary>
         /// Installed dev plugins.
         /// </summary>
         DevInstalled = 10,
-        
+
         /// <summary>
         /// Icon tester.
         /// </summary>
         IconTester = 11,
-        
+
         /// <summary>
         /// Changelogs for Dalamud.
         /// </summary>
         DalamudChangelogs = 12,
-        
+
         /// <summary>
         /// Changelogs for plugins.
         /// </summary>
         PluginChangelogs = 13,
-        
+
         /// <summary>
         /// Change plugin profiles.
         /// </summary>
         PluginProfiles = 14,
-        
+
         /// <summary>
         /// Updateable plugins.
         /// </summary>
         UpdateablePlugins = 15,
-        
+
         /// <summary>
         /// Enabled plugins.
         /// </summary>
@@ -165,37 +165,37 @@ internal class PluginCategoryManager
         /// Plugins tagged as "other".
         /// </summary>
         Other = FirstTagBasedCategoryId + 0,
-        
+
         /// <summary>
         /// Plugins tagged as "jobs".
         /// </summary>
         Jobs = FirstTagBasedCategoryId + 1,
-        
+
         /// <summary>
         /// Plugins tagged as "ui".
         /// </summary>
         Ui = FirstTagBasedCategoryId + 2,
-        
+
         /// <summary>
         /// Plugins tagged as "minigames".
         /// </summary>
         MiniGames = FirstTagBasedCategoryId + 3,
-        
+
         /// <summary>
         /// Plugins tagged as "inventory".
         /// </summary>
         Inventory = FirstTagBasedCategoryId + 4,
-        
+
         /// <summary>
         /// Plugins tagged as "sound".
         /// </summary>
         Sound = FirstTagBasedCategoryId + 5,
-        
+
         /// <summary>
         /// Plugins tagged as "social".
         /// </summary>
         Social = FirstTagBasedCategoryId + 6,
-        
+
         /// <summary>
         /// Plugins tagged as "utility".
         /// </summary>
@@ -211,7 +211,7 @@ internal class PluginCategoryManager
     /// Gets the list of all known UI groups.
     /// </summary>
     public GroupInfo[] GroupList => this.groupList;
-    
+
     /// <summary>
     /// Gets or sets the current group kind.
     /// </summary>
@@ -229,12 +229,12 @@ internal class PluginCategoryManager
             }
         }
     }
-    
+
     /// <summary>
     /// Gets information about currently selected group.
     /// </summary>
     public GroupInfo CurrentGroup => this.groupList[this.currentGroupIdx];
-    
+
     /// <summary>
     /// Gets or sets the current category kind.
     /// </summary>
@@ -250,7 +250,7 @@ internal class PluginCategoryManager
             }
         }
     }
-    
+
     /// <summary>
     /// Gets information about currently selected category.
     /// </summary>
@@ -274,7 +274,7 @@ internal class PluginCategoryManager
     /// Rebuild available categories based on currently available plugins.
     /// </summary>
     /// <param name="availablePlugins">list of all available plugin manifests to install.</param>
-    public void BuildCategories(IEnumerable<PluginManifest> availablePlugins)
+    public void BuildCategories(IEnumerable<RemotePluginManifest> availablePlugins)
     {
         // rebuild map plugin name -> categoryIds
         this.mapPluginCategories.Clear();
@@ -334,7 +334,7 @@ internal class PluginCategoryManager
         {
             groupAvail.Categories.Add(this.CategoryList[categoryIdx].CategoryKind);
         }
-        
+
         // Hidden at the end
         groupAvail.Categories.Add(CategoryKind.Hidden);
 
@@ -405,7 +405,7 @@ internal class PluginCategoryManager
     public void SetCategoryHighlightsForPlugins(IEnumerable<PluginManifest> plugins)
     {
         ArgumentNullException.ThrowIfNull(plugins);
-        
+
         this.highlightedCategoryKinds.Clear();
 
         foreach (var entry in plugins)
@@ -486,7 +486,7 @@ internal class PluginCategoryManager
             /// Check if plugin testing is enabled.
             /// </summary>
             DoPluginTest,
-            
+
             /// <summary>
             /// Check if there are any hidden plugins.
             /// </summary>
@@ -565,7 +565,7 @@ internal class PluginCategoryManager
         public static string Category_AvailableForTesting => Loc.Localize("InstallerCategoryAvailableForTesting", "Testing Available");
 
         public static string Category_Hidden => Loc.Localize("InstallerCategoryHidden", "Hidden");
-        
+
         public static string Category_DevInstalled => Loc.Localize("InstallerInstalledDevPlugins", "Installed Dev Plugins");
 
         public static string Category_IconTester => "Image/Icon Tester";
@@ -579,7 +579,7 @@ internal class PluginCategoryManager
         public static string Category_DisabledPlugins => Loc.Localize("InstallerCategoryDisabledPlugins", "Disabled");
 
         public static string Category_IncompatiblePlugins => Loc.Localize("InstallerCategoryIncompatiblePlugins", "Incompatible");
-        
+
         public static string Category_Other => Loc.Localize("InstallerCategoryOther", "Other");
 
         public static string Category_Jobs => Loc.Localize("InstallerCategoryJobs", "Jobs");

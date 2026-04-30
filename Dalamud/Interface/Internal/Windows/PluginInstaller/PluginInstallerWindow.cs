@@ -108,7 +108,7 @@ internal class PluginInstallerWindow : Window, IDisposable
     private string feedbackModalBody = string.Empty;
     private string feedbackModalContact = string.Empty;
     private bool feedbackModalIncludeException = false;
-    private IPluginManifest? feedbackPlugin = null;
+    private RemotePluginManifest? feedbackPlugin = null;
     private bool feedbackIsTesting = false;
 
     private int updatePluginCount = 0;
@@ -2851,7 +2851,7 @@ internal class PluginInstallerWindow : Window, IDisposable
         if (plugin.IsTesting)
             flags |= PluginHeaderFlags.IsTesting;
 
-        if (this.DrawPluginCollapsingHeader(label, plugin, plugin.Manifest, flags, () => this.DrawInstalledPluginContextMenu(plugin, testingOptIn), index))
+        if (this.DrawPluginCollapsingHeader(label, plugin, plugin.Manifest, flags, () => this.DrawInstalledPluginContextMenu(plugin, remoteManifest, testingOptIn), index))
         {
             if (!this.WasPluginSeen(plugin.Manifest.InternalName))
                 configuration.SeenPluginInternalName.Add(plugin.Manifest.InternalName);
@@ -2880,10 +2880,11 @@ internal class PluginInstallerWindow : Window, IDisposable
             var canFeedback = !isThirdParty &&
                               !plugin.IsDev &&
                               !plugin.IsOrphaned &&
-                              (plugin.Manifest.DalamudApiLevel == PluginManager.DalamudApiLevel ||
-                               (plugin.Manifest.TestingDalamudApiLevel == PluginManager.DalamudApiLevel && hasTestingAvailable)) &&
+                              remoteManifest != null &&
+                              (remoteManifest.DalamudApiLevel == PluginManager.DalamudApiLevel ||
+                               (remoteManifest.TestingDalamudApiLevel == PluginManager.DalamudApiLevel && hasTestingAvailable)) &&
                               acceptsFeedback &&
-                              availablePluginUpdate == default;
+                              availablePluginUpdate == null;
 
             // Installed from
             if (plugin.IsDev)
@@ -2949,7 +2950,7 @@ internal class PluginInstallerWindow : Window, IDisposable
             if (canFeedback)
             {
                 ImGui.SameLine();
-                this.DrawSendFeedbackButton(plugin.Manifest, plugin.IsTesting, false);
+                this.DrawSendFeedbackButton(remoteManifest, plugin.IsTesting, false);
             }
 
             if (availablePluginUpdate != default && !plugin.IsDev)
@@ -3025,14 +3026,14 @@ internal class PluginInstallerWindow : Window, IDisposable
         ImGui.PopStyleColor(2);
     }
 
-    private unsafe void DrawInstalledPluginContextMenu(LocalPlugin plugin, PluginTestingOptIn? optIn)
+    private unsafe void DrawInstalledPluginContextMenu(LocalPlugin plugin, RemotePluginManifest? remoteManifest, PluginTestingOptIn? optIn)
     {
         var pluginManager = Service<PluginManager>.Get();
         var configuration = Service<DalamudConfiguration>.Get();
 
         if (ImGui.BeginPopupContextItem("InstalledItemContextMenu"u8))
         {
-            if (configuration.DoPluginTest)
+            if (configuration.DoPluginTest && remoteManifest != null)
             {
                 var repoManifest = this.pluginListAvailable.FirstOrDefault(x => x.InternalName == plugin.Manifest.InternalName);
                 if (repoManifest?.IsTestingExclusive == true)
@@ -3044,7 +3045,7 @@ internal class PluginInstallerWindow : Window, IDisposable
                     {
                         configuration.PluginTestingOptIns!.Remove(optIn);
 
-                        if (plugin.Manifest.TestingAssemblyVersion > repoManifest?.AssemblyVersion)
+                        if (remoteManifest.TestingAssemblyVersion > repoManifest?.AssemblyVersion)
                         {
                             this.testingWarningModalOnNextFrame = true;
                         }
@@ -3437,7 +3438,7 @@ internal class PluginInstallerWindow : Window, IDisposable
         }
     }
 
-    private void DrawSendFeedbackButton(IPluginManifest manifest, bool isTesting, bool big)
+    private void DrawSendFeedbackButton(RemotePluginManifest manifest, bool isTesting, bool big)
     {
         var clicked = big ?
                           ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Comment, Locs.FeedbackModal_Title) :

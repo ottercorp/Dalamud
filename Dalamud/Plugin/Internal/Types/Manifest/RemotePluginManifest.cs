@@ -17,9 +17,34 @@ internal record RemotePluginManifest : PluginManifest
     /// </summary>
     [JsonIgnore]
     public PluginRepository SourceRepo { get; set; } = null!;
-    
+
     /// <summary>
     /// Gets or sets the changelog to be shown when obtaining the testing version of the plugin.
     /// </summary>
     public string? TestingChangelog { get; set; }
+
+    /// <summary>
+    /// Gets or sets the assembly version of the plugin's testing variant.
+    /// </summary>
+    public Version? TestingAssemblyVersion { get; set; }
+
+    /// <summary>
+    /// Gets or sets the API level of the plugin's testing variant.
+    /// For the current API level, please see <see cref="PluginManager.DalamudApiLevel"/> for the currently used API level.
+    /// </summary>
+    public int? TestingDalamudApiLevel { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the plugin is only available for testing.
+    /// </summary>
+    public bool IsTestingExclusive { get; set; }
+
+    /// <summary>
+    /// Gets a value indicating whether this plugin is eligible for testing.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsAvailableForTesting
+        => this.TestingAssemblyVersion != null &&
+           this.TestingAssemblyVersion > this.AssemblyVersion &&
+           this.TestingDalamudApiLevel == PluginManager.DalamudApiLevel;
 }
