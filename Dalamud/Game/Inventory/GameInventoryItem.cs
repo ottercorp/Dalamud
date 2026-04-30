@@ -318,7 +318,8 @@ public unsafe struct GameInventoryItem : IEquatable<GameInventoryItem>
 
         var inventory = inventoryManager->GetInventoryContainer((InventoryType)type);
         if (inventory is null) return default;
+        if (inventory->Items is null) return default;
 
-        return new ReadOnlySpan<GameInventoryItem>(inventory->Items, (int)inventory->Size);
+        return new ReadOnlySpan<GameInventoryItem>(inventory->Items, inventory->Size);
     }
 }
