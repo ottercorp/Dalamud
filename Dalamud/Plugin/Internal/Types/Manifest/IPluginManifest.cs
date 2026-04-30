@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 
+using Dalamud.Utility;
+
 namespace Dalamud.Plugin.Internal.Types.Manifest;
 
 /// <summary>
 /// Public interface for the base plugin manifest.
 /// </summary>
+[Api16ToDo("Make internal, create copy if it really needs to be exposed or just remove")]
 public interface IPluginManifest
 {
     /// <summary>
@@ -102,4 +105,14 @@ public interface IPluginManifest
     /// Gets an URL for the plugin's icon.
     /// </summary>
     public string? IconUrl { get; }
+
+#pragma warning disable SA1600
+#pragma warning disable SA1516
+    [Api16ToDo("Remove from public API, testing plugins don't have this information in the local manifest")]
+    public Version? TestingAssemblyVersion { get; }
+    public int? TestingDalamudApiLevel { get; }
+    public bool IsTestingExclusive { get; }
+    public bool IsAvailableForTesting { get; }
+#pragma warning restore SA1516
+#pragma warning restore SA1600
 }
