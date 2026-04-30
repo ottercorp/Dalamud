@@ -3033,10 +3033,9 @@ internal class PluginInstallerWindow : Window, IDisposable
 
         if (ImGui.BeginPopupContextItem("InstalledItemContextMenu"u8))
         {
-            if (configuration.DoPluginTest && remoteManifest != null)
+            if (configuration.DoPluginTest)
             {
-                var repoManifest = this.pluginListAvailable.FirstOrDefault(x => x.InternalName == plugin.Manifest.InternalName);
-                if (repoManifest?.IsTestingExclusive == true)
+                if (remoteManifest == null || remoteManifest?.IsTestingExclusive == true)
                     ImGui.BeginDisabled();
 
                 if (ImGui.MenuItem(Locs.PluginContext_TestingOptIn, optIn != null))
@@ -3045,7 +3044,8 @@ internal class PluginInstallerWindow : Window, IDisposable
                     {
                         configuration.PluginTestingOptIns!.Remove(optIn);
 
-                        if (remoteManifest.TestingAssemblyVersion > repoManifest?.AssemblyVersion)
+                        // Warn about downgrade
+                        if (remoteManifest?.TestingAssemblyVersion > remoteManifest?.AssemblyVersion)
                         {
                             this.testingWarningModalOnNextFrame = true;
                         }
@@ -3059,7 +3059,7 @@ internal class PluginInstallerWindow : Window, IDisposable
                     _ = pluginManager.ReloadAllReposAsync();
                 }
 
-                if (repoManifest?.IsTestingExclusive == true)
+                if (remoteManifest?.IsTestingExclusive == true)
                     ImGui.EndDisabled();
             }
 
