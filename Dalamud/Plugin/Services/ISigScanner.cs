@@ -15,12 +15,6 @@ public interface ISigScanner : IDalamudService
     public bool IsCopy { get; }
 
     /// <summary>
-    /// Gets a value indicating whether the ProcessModule is 32-bit.
-    /// </summary>
-    [Obsolete("We're now only supporting 64-bit processes.")]
-    public bool Is32BitProcess { get; }
-
-    /// <summary>
     /// Gets the base address of the search area. When copied, this will be the address of the copy.
     /// </summary>
     public nint SearchBase { get; }

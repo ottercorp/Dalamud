@@ -73,7 +73,7 @@ public interface ICharacter : IGameObject
     /// Gets a byte array describing the visual appearance of this character.
     /// Indexed by <see cref="CustomizeIndex"/>.
     /// </summary>
-    public byte[] Customize { get; }
+    public Span<byte> Customize { get; }
 
     /// <summary>
     /// Gets the underlying CustomizeData struct for this character.
@@ -162,8 +162,7 @@ internal unsafe class Character : GameObject, ICharacter
     public byte Level => this.Struct->CharacterData.Level;
 
     /// <inheritdoc/>
-    [Api15ToDo("Do not allocate on each call, use the CS Span and let consumers do allocation if necessary")]
-    public byte[] Customize => this.Struct->DrawData.CustomizeData.Data.ToArray();
+    public Span<byte> Customize => this.Struct->DrawData.CustomizeData.Data;
 
     /// <inheritdoc/>
     public ICustomizeData CustomizeData => new CustomizeData((nint)(&this.Struct->DrawData.CustomizeData));

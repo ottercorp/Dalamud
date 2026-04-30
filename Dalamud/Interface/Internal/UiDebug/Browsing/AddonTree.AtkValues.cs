@@ -7,8 +7,6 @@ using Dalamud.Utility;
 
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
-using ValueType = FFXIVClientStructs.FFXIV.Component.GUI.ValueType;
-
 namespace Dalamud.Interface.Internal.UiDebug.Browsing;
 
 /// <inheritdoc cref="AddonTree"/>
@@ -64,16 +62,16 @@ public unsafe partial class AddonTree
                             {
                                 case 0:
                                     break;
-                                case ValueType.Int:
-                                case ValueType.UInt:
+                                case AtkValueType.Int:
+                                case AtkValueType.UInt:
                                 {
                                     ImGui.Text($"{atkValue->Int}");
                                     break;
                                 }
 
-                                case ValueType.ManagedString:
-                                case ValueType.String8:
-                                case ValueType.String:
+                                case AtkValueType.ManagedString:
+                                case AtkValueType.String8:
+                                case AtkValueType.String:
                                 {
                                     if (atkValue->String.Value == null)
                                     {
@@ -87,13 +85,13 @@ public unsafe partial class AddonTree
                                     break;
                                 }
 
-                                case ValueType.Bool:
+                                case AtkValueType.Bool:
                                 {
                                     ImGui.Text($"{atkValue->Byte != 0}");
                                     break;
                                 }
 
-                                case ValueType.Pointer:
+                                case AtkValueType.Pointer:
                                     ImGui.Text($"{(nint)atkValue->Pointer}");
                                     break;
 

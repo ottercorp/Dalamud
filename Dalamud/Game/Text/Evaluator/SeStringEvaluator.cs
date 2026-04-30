@@ -36,6 +36,7 @@ using Lumina.Text.Payloads;
 using Lumina.Text.ReadOnly;
 
 using AddonSheet = Lumina.Excel.Sheets.Addon;
+using CSFramework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework;
 using StatusSheet = Lumina.Excel.Sheets.Status;
 
 namespace Dalamud.Game.Text.Evaluator;
@@ -409,20 +410,17 @@ internal class SeStringEvaluator : IServiceType, ISeStringEvaluator
         return false;
     }
 
-    private bool TryResolveSwitchPlatform(in SeStringContext context, in ReadOnlySePayloadSpan payload)
+    private unsafe bool TryResolveSwitchPlatform(in SeStringContext context, in ReadOnlySePayloadSpan payload)
     {
         if (!payload.TryGetExpression(out var expr1))
             return false;
 
-        if (!expr1.TryGetInt(out var intVal))
+        if (!expr1.TryGetInt(out var intVal) || intVal <= 0)
             return false;
 
-        // Our version of the game uses IsMacClient() here and the
-        // Xbox version seems to always return 7 for the platform.
-        var platform = Util.IsWine() ? 5 : 3;
+        var platform = (int)CSFramework.Instance()->GetClientPlatform();
 
-        // The sheet is seeminly split into first 20 rows for wired controllers
-        // and the last 20 rows for wireless controllers.
+        // The sheet is seeminly split into 20 rows segments.
         var rowId = (uint)((20 * ((intVal - 1) / 20)) + (platform - 4 < 2 ? 2 : 1));
 
         if (!this.dataManager.GetExcelSheet<Platform>().TryGetRow(rowId, out var platformRow))

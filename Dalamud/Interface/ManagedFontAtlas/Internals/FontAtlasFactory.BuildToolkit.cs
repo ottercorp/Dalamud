@@ -370,10 +370,7 @@ internal sealed partial class FontAtlasFactory
                     return this.factory.AddFont(
                         this,
                         asset,
-                        fontConfig with
-                        {
-                            FontNo = 0,
-                        });
+                        fontConfig);
             }
         }
 
@@ -561,32 +558,39 @@ internal sealed partial class FontAtlasFactory
                 return;
 
             var dalamudConfiguration = Service<DalamudConfiguration>.Get();
-            // if (dalamudConfiguration.EffectiveLanguage == "ko"
-            //     || Service<DalamudIme>.GetNullable()?.EncounteredHangul is true)
-            // {
-            //     this.AddDalamudAssetFont(
-            //         DalamudAsset.NotoSansKrRegular,
-            //         fontConfig with
-            //         {
-            //             MergeFont = targetFont,
-            //             GlyphRanges = default(FluentGlyphRangeBuilder).WithLanguage("ko-kr").BuildExact(),
-            //         });
-            // }
+            var ime = Service<DalamudIme>.GetNullable();
 
-            if (Service<DalamudConfiguration>.Get().EffectiveLanguage == "tw")
+            string langTag = null;
+            // fontNo: 0 = japanese, 1 = traditional chinese, 2 = simplified chinese, 3 = korean
+            int fontNo = 0;
+
+            if (dalamudConfiguration.EffectiveLanguage == "tw")
             {
-                this.AttachWindowsDefaultFont(CultureInfo.GetCultureInfo("zh-hant"), fontConfig with
-                {
-                    GlyphRanges = default(FluentGlyphRangeBuilder).WithLanguage("zh-hant").BuildExact(),
-                });
+                langTag = "zh-hant";
+                fontNo = 1;
             }
-            else if (Service<DalamudConfiguration>.Get().EffectiveLanguage == "zh"
-                     || Service<DalamudIme>.GetNullable()?.EncounteredHan is true)
+            else if (dalamudConfiguration.EffectiveLanguage == "zh" || ime?.EncounteredHan is true)
             {
-                this.AttachWindowsDefaultFont(CultureInfo.GetCultureInfo("zh-hans"), fontConfig with
-                {
-                    GlyphRanges = default(FluentGlyphRangeBuilder).WithLanguage("zh-hans").BuildExact(),
-                });
+                langTag = "zh-hans";
+                fontNo = 2;
+            }
+            else if (dalamudConfiguration.EffectiveLanguage == "ko" || ime?.EncounteredHangul is true)
+            {
+                langTag = "ko-kr";
+                fontNo = 3;
+            }
+
+            Log.Debug($"Loading extra glyphs for language tag '{langTag}' (font no {fontNo})");
+            if (langTag != null)
+            {
+                this.AddDalamudAssetFont(
+                    DalamudAsset.NotoSansCjkRegular,
+                    fontConfig with
+                    {
+                        FontNo = fontNo,
+                        MergeFont = targetFont,
+                        GlyphRanges = default(FluentGlyphRangeBuilder).WithLanguage(langTag).BuildExact(),
+                    });
             }
         }
 

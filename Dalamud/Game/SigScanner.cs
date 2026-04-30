@@ -57,7 +57,6 @@ public class SigScanner : IDisposable, ISigScanner
     {
         this.cacheFile = cacheFile;
         this.Module = module;
-        this.Is32BitProcess = !Environment.Is64BitProcess;
         this.IsCopy = doCopy;
 
         if (this.IsCopy)
@@ -79,10 +78,6 @@ public class SigScanner : IDisposable, ISigScanner
 
     /// <inheritdoc/>
     public bool IsCopy { get; }
-
-    /// <inheritdoc/>
-    [Api15ToDo("Remove this property. In the interface too.")]
-    public bool Is32BitProcess { get; }
 
     /// <inheritdoc/>
     public nint SearchBase => this.IsCopy ? this.moduleCopyPtr : this.Module.BaseAddress;
@@ -120,8 +115,6 @@ public class SigScanner : IDisposable, ISigScanner
     /// <summary>Gets or sets a value indicating whether this instance of <see cref="SigScanner"/> is meant to be a
     /// Dalamud service.</summary>
     private protected bool IsService { get; set; }
-
-    private nint TextSectionTop => this.TextSectionBase + this.TextSectionSize;
 
     /// <summary>
     /// Scan memory for a signature.
@@ -275,7 +268,6 @@ public class SigScanner : IDisposable, ISigScanner
     /// <inheritdoc/>
     public nint ResolveRelativeAddress(nint nextInstAddr, int relOffset)
     {
-        if (this.Is32BitProcess) throw new NotSupportedException("32 bit is not supported.");
         return nextInstAddr + relOffset;
     }
 
@@ -291,21 +283,23 @@ public class SigScanner : IDisposable, ISigScanner
         }
 
         var scanRet = Scan(this.TextSectionBase, this.TextSectionSize, signature);
-
-        if (this.IsCopy)
-            scanRet = new nint(scanRet.ToInt64() - this.moduleCopyOffset);
-
         var insnByte = Marshal.ReadByte(scanRet);
+        var baseAddress = this.IsCopy ? this.moduleCopyOffset + this.Module.BaseAddress : this.Module.BaseAddress;
 
         if (insnByte == 0xE8 || insnByte == 0xE9)
         {
             scanRet = ReadJmpCallSig(scanRet);
-            var rel = scanRet - this.Module.BaseAddress;
+            var rel = scanRet - baseAddress;
             if (rel < 0 || rel >= this.TextSectionSize)
             {
                 throw new KeyNotFoundException(
                     $"Signature \"{signature}\" resolved to 0x{rel:X} which is outside .text section. Possible signature conflicts?");
             }
+        }
+
+        if (this.IsCopy)
+        {
+            scanRet = scanRet - this.moduleCopyOffset;
         }
 
         // If this is below the module, there's bound to be a problem with the sig/resolution... Let's not save it

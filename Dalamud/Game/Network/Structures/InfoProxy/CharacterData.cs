@@ -10,57 +10,6 @@ using Lumina.Excel.Sheets;
 namespace Dalamud.Game.Network.Structures.InfoProxy;
 
 /// <summary>
-/// Display group of a character. Used for friends.
-/// </summary>
-public enum DisplayGroup : sbyte
-{
-    /// <summary>
-    /// All display groups.
-    /// </summary>
-    All = -1,
-
-    /// <summary>
-    /// No display group.
-    /// </summary>
-    None,
-
-    /// <summary>
-    /// Star display group.
-    /// </summary>
-    Star,
-
-    /// <summary>
-    /// Circle display group.
-    /// </summary>
-    Circle,
-
-    /// <summary>
-    /// Triangle display group.
-    /// </summary>
-    Triangle,
-
-    /// <summary>
-    /// Diamond display group.
-    /// </summary>
-    Diamond,
-
-    /// <summary>
-    /// Heart display group.
-    /// </summary>
-    Heart,
-
-    /// <summary>
-    /// Spade display group.
-    /// </summary>
-    Spade,
-
-    /// <summary>
-    /// Club display group.
-    /// </summary>
-    Club,
-}
-
-/// <summary>
 /// Dalamud wrapper around a client structs <see cref="InfoProxyCommonList.CharacterData"/>.
 /// </summary>
 public unsafe class CharacterData

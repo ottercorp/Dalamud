@@ -38,6 +38,8 @@ public interface IFontFamilyId : IObjectWithLocalizableName
     public static List<IFontFamilyId> ListDalamudFonts() =>
         [
             new DalamudAssetFontAndFamilyId(DalamudAsset.NotoSansScMedium),
+            new DalamudAssetFontAndFamilyId(DalamudAsset.NotoSansCjkMedium),
+            new DalamudAssetFontAndFamilyId(DalamudAsset.NotoSansCjkRegular),
             new DalamudAssetFontAndFamilyId(DalamudAsset.InconsolataRegular),
             new DalamudAssetFontAndFamilyId(DalamudAsset.FontAwesomeFreeSolid),
         ];

@@ -102,7 +102,7 @@ public class StyleEditorWindow : Window
         {
             this.SaveStyle();
 
-            var newStyle = StyleModelV1.DalamudStandard;
+            var newStyle = config.SavedStyles[this.currentSel];
             newStyle.Name = Util.GetRandomName();
             config.SavedStyles.Add(newStyle);
 
