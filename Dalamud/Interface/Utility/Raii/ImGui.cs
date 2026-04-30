@@ -50,6 +50,9 @@ public static partial class ImRaii
     public static FontDisposable PushFont(ImFontPtr font, bool condition = true)
         => new FontDisposable().Push(font, condition);
 
+    public static FontDisposable DefaultFont()
+        => FontDisposable.PushDefaultFont();
+
     public static IdDisposable PushId(ImU8String id, bool enabled = true)
         => new IdDisposable().Push(id, enabled);
 
