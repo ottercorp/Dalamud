@@ -1,5 +1,8 @@
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Utility;
+
+using Lumina.Text.ReadOnly;
 
 namespace Dalamud.Game.Chat;
 
@@ -25,6 +28,16 @@ public interface IChatMessage
     /// Gets the relationship of the entity receiving the message or being targeted by the action.
     /// </summary>
     XivChatRelationKind TargetKind { get; }
+
+    /// <summary>
+    /// Gets the original sender name, before any plugin might have changed it.
+    /// </summary>
+    ReadOnlySeString OriginalSender { get; }
+
+    /// <summary>
+    /// Gets the original message, before any plugin might have changed it.
+    /// </summary>
+    ReadOnlySeString OriginalMessage { get; }
 
     /// <summary>
     /// Gets the sender name.
@@ -99,40 +112,36 @@ internal class ChatMessage : IHandleableChatMessage
     public XivChatRelationKind TargetKind { get; private set; }
 
     /// <inheritdoc />
-    public SeString Sender
+    public ReadOnlySeString OriginalSender { get; private set; }
+
+    /// <inheritdoc />
+    public ReadOnlySeString OriginalMessage { get; private set; }
+
+    /// <inheritdoc />
+    public SeString Sender { get; set; }
+
+    /// <inheritdoc />
+    public SeString Message { get; set; }
+
+    /// <inheritdoc />
+    public bool SenderModified
     {
-        get;
-        set
+        get
         {
-            var newValue = value ?? new SeString();
-
-            if (field == null || !field.Encode().SequenceEqual(newValue.Encode()))
-                this.SenderModified = true;
-
-            field = newValue;
+            var encoded = this.Sender.Encode();
+            return new ReadOnlySeStringSpan(encoded) != this.OriginalSender;
         }
     }
 
     /// <inheritdoc />
-    public SeString Message
+    public bool MessageModified
     {
-        get;
-        set
+        get
         {
-            var newValue = value ?? new SeString();
-
-            if (field == null || !field.Encode().SequenceEqual(newValue.Encode()))
-                this.MessageModified = true;
-
-            field = newValue;
+            var encoded = this.Message.Encode();
+            return new ReadOnlySeStringSpan(encoded) != this.OriginalMessage;
         }
     }
-
-    /// <inheritdoc />
-    public bool SenderModified { get; private set; }
-
-    /// <inheritdoc />
-    public bool MessageModified { get; private set; }
 
     /// <inheritdoc />
     public int Timestamp { get; private set; }
@@ -149,18 +158,18 @@ internal class ChatMessage : IHandleableChatMessage
     /// <param name="logKind">The type of chat.</param>
     /// <param name="sourceKind">The relationship of the entity sending the message or performing the action.</param>
     /// <param name="targetKind">The relationship of the entity receiving the message or being targeted by the action.</param>
-    /// <param name="lSender">The sender name.</param>
-    /// <param name="lMessage">The message sent.</param>
+    /// <param name="sender">The sender name.</param>
+    /// <param name="message">The message sent.</param>
     /// <param name="timestamp">The timestamp of when the message was sent.</param>
-    internal void SetData(XivChatType logKind, XivChatRelationKind sourceKind, XivChatRelationKind targetKind, SeString lSender, SeString lMessage, int timestamp)
+    internal void SetData(XivChatType logKind, XivChatRelationKind sourceKind, XivChatRelationKind targetKind, ReadOnlySeString sender, ReadOnlySeString message, int timestamp)
     {
         this.LogKind = logKind;
         this.SourceKind = sourceKind;
         this.TargetKind = targetKind;
-        this.Sender = lSender;
-        this.Message = lMessage;
-        this.SenderModified = false;
-        this.MessageModified = false;
+        this.OriginalSender = sender;
+        this.OriginalMessage = message;
+        this.Sender = sender.ToDalamudString();
+        this.Message = message.ToDalamudString();
         this.Timestamp = timestamp;
         this.IsHandled = false;
     }
@@ -175,8 +184,6 @@ internal class ChatMessage : IHandleableChatMessage
         this.TargetKind = 0;
         this.Sender = null;
         this.Message = null;
-        this.SenderModified = false;
-        this.MessageModified = false;
         this.Timestamp = 0;
         this.IsHandled = false;
     }
