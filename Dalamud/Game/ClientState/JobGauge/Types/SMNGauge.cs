@@ -76,13 +76,13 @@ public unsafe class SMNGauge : JobGaugeBase<SummonerGauge>
     /// Gets a value indicating whether Bahamut is ready to be summoned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsBahamutReady => !this.AetherFlags.HasFlag(AetherFlags.PhoenixReady);
+    public bool IsBahamutReady => !this.AetherFlags.HasFlag(AetherFlags.PhoenixPrimed);
 
     /// <summary>
     /// Gets a value indicating whether if Phoenix is ready to be summoned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsPhoenixReady => this.AetherFlags.HasFlag(AetherFlags.PhoenixReady);
+    public bool IsPhoenixReady => this.AetherFlags.HasFlag(AetherFlags.PhoenixPrimed);
 
     /// <summary>
     /// Gets a value indicating whether if Ifrit is ready to be summoned.
@@ -106,19 +106,19 @@ public unsafe class SMNGauge : JobGaugeBase<SummonerGauge>
     /// Gets a value indicating whether if Ifrit is currently attuned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsIfritAttuned => this.AttunementType == SummonAttunement.IfritAttuned;
+    public bool IsIfritAttuned => this.AttunementType == SummonAttunement.IfritReady;
 
     /// <summary>
     /// Gets a value indicating whether if Titan is currently attuned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsTitanAttuned => this.AttunementType == SummonAttunement.TitanAttuned;
+    public bool IsTitanAttuned => this.AttunementType == SummonAttunement.TitanReady;
 
     /// <summary>
     /// Gets a value indicating whether if Garuda is currently attuned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsGarudaAttuned => this.AttunementType == SummonAttunement.GarudaAttuned;
+    public bool IsGarudaAttuned => this.AttunementType == SummonAttunement.GarudaReady;
 
     /// <summary>
     /// Gets a value indicating whether there are any Aetherflow stacks available.
