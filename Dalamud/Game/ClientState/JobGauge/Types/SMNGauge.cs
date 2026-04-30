@@ -2,6 +2,8 @@ using Dalamud.Game.ClientState.JobGauge.Enums;
 
 using FFXIVClientStructs.FFXIV.Client.Game.Gauge;
 
+using AetherFlags = Dalamud.Game.ClientState.JobGauge.Enums.AetherFlags;
+
 namespace Dalamud.Game.ClientState.JobGauge.Types;
 
 /// <summary>
@@ -62,15 +64,13 @@ public unsafe class SMNGauge : JobGaugeBase<SummonerGauge>
 
     /// <summary>
     /// Gets the type of attunement available.
-    /// Use the summon attuned accessors instead.
     /// </summary>
     public SummonAttunement AttunementType => (SummonAttunement)this.Struct->AttunementType;
 
     /// <summary>
     /// Gets the current aether flags.
-    /// Use the summon accessors instead.
     /// </summary>
-    public AetherFlags AetherFlags => this.Struct->AetherFlags;
+    public AetherFlags AetherFlags => (AetherFlags)this.Struct->AetherFlags;
 
     /// <summary>
     /// Gets a value indicating whether Bahamut is ready to be summoned.
@@ -106,19 +106,19 @@ public unsafe class SMNGauge : JobGaugeBase<SummonerGauge>
     /// Gets a value indicating whether if Ifrit is currently attuned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsIfritAttuned => this.AttunementType == SummonAttunement.IfritReady;
+    public bool IsIfritAttuned => this.AttunementType == SummonAttunement.Ifrit;
 
     /// <summary>
     /// Gets a value indicating whether if Titan is currently attuned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsTitanAttuned => this.AttunementType == SummonAttunement.TitanReady;
+    public bool IsTitanAttuned => this.AttunementType == SummonAttunement.Titan;
 
     /// <summary>
     /// Gets a value indicating whether if Garuda is currently attuned.
     /// </summary>
     /// <returns><c>true</c> or <c>false</c>.</returns>
-    public bool IsGarudaAttuned => this.AttunementType == SummonAttunement.GarudaReady;
+    public bool IsGarudaAttuned => this.AttunementType == SummonAttunement.Garuda;
 
     /// <summary>
     /// Gets a value indicating whether there are any Aetherflow stacks available.
