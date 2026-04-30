@@ -389,7 +389,7 @@ internal sealed unsafe class ChatGui : IInternalDisposableService, IChatGui
             var sourceKind = (XivChatRelationKind)logInfo.SourceKind;
             var targetKind = (XivChatRelationKind)logInfo.TargetKind;
 
-            this.currentChatMessage.SetData(logKind, sourceKind, targetKind, sender->AsReadOnlySeString(), message->AsReadOnlySeString(), timestamp);
+            this.currentChatMessage.SetData(logKind, sourceKind, targetKind, sender, message, timestamp);
 
             // First pass
             foreach (var action in Delegate.EnumerateInvocationList(this.ChatMessage))
