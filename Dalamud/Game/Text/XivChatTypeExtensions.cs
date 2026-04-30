@@ -39,7 +39,7 @@ public static class XivChatTypeExtensions
         XivChatType.GmLinkshell7 => true,
         XivChatType.GmLinkshell8 => true,
         XivChatType.GmNoviceNetwork => true,
-        _ => false
+        _ => false,
     };
 
     /// <summary>
@@ -71,6 +71,6 @@ public static class XivChatTypeExtensions
         XivChatType.Gathering => true,
         XivChatType.FreeCompanyLoginLogout => true,
         XivChatType.PvpTeamLoginLogout => true,
-        _ => false
+        _ => false,
     };
 }

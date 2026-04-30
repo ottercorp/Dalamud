@@ -176,12 +176,12 @@ internal class LocalPlugin : IAsyncDisposable
     /// <summary>
     /// Gets a value indicating whether this plugin's API level is out of date.
     /// </summary>
-    public bool IsOutdated => this.manifest.EffectiveApiLevel < PluginManager.DalamudApiLevel;
+    public bool IsOutdated => this.manifest.DalamudApiLevel < PluginManager.DalamudApiLevel;
 
     /// <summary>
     /// Gets a value indicating whether the plugin is for testing use only.
     /// </summary>
-    public bool IsTesting => this.manifest.IsTestingExclusive || this.manifest.Testing;
+    public bool IsTesting => this.manifest.Testing;
 
     /// <summary>
     /// Gets a value indicating whether this plugin is orphaned(belongs to a repo) or not.
@@ -221,7 +221,7 @@ internal class LocalPlugin : IAsyncDisposable
     /// <summary>
     /// Gets the effective version of this plugin.
     /// </summary>
-    public Version EffectiveVersion => this.manifest.EffectiveVersion;
+    public Version EffectiveVersion => this.manifest.AssemblyVersion;
 
     /// <summary>
     /// Gets the effective working plugin ID for this plugin.
@@ -315,8 +315,8 @@ internal class LocalPlugin : IAsyncDisposable
                 throw new PluginPreconditionFailedException($"Unable to load {this.Name}, game is newer than applicable version {this.manifest.ApplicableVersion}");
 
             // We want to allow loading dev plugins with a lower API level than the current Dalamud API level, for ease of development
-            if (!pluginManager.LoadAllApiLevels && !this.IsDev && this.manifest.EffectiveApiLevel < PluginManager.DalamudApiLevel)
-                throw new PluginPreconditionFailedException($"Unable to load {this.Name}, incompatible API level {this.manifest.EffectiveApiLevel}");
+            if (!pluginManager.LoadAllApiLevels && !this.IsDev && this.manifest.DalamudApiLevel < PluginManager.DalamudApiLevel)
+                throw new PluginPreconditionFailedException($"Unable to load {this.Name}, incompatible API level {this.manifest.DalamudApiLevel}");
 
             // We might want to throw here?
             if (!this.IsWantedByAnyProfile)

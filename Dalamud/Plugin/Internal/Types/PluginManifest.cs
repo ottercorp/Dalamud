@@ -59,14 +59,6 @@ internal record PluginManifest : IPluginManifest
 
     /// <inheritdoc/>
     [JsonProperty]
-    public Version? TestingAssemblyVersion { get; init; }
-
-    /// <inheritdoc/>
-    [JsonProperty]
-    public bool IsTestingExclusive { get; init; }
-
-    /// <inheritdoc/>
-    [JsonProperty]
     public string? RepoUrl { get; init; }
 
     /// <summary>
@@ -83,10 +75,6 @@ internal record PluginManifest : IPluginManifest
     /// <inheritdoc/>
     [JsonProperty]
     public int DalamudApiLevel { get; init; } = PluginManager.DalamudApiLevel;
-
-    /// <inheritdoc/>
-    [JsonProperty]
-    public int? TestingDalamudApiLevel { get; init; }
 
     /// <inheritdoc/>
     [JsonProperty]
@@ -160,12 +148,5 @@ internal record PluginManifest : IPluginManifest
 
     /// <inheritdoc/>
     [JsonProperty("_Dip17Channel")]
-    public string? Dip17Channel { get; init; }
-
-    /// <inheritdoc/>
-    [JsonIgnore]
-    public bool IsAvailableForTesting
-        => this.TestingAssemblyVersion != null &&
-           this.TestingAssemblyVersion > this.AssemblyVersion &&
-           this.TestingDalamudApiLevel == PluginManager.DalamudApiLevel;
+    public string? Dip17Channel { get; set; }
 }
