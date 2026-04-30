@@ -313,6 +313,9 @@ public unsafe struct GameInventoryItem : IEquatable<GameInventoryItem>
     /// <returns>The span.</returns>
     internal static ReadOnlySpan<GameInventoryItem> GetReadOnlySpanOfInventory(GameInventoryType type)
     {
+        if (GameInventory.ExcludedInventoryTypes.Contains(type))
+            return default;
+
         var inventoryManager = InventoryManager.Instance();
         if (inventoryManager is null) return default;
 
