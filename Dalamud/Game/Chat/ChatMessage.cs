@@ -124,10 +124,24 @@ internal class ChatMessage : IHandleableChatMessage
     public SeString Message { get; set; }
 
     /// <inheritdoc />
-    public bool SenderModified => new ReadOnlySeString(this.Sender.Encode()) != this.OriginalSender;
+    public bool SenderModified
+    {
+        get
+        {
+            var encoded = this.Sender.Encode();
+            return new ReadOnlySeStringSpan(encoded) != this.OriginalSender;
+        }
+    }
 
     /// <inheritdoc />
-    public bool MessageModified => new ReadOnlySeString(this.Message.Encode()) != this.OriginalMessage;
+    public bool MessageModified
+    {
+        get
+        {
+            var encoded = this.Message.Encode();
+            return new ReadOnlySeStringSpan(encoded) != this.OriginalMessage;
+        }
+    }
 
     /// <inheritdoc />
     public int Timestamp { get; private set; }
