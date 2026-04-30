@@ -16,7 +16,14 @@ public static partial class ImRaii
 
         /// <summary> Push the default font if any other font is currently pushed. </summary>
         /// <returns> A disposable object that can be used to push further fonts and pops those fonts after leaving scope. Use with using. </returns>
+        [Obsolete("Use `ImRaii.DefaultFont()` instead.")]
+        // ReSharper disable once MemberHidesStaticFromOuterClass
         public static FontDisposable DefaultFont()
+            => new FontDisposable().Push(DefaultPushed, FontPushCounter > 0);
+
+        /// <summary> Push the default font if any other font is currently pushed. </summary>
+        /// <returns> A disposable object that can be used to push further fonts and pops those fonts after leaving scope. Use with using. </returns>
+        public static FontDisposable PushDefaultFont()
             => new FontDisposable().Push(DefaultPushed, FontPushCounter > 0);
 
         /// <summary> Push a font to the font stack. </summary>
