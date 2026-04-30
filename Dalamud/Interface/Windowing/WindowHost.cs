@@ -219,7 +219,7 @@ public class WindowHost
         // Determine window background alpha
         float effectiveWindowBgAlpha;
         {
-            var nextWindowData = ImGuiP.ImGuiNextWindowData();
+            ref var nextWindowData = ref ImGui.GetCurrentContext().NextWindowData;
             effectiveWindowBgAlpha = ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg].W;
             if (nextWindowData.Flags.HasFlag(ImGuiNextWindowDataFlags.HasBgAlpha))
             {
@@ -240,11 +240,6 @@ public class WindowHost
 
         if (this.CanShowCloseButton ? ImGui.Begin(this.Window.WindowName, ref isWindowOpen, flags) : ImGui.Begin(this.Window.WindowName, flags))
         {
-            if (this.Window.IsOpen != isWindowOpen)
-            {
-                this.Window.IsOpen = isWindowOpen;
-            }
-
             // Apply background blur
             {
                 var effectiveBlurFactor = this.internalBlurFactorOverride ?? internalDrawParams.DefaultBackgroundBlurStrength;
@@ -304,6 +299,11 @@ public class WindowHost
                     this.lastError = ex;
                 }
             }
+        }
+
+        if (this.Window.IsOpen != isWindowOpen)
+        {
+            this.Window.IsOpen = isWindowOpen;
         }
 
         const string additionsPopupName = "WindowSystemContextActions";

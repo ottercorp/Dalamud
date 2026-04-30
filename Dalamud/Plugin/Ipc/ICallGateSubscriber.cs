@@ -97,7 +97,7 @@ public interface ICallGateSubscriber<T1, T2, T3, T4, TRet> : ICallGateSubscriber
 }
 
 /// <inheritdoc cref="CallGatePubSubBase"/> : ICallGateSubscriber
-public interface ICallGateSubscriber<T1, T2, T3, T4, T5, TRet>
+public interface ICallGateSubscriber<T1, T2, T3, T4, T5, TRet> : ICallGateSubscriber
 {
     /// <inheritdoc cref="CallGatePubSubBase.Subscribe"/>
     public void Subscribe(Action<T1, T2, T3, T4, T5> action);
@@ -113,7 +113,7 @@ public interface ICallGateSubscriber<T1, T2, T3, T4, T5, TRet>
 }
 
 /// <inheritdoc cref="CallGatePubSubBase"/> : ICallGateSubscriber
-public interface ICallGateSubscriber<T1, T2, T3, T4, T5, T6, TRet>
+public interface ICallGateSubscriber<T1, T2, T3, T4, T5, T6, TRet> : ICallGateSubscriber
 {
     /// <inheritdoc cref="CallGatePubSubBase.Subscribe"/>
     public void Subscribe(Action<T1, T2, T3, T4, T5, T6> action);
@@ -129,7 +129,7 @@ public interface ICallGateSubscriber<T1, T2, T3, T4, T5, T6, TRet>
 }
 
 /// <inheritdoc cref="CallGatePubSubBase"/> : ICallGateSubscriber
-public interface ICallGateSubscriber<T1, T2, T3, T4, T5, T6, T7, TRet>
+public interface ICallGateSubscriber<T1, T2, T3, T4, T5, T6, T7, TRet> : ICallGateSubscriber
 {
     /// <inheritdoc cref="CallGatePubSubBase.Subscribe"/>
     public void Subscribe(Action<T1, T2, T3, T4, T5, T6, T7> action);
@@ -145,7 +145,7 @@ public interface ICallGateSubscriber<T1, T2, T3, T4, T5, T6, T7, TRet>
 }
 
 /// <inheritdoc cref="CallGatePubSubBase"/> : ICallGateSubscriber
-public interface ICallGateSubscriber<T1, T2, T3, T4, T5, T6, T7, T8, TRet>
+public interface ICallGateSubscriber<T1, T2, T3, T4, T5, T6, T7, T8, TRet> : ICallGateSubscriber
 {
     /// <inheritdoc cref="CallGatePubSubBase.Subscribe"/>
     public void Subscribe(Action<T1, T2, T3, T4, T5, T6, T7, T8> action);

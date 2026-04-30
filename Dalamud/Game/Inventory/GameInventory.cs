@@ -18,6 +18,14 @@ namespace Dalamud.Game.Inventory;
 [ServiceManager.EarlyLoadedService]
 internal class GameInventory : IInternalDisposableService
 {
+    /// <summary>
+    /// Lists excluded InventoryTypes that are not supported by this service.
+    /// </summary>
+    internal static readonly GameInventoryType[] ExcludedInventoryTypes = [
+        GameInventoryType.Cosmopouch1,
+        GameInventoryType.Cosmopouch2
+    ];
+
     private readonly List<GameInventoryPluginScoped> subscribersPendingChange = [];
     private readonly List<GameInventoryPluginScoped> subscribers = [];
 
@@ -43,7 +51,7 @@ internal class GameInventory : IInternalDisposableService
     [ServiceManager.ServiceConstructor]
     private GameInventory()
     {
-        this.inventoryTypes = Enum.GetValues<GameInventoryType>();
+        this.inventoryTypes = [.. Enum.GetValues<GameInventoryType>().Where(static type => !ExcludedInventoryTypes.Contains(type))];
         this.inventoryItems = new GameInventoryItem[this.inventoryTypes.Length][];
 
         this.gameGui.AgentUpdate += this.OnAgentUpdate;
