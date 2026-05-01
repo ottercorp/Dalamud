@@ -1477,13 +1477,13 @@ internal class PluginManager : IInternalDisposableService
             if (tempManifest.InternalName != repoManifest.InternalName)
             {
                 throw new Exception(
-                    $"Distributed internal name does not match repo internal name: {tempManifest.InternalName} - {repoManifest.InternalName}");
+                    $"Distributed internal name does not match repo internal name, distributed: {tempManifest.InternalName} repo: {repoManifest.InternalName}");
             }
 
-            if (tempManifest.AssemblyVersion != repoManifest.AssemblyVersion)
+            if (tempManifest.AssemblyVersion != version)
             {
                 throw new Exception(
-                    $"Distributed plugin version does not match repo version: {tempManifest.AssemblyVersion} - {repoManifest.AssemblyVersion}");
+                    $"Distributed plugin version does not match repo version, distributed: {tempManifest.AssemblyVersion} repo: {version}");
             }
 
             if (tempManifest.WorkingPluginId != Guid.Empty)
