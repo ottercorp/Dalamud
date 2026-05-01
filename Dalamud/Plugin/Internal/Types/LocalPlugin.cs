@@ -402,7 +402,7 @@ internal class LocalPlugin : IAsyncDisposable
 
             try
             {
-                Log.Information("Creating plugin instance for {PluginName} (async={IsAsync})", this.InternalName, this.pluginType == typeof(IAsyncDalamudPlugin));
+                Log.Information("Creating plugin instance for {PluginName} (async={IsAsync})", this.InternalName, this.pluginType!.IsAssignableTo(typeof(IAsyncDalamudPlugin)));
                 this.instance = await CreatePluginInstance(
                                     this.manifest,
                                     this.serviceScope,
