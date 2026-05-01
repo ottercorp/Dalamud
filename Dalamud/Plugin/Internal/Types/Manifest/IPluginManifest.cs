@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 
+using Dalamud.Utility;
+
 namespace Dalamud.Plugin.Internal.Types.Manifest;
 
 /// <summary>
 /// Public interface for the base plugin manifest.
 /// </summary>
+[Api16ToDo("Make internal, create copy if it really needs to be exposed or just remove")]
 public interface IPluginManifest
 {
     /// <summary>
@@ -38,11 +41,6 @@ public interface IPluginManifest
     public Version AssemblyVersion { get; }
 
     /// <summary>
-    /// Gets the assembly version of the plugin's testing variant.
-    /// </summary>
-    public Version? TestingAssemblyVersion { get; }
-
-    /// <summary>
     /// Gets the minimum Dalamud assembly version this plugin requires.
     /// </summary>
     public Version? MinimumDalamudVersion { get; }
@@ -74,12 +72,6 @@ public interface IPluginManifest
     public int DalamudApiLevel { get; }
 
     /// <summary>
-    /// Gets the API level of the plugin's testing variant.
-    /// For the current API level, please see <see cref="PluginManager.DalamudApiLevel"/> for the currently used API level.
-    /// </summary>
-    public int? TestingDalamudApiLevel { get; }
-
-    /// <summary>
     /// Gets the number of downloads this plugin has.
     /// </summary>
     public long DownloadCount { get; }
@@ -105,11 +97,6 @@ public interface IPluginManifest
     public string? FeedbackMessage { get; }
 
     /// <summary>
-    /// Gets a value indicating whether the plugin is only available for testing.
-    /// </summary>
-    public bool IsTestingExclusive { get; }
-
-    /// <summary>
     /// Gets a list of screenshot image URLs to show in the plugin installer.
     /// </summary>
     public List<string>? ImageUrls { get; }
@@ -119,8 +106,13 @@ public interface IPluginManifest
     /// </summary>
     public string? IconUrl { get; }
 
-    /// <summary>
-    /// Gets a value indicating whether this plugin is eligible for testing.
-    /// </summary>
+#pragma warning disable SA1600
+#pragma warning disable SA1516
+    [Api16ToDo("Remove from public API, testing plugins don't have this information in the local manifest")]
+    public Version? TestingAssemblyVersion { get; }
+    public int? TestingDalamudApiLevel { get; }
+    public bool IsTestingExclusive { get; }
     public bool IsAvailableForTesting { get; }
+#pragma warning restore SA1516
+#pragma warning restore SA1600
 }

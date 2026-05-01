@@ -301,9 +301,9 @@ public class WindowHost
             }
         }
 
-        if (this.Window.IsOpen != isWindowOpen)
+        if (this.Window.IsOpen && !isWindowOpen)
         {
-            this.Window.IsOpen = isWindowOpen;
+            this.Window.IsOpen = false;
         }
 
         const string additionsPopupName = "WindowSystemContextActions";

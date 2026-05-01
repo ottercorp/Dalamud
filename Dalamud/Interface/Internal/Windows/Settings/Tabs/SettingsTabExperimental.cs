@@ -30,7 +30,11 @@ internal sealed class SettingsTabExperimental : SettingsTab
             LazyLoc.Localize("DalamudSettingsPluginTest", "Get plugin testing builds"),
             LazyLoc.Localize("DalamudSettingsPluginTestHint", "Receive testing prereleases for selected plugins.\nTo opt-in to testing builds for a plugin, you have to right click it in the \"Installed Plugins\" tab of the plugin installer and select \"Receive plugin testing versions\"."),
             c => c.DoPluginTest,
-            (v, c) => c.DoPluginTest = v),
+            (v, c) =>
+            {
+                c.DoPluginTest = v;
+                _ = Service<PluginManager>.Get().ReloadAllReposAsync();
+            }),
         new HintSettingsEntry(
             LazyLoc.Localize("DalamudSettingsPluginTestWarning", "Testing plugins may contain bugs or crash your game. Please only enable this if you are aware of the risks."),
             ImGuiColors.AttentionForeground),

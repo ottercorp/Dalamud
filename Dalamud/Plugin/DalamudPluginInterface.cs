@@ -81,6 +81,14 @@ internal sealed class DalamudPluginInterface : IDalamudPluginInterface, IDisposa
 
         localization.LocalizationChanged += this.OnLocalizationChanged;
         configuration.DalamudConfigurationSaved += this.OnDalamudConfigurationSaved;
+
+        // Clone manifest, fixup testing fields we moved
+        // API16: Remove
+        var copiedManifest = ((PluginManifest)plugin.Manifest).Copy();
+        copiedManifest.TestingAssemblyVersion = copiedManifest.AssemblyVersion;
+        copiedManifest.TestingDalamudApiLevel = copiedManifest.DalamudApiLevel;
+        copiedManifest.IsTestingExclusive = false; // No way to know
+        this.Manifest = copiedManifest;
     }
 
     /// <inheritdoc/>
@@ -102,7 +110,7 @@ internal sealed class DalamudPluginInterface : IDalamudPluginInterface, IDisposa
     public string InternalName => this.plugin.InternalName;
 
     /// <inheritdoc/>
-    public IPluginManifest Manifest => this.plugin.Manifest;
+    public IPluginManifest Manifest { get; }
 
     /// <inheritdoc/>
     public bool IsDev => this.plugin.IsDev;
