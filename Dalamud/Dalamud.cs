@@ -81,7 +81,7 @@ internal sealed unsafe class Dalamud : IServiceType
 
         using (Timings.Start("HookVerifier Init"))
         {
-            HookVerifier.Initialize(scanner);
+            HookVerifier.Initialize();
         }
 
         void KickoffGameThread()
