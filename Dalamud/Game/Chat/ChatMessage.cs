@@ -2,6 +2,9 @@ using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Utility;
 
+using FFXIVClientStructs.FFXIV.Client.System.String;
+using FFXIVClientStructs.Interop;
+
 using Lumina.Text.ReadOnly;
 
 namespace Dalamud.Game.Chat;
@@ -100,8 +103,15 @@ public interface IHandleableChatMessage : IMutableChatMessage
 /// <summary>
 /// This struct represents an intercepted chat message.
 /// </summary>
-internal class ChatMessage : IHandleableChatMessage
+internal unsafe class ChatMessage : IHandleableChatMessage
 {
+    private Utf8String* senderPointer;
+    private Utf8String* messagePointer;
+    private ReadOnlySeString? cachedOriginalSender;
+    private ReadOnlySeString? cachedOriginalMessage;
+    private SeString? cachedSender;
+    private SeString? cachedMessage;
+
     /// <inheritdoc />
     public XivChatType LogKind { get; private set; }
 
@@ -112,25 +122,41 @@ internal class ChatMessage : IHandleableChatMessage
     public XivChatRelationKind TargetKind { get; private set; }
 
     /// <inheritdoc />
-    public ReadOnlySeString OriginalSender { get; private set; }
+    public ReadOnlySeString OriginalSender => this.cachedOriginalSender ??= this.senderPointer->AsReadOnlySeString();
 
     /// <inheritdoc />
-    public ReadOnlySeString OriginalMessage { get; private set; }
+    public ReadOnlySeString OriginalMessage => this.cachedOriginalMessage ??= this.messagePointer->AsReadOnlySeString();
 
     /// <inheritdoc />
-    public SeString Sender { get; set; }
+    public SeString Sender
+    {
+        get => this.cachedSender ??= this.senderPointer != null ? this.senderPointer->AsDalamudSeString() : new SeString();
+        set => this.cachedSender = value;
+    }
 
     /// <inheritdoc />
-    public SeString Message { get; set; }
+    public SeString Message
+    {
+        get => this.cachedMessage ??= this.messagePointer != null ? this.messagePointer->AsDalamudSeString() : new SeString();
+        set => this.cachedMessage = value;
+    }
 
     /// <inheritdoc />
     public bool SenderModified
     {
         get
         {
-            var encoded = this.Sender.Encode();
-            return new ReadOnlySeStringSpan(encoded) != this.OriginalSender;
+            if (this.cachedSender == null)
+                return false;
+
+            if (!field)
+            {
+                var encoded = this.Sender.Encode();
+                field = new ReadOnlySeStringSpan(encoded) != this.senderPointer->AsReadOnlySeStringSpan();
+            }
+            return field;
         }
+        private set;
     }
 
     /// <inheritdoc />
@@ -138,9 +164,17 @@ internal class ChatMessage : IHandleableChatMessage
     {
         get
         {
-            var encoded = this.Message.Encode();
-            return new ReadOnlySeStringSpan(encoded) != this.OriginalMessage;
+            if (this.cachedMessage == null)
+                return false;
+
+            if (!field)
+            {
+                var encoded = this.Message.Encode();
+                return new ReadOnlySeStringSpan(encoded) != this.messagePointer->AsReadOnlySeStringSpan();
+            }
+            return field;
         }
+        private set;
     }
 
     /// <inheritdoc />
@@ -161,15 +195,18 @@ internal class ChatMessage : IHandleableChatMessage
     /// <param name="sender">The sender name.</param>
     /// <param name="message">The message sent.</param>
     /// <param name="timestamp">The timestamp of when the message was sent.</param>
-    internal void SetData(XivChatType logKind, XivChatRelationKind sourceKind, XivChatRelationKind targetKind, ReadOnlySeString sender, ReadOnlySeString message, int timestamp)
+    internal void SetData(XivChatType logKind, XivChatRelationKind sourceKind, XivChatRelationKind targetKind, Utf8String* sender, Utf8String* message, int timestamp)
     {
+        this.senderPointer = sender;
+        this.messagePointer = message;
+        this.cachedOriginalSender = null;
+        this.cachedOriginalMessage = null;
+        this.cachedSender = null;
+        this.cachedMessage = null;
+
         this.LogKind = logKind;
         this.SourceKind = sourceKind;
         this.TargetKind = targetKind;
-        this.OriginalSender = sender;
-        this.OriginalMessage = message;
-        this.Sender = sender.ToDalamudString();
-        this.Message = message.ToDalamudString();
         this.Timestamp = timestamp;
         this.IsHandled = false;
     }
@@ -179,11 +216,16 @@ internal class ChatMessage : IHandleableChatMessage
     /// </summary>
     internal void Clear()
     {
+        this.senderPointer = null;
+        this.messagePointer = null;
+        this.cachedOriginalSender = null;
+        this.cachedOriginalMessage = null;
+        this.cachedSender = null;
+        this.cachedMessage = null;
+
         this.LogKind = 0;
         this.SourceKind = 0;
         this.TargetKind = 0;
-        this.Sender = null;
-        this.Message = null;
         this.Timestamp = 0;
         this.IsHandled = false;
     }
