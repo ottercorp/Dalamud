@@ -33,6 +33,8 @@ HANDLE g_crashhandler_pipe_write = nullptr;
 
 wchar_t g_external_event_info[16384] = L"";
 
+LPVOID g_managed_stracktrace_fun = nullptr;
+
 std::recursive_mutex g_exception_handler_mutex;
 
 std::chrono::time_point<std::chrono::system_clock> g_time_start;
@@ -201,17 +203,9 @@ LONG exception_handler(EXCEPTION_POINTERS* ex)
     {
         stackTrace = L"(no CLR stack trace available)";
     }
-    else if (void* fn; const auto err = static_cast<DWORD>(g_clr->get_function_pointer(
-        L"Dalamud.EntryPoint, Dalamud",
-        L"VehCallback",
-        L"Dalamud.EntryPoint+VehDelegate, Dalamud",
-        nullptr, nullptr, &fn)))
+    else if (g_managed_stracktrace_fun)
     {
-        stackTrace = std::format(L"Failed to read stack trace: 0x{:08x}", err);
-    }
-    else
-    {
-        stackTrace = static_cast<wchar_t*(*)()>(fn)();
+        stackTrace = static_cast<wchar_t*(*)()>(g_managed_stracktrace_fun)();
         // Don't free it, as the program's going to be quit anyway
     }
 
@@ -453,6 +447,11 @@ void veh::raise_external_event(const std::wstring& info)
     const auto info_size = std::min(info.size(), std::size(g_external_event_info) - 1);
     wcsncpy_s(g_external_event_info, info.c_str(), info_size);
     RaiseException(CUSTOM_EXCEPTION_EXTERNAL_EVENT, 0, 0, nullptr);
+}
+
+void veh::set_managed_stacktrace_fun(LPVOID fun)
+{
+    g_managed_stracktrace_fun = fun;
 }
 
 extern "C" __declspec(dllexport) void BootVehRaiseExternalEventW(LPCWSTR info)
