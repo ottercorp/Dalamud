@@ -44,16 +44,13 @@ internal unsafe class UnlockState : IInternalDisposableService, IUnlockState
     private readonly GameGui gameGui = Service<GameGui>.Get();
 
     [ServiceManager.ServiceDependency]
-    private readonly TargetSigScanner sigScanner = Service<TargetSigScanner>.Get();
-
-    [ServiceManager.ServiceDependency]
     private readonly RecipeData recipeData = Service<RecipeData>.Get();
 
     private readonly ConcurrentDictionary<Type, HashSet<uint>> cachedUnlockedRowIds = [];
     private readonly Hook<CSAchievement.Delegates.SetAchievementCompleted> setAchievementCompletedHook;
     private readonly Hook<TitleList.Delegates.SetTitleUnlocked> setTitleUnlockedHook;
-    private readonly Hook<SetOrnamentUnlockedDelegate> setOrnamentUnlockedHook;
-    private readonly Hook<SetGlassesStyleUnlockedDelegate> setGlassesStyleUnlockedHook;
+    private readonly Hook<CSPlayerState.Delegates.SetOrnamentUnlocked> setOrnamentUnlockedHook;
+    private readonly Hook<CSPlayerState.Delegates.SetGlassesStyleUnlocked> setGlassesStyleUnlockedHook;
 
     [ServiceManager.ServiceConstructor]
     private UnlockState()
@@ -70,14 +67,12 @@ internal unsafe class UnlockState : IInternalDisposableService, IUnlockState
             (nint)TitleList.MemberFunctionPointers.SetTitleUnlocked,
             this.SetTitleUnlockedDetour);
 
-        // TODO: replace with PlayerState.SetOrnamentUnlocked
-        this.setOrnamentUnlockedHook = Hook<SetOrnamentUnlockedDelegate>.FromAddress(
-            this.sigScanner.ScanText("48 89 5C 24 ?? 57 48 83 EC ?? 8B DA 41 0F B6 F8 C1 EA"),
+        this.setOrnamentUnlockedHook = Hook<CSPlayerState.Delegates.SetOrnamentUnlocked>.FromAddress(
+            (nint)CSPlayerState.MemberFunctionPointers.SetOrnamentUnlocked,
             this.SetOrnamentUnlockedDetour);
 
-        // TODO: replace with PlayerState.SetGlassesStyleUnlocked
-        this.setGlassesStyleUnlockedHook = Hook<SetGlassesStyleUnlockedDelegate>.FromAddress(
-            this.sigScanner.ScanText("48 89 5C 24 ?? 57 48 83 EC ?? 0F BF DA 41 0F B6 F8"),
+        this.setGlassesStyleUnlockedHook = Hook<CSPlayerState.Delegates.SetGlassesStyleUnlocked>.FromAddress(
+            (nint)CSPlayerState.MemberFunctionPointers.SetGlassesStyleUnlocked,
             this.SetGlassesStyleUnlockedDetour);
 
         this.setAchievementCompletedHook.Enable();
@@ -85,10 +80,6 @@ internal unsafe class UnlockState : IInternalDisposableService, IUnlockState
         this.setOrnamentUnlockedHook.Enable();
         this.setGlassesStyleUnlockedHook.Enable();
     }
-
-    private delegate void SetOrnamentUnlockedDelegate(CSPlayerState* thisPtr, uint ornamentId, byte isUnlocked);
-
-    private delegate void SetGlassesStyleUnlockedDelegate(CSPlayerState* thisPtr, ushort glassesStyleId, byte isUnlocked);
 
     /// <inheritdoc/>
     public event IUnlockState.UnlockDelegate Unlock;
@@ -747,21 +738,21 @@ internal unsafe class UnlockState : IInternalDisposableService, IUnlockState
         this.RaiseUnlockSafely((RowRef)LuminaUtils.CreateRef<Title>(id));
     }
 
-    private void SetOrnamentUnlockedDetour(CSPlayerState* thisPtr, uint ornamentId, byte isUnlocked)
+    private void SetOrnamentUnlockedDetour(CSPlayerState* thisPtr, uint ornamentId, bool isUnlocked)
     {
         this.setOrnamentUnlockedHook.Original(thisPtr, ornamentId, isUnlocked);
 
-        if (isUnlocked == 0 || !this.IsLoaded)
+        if (!isUnlocked || !this.IsLoaded)
             return;
 
         this.RaiseUnlockSafely((RowRef)LuminaUtils.CreateRef<Ornament>(ornamentId));
     }
 
-    private void SetGlassesStyleUnlockedDetour(CSPlayerState* thisPtr, ushort glassesStyleId, byte isUnlocked)
+    private void SetGlassesStyleUnlockedDetour(CSPlayerState* thisPtr, ushort glassesStyleId, bool isUnlocked)
     {
         this.setGlassesStyleUnlockedHook.Original(thisPtr, glassesStyleId, isUnlocked);
 
-        if (isUnlocked == 0 || !this.IsLoaded)
+        if (!isUnlocked || !this.IsLoaded)
             return;
 
         this.RaiseUnlockSafely((RowRef)LuminaUtils.CreateRef<GlassesStyle>(glassesStyleId));
