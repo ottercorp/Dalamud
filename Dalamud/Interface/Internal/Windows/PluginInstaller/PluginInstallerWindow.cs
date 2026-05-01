@@ -3035,8 +3035,8 @@ internal class PluginInstallerWindow : Window, IDisposable
         {
             if (configuration.DoPluginTest)
             {
-                if (remoteManifest == null || remoteManifest?.IsTestingExclusive == true)
-                    ImGui.BeginDisabled();
+                using var disabled =
+                    ImRaii.Disabled(remoteManifest == null || remoteManifest?.IsTestingExclusive == true);
 
                 if (ImGui.MenuItem(Locs.PluginContext_TestingOptIn, optIn != null))
                 {
@@ -3058,9 +3058,6 @@ internal class PluginInstallerWindow : Window, IDisposable
                     configuration.QueueSave();
                     _ = pluginManager.ReloadAllReposAsync();
                 }
-
-                if (remoteManifest?.IsTestingExclusive == true)
-                    ImGui.EndDisabled();
             }
 
             if (ImGui.MenuItem(Locs.PluginContext_DeletePluginConfigReload))
