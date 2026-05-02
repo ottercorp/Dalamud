@@ -1,17 +1,15 @@
 using System.Collections.Frozen;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
-using Dalamud.Game;
 using Dalamud.Logging.Internal;
 
 using FFXIVClientStructs.FFXIV.Application.Network;
-
 using InteropGenerator.Runtime;
 using InteropGenerator.Runtime.Attributes;
 
@@ -27,7 +25,7 @@ internal static partial class HookVerifier
     private static readonly ModuleLog Log = new("HookVerifier");
 
     /// <summary>
-    /// Hook verification targets that doesn't exist in ClientStructs.
+    /// Hook verification targets that don't exist in ClientStructs.
     /// </summary>
     private static readonly VerificationEntry[] ToVerify = [];
 
@@ -38,76 +36,118 @@ internal static partial class HookVerifier
     /// <summary>
     /// Initializes a new instance of the <see cref="HookVerifier"/> class.
     /// </summary>
-    /// <param name="scanner">Process to scan in.</param>
-    public static unsafe void Initialize(TargetSigScanner scanner)
+    public static void Initialize()
     {
         var csAssembly = Assembly.GetAssembly(typeof(ZoneClient))!;
         var csTypes = csAssembly.GetTypes();
 
         var verifyContainer = new List<VerificationEntry>(1024);
 
-        foreach (var csType in csTypes)
-        {
-            var methods = csType.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public);
-            var fullName = ClientStructsNamespaceTrim().Replace(csType.FullName!, string.Empty).Replace(".", "::");
-
-            foreach (var method in methods)
+        Parallel.ForEach(
+            csTypes,
+            csType =>
             {
-                if (method.GetCustomAttribute<ObsoleteAttribute>() is { }) continue;
-                var name = fullName + "." + method.Name;
-                if (method.GetCustomAttribute<MemberFunctionAttribute>() is { } memberFunctionAttribute)
+                var methods = csType.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public);
+                if (methods.Length == 0)
+                    return;
+
+                var fullName = ClientStructsNamespaceTrim().Replace(csType.FullName!, string.Empty).Replace(".", "::");
+
+                Type? addressesType = null;
+                Type? delegateType = null;
+                foreach (var method in methods)
                 {
-                    var delegateType = csAssembly.GetType(csType.FullName + "+Delegates");
-                    if (delegateType != null && !method.IsStatic)
+                    if (Attribute.IsDefined(method, typeof(ObsoleteAttribute))) continue;
+
+                    if (!Attribute.IsDefined(method, typeof(MemberFunctionAttribute)) &&
+                        !Attribute.IsDefined(method, typeof(StaticAddressAttribute)))
+                        continue;
+
+                    addressesType ??= csAssembly.GetType(csType.FullName + "+Addresses");
+
+                    if (addressesType == null)
                     {
-                        var delegateMember = delegateType.GetMember(method.Name);
-                        if (delegateMember.Length != 0)
+                        Log.Warning(
+                            "Could not find Addresses type for {Type}, skipping verification for all members",
+                            csType.FullName);
+                        continue;
+                    }
+
+                    var address = addressesType.GetField(method.Name, BindingFlags.Static | BindingFlags.Public)
+                                               ?.GetValue(null);
+                    if (address is not Address addressValue)
+                    {
+                        Log.Warning(
+                            "Could not find address for {Type}.{Member}, skipping verification",
+                            csType.FullName,
+                            method.Name);
+                        continue;
+                    }
+
+                    var name = fullName + "." + method.Name;
+                    if (method.GetCustomAttribute<MemberFunctionAttribute>() is { } memberFunctionAttribute)
+                    {
+                        if (!method.IsStatic)
                         {
-                            verifyContainer.Add(new VerificationEntry(name, memberFunctionAttribute.Signature, memberFunctionAttribute.RelativeFollowOffsets, (Type)delegateMember[0]));
+                            delegateType ??= csAssembly.GetType(csType.FullName + "+Delegates");
+                            if (delegateType == null)
+                            {
+                                Log.Warning(
+                                    "Could not find delegate type for {Type}.{Member}, skipping verification",
+                                    csType.FullName,
+                                    method.Name);
+                                continue;
+                            }
+
+                            var delegateMember = delegateType.GetMember(method.Name);
+                            if (delegateMember.Length != 0)
+                            {
+                                verifyContainer.Add(
+                                    new VerificationEntry(
+                                        name,
+                                        memberFunctionAttribute.Signature,
+                                        addressValue.Value,
+                                        (Type)delegateMember[0]));
+                            }
+                            else
+                            {
+                                verifyContainer.Add(
+                                    new VerificationEntry(
+                                        name,
+                                        memberFunctionAttribute.Signature,
+                                        addressValue.Value,
+                                        Parameters: method.GetParameters(),
+                                        ReturnType: method.ReturnType));
+                            }
                         }
                         else
                         {
-                            verifyContainer.Add(new VerificationEntry(name, memberFunctionAttribute.Signature, memberFunctionAttribute.RelativeFollowOffsets, Parameters: method.GetParameters(), ReturnType: method.ReturnType));
+                            verifyContainer.Add(
+                                new VerificationEntry(
+                                    name,
+                                    memberFunctionAttribute.Signature,
+                                    addressValue.Value,
+                                    Parameters: method.GetParameters(),
+                                    ReturnType: method.ReturnType));
                         }
                     }
-                    else
+                    else if (method.GetCustomAttribute<StaticAddressAttribute>() is { } staticAddressAttribute)
                     {
-                        verifyContainer.Add(new VerificationEntry(name, memberFunctionAttribute.Signature, memberFunctionAttribute.RelativeFollowOffsets, Parameters: method.GetParameters(), ReturnType: method.ReturnType));
+                        verifyContainer.Add(
+                            new VerificationEntry(
+                                name,
+                                staticAddressAttribute.Signature,
+                                addressValue.Value,
+                                Parameters: method.GetParameters(),
+                                ReturnType: method.ReturnType));
                     }
                 }
-                else if (method.GetCustomAttribute<StaticAddressAttribute>() is { } staticAddressAttribute)
-                {
-                    verifyContainer.Add(new VerificationEntry(name, staticAddressAttribute.Signature, staticAddressAttribute.RelativeFollowOffsets, Parameters: method.GetParameters(), ReturnType: method.ReturnType));
-                }
-            }
-        }
+            });
 
         verifyContainer.AddRange(ToVerify);
 
-        var module = Process.GetCurrentProcess().MainModule!;
-
-        var targetSpan = new Span<byte>((void*)module.BaseAddress, module.ModuleMemorySize);
-
-        foreach (var entry in verifyContainer)
-        {
-            if (!scanner.TryScanText(entry.Signature, out var address))
-            {
-                Log.Error("Could not resolve signature for hook {Name} ({Sig})", entry.Name, entry.Signature);
-                continue;
-            }
-
-            var outLocation = (int)(address - module.BaseAddress);
-
-            foreach (var relOffset in entry.RelativeFollowOffsets)
-            {
-                var relativeOffset = BitConverter.ToInt32(targetSpan.Slice(outLocation + relOffset, 4));
-                outLocation = outLocation + relOffset + 4 + relativeOffset;
-            }
-
-            entry.Address = module.BaseAddress + outLocation;
-        }
-
         allToVerify = verifyContainer.GroupBy(v => v.Address).ToFrozenDictionary(v => v.Key, v => v.ToArray());
+        Log.Verbose("Initialized HookVerifier with {Count} entries to verify", allToVerify.Sum(kv => kv.Value.Length));
 
         verifyContainer.Clear();
     }
@@ -195,7 +235,7 @@ internal static partial class HookVerifier
                     HookVerificationException.GetSignature(entry.TargetDelegateType) :
                     $"{entry.ReturnType!.Name} ({string.Join(", ", entry.Parameters!.Select(p => p.ParameterType.Name))})";
 
-                exceptions = [HookVerificationException.Create(address, passedType, enforcedDelegate, entry.Message, entry.Name, failContext, hookCaller), .. exceptions];
+                exceptions = [HookVerificationException.Create(address, passedType, enforcedDelegate, entry.Message, entry.Name, entry.Signature, failContext, hookCaller), .. exceptions];
                 ret = false;
             }
         }
@@ -244,8 +284,12 @@ internal static partial class HookVerifier
     private static bool IsStruct(Type type)
         => type != typeof(decimal) && type is { IsValueType: true, IsPrimitive: false, IsEnum: false };
 
-    private record VerificationEntry(string Name, string Signature, ushort[] RelativeFollowOffsets, Type? TargetDelegateType = null, ParameterInfo[]? Parameters = null, Type? ReturnType = null, string Message = "Failed match against expected documentation.")
-    {
-        public nint Address { get; set; }
-    }
+    private record VerificationEntry(
+        string Name,
+        string Signature,
+        nint Address,
+        Type? TargetDelegateType = null,
+        ParameterInfo[]? Parameters = null,
+        Type? ReturnType = null,
+        string Message = "Failed match against expected documentation.");
 }

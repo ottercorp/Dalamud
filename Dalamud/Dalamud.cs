@@ -79,9 +79,11 @@ internal sealed unsafe class Dalamud : IServiceType
         // Set up FFXIVClientStructs
         this.SetupClientStructsResolver(cacheDir);
 
-        using (Timings.Start("HookVerifier Init"))
+        // Set up hook verification if we have any dev plugins. It takes a little while at the moment
+        if (configuration.DevPluginLoadLocations.Count > 0)
         {
-            HookVerifier.Initialize(scanner);
+            using var t = Timings.Start("HookVerifier Init");
+            HookVerifier.Initialize();
         }
 
         void KickoffGameThread()
