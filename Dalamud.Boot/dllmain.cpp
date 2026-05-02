@@ -314,7 +314,7 @@ HRESULT WINAPI InitializeImpl(LPVOID lpParam, HANDLE hMainThreadContinue) {
     if (FAILED(result))
         return result;
 
-    using custom_component_entry_point_fn = void (CORECLR_DELEGATE_CALLTYPE*)(LPVOID, HANDLE);
+    using custom_component_entry_point_fn = LPVOID (CORECLR_DELEGATE_CALLTYPE*)(LPVOID, HANDLE);
     const auto entrypoint_fn = reinterpret_cast<custom_component_entry_point_fn>(entrypoint_vfn);
 
     // ============================== VEH ======================================== //
@@ -385,8 +385,9 @@ HRESULT WINAPI InitializeImpl(LPVOID lpParam, HANDLE hMainThreadContinue) {
     // utils::wait_for_game_window();
 
     logging::I("Initializing Dalamud...");
-    entrypoint_fn(lpParam, hMainThreadContinue);
-    logging::I("Done!");
+    const LPVOID managed_stacktrace_fun = entrypoint_fn(lpParam, hMainThreadContinue);
+    veh::set_managed_stacktrace_fun(managed_stacktrace_fun);
+    logging::I("Done! (managed_stacktrace_fun={})", managed_stacktrace_fun);
 
     return S_OK;
 }

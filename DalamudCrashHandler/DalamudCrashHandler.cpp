@@ -1060,7 +1060,12 @@ int main() {
             log << std::format(L"GPU Desc: {}", adapterDescription.Description) << std::endl;
         }
 
-        log << L"\n" << stackTrace << std::endl;
+        if (!stackTrace.empty())
+        {
+            log << L"\nManaged Call Stack\n{";
+            log << L"\n" << stackTrace << std::endl;
+            log << L"\n}\n";
+        }
 
         if (pProgressDialog)
             pProgressDialog->SetLine(3, L"Refreshing Module List", FALSE, NULL);
