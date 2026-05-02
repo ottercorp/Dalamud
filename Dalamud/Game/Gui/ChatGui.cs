@@ -601,6 +601,7 @@ internal class ChatGuiPluginScoped : IInternalDisposableService, IChatGui
     {
         this.plugin = plugin;
         this.chatGuiService.ChatMessage += this.OnMessageForward;
+        this.chatGuiService.CheckMessageHandled += this.OnCheckMessageHandledForward;
         this.chatGuiService.ChatMessageHandled += this.OnMessageHandledForward;
         this.chatGuiService.ChatMessageUnhandled += this.OnMessageUnhandledForward;
         this.chatGuiService.LogMessage += this.OnLogMessageForward;

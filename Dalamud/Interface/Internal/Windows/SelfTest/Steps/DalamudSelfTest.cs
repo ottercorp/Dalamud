@@ -16,6 +16,7 @@ internal class DalamudSelfTest : IServiceType
             new LoginEventSelfTestStep(),
             new WaitFramesSelfTestStep(1000),
             new FrameworkTaskSchedulerSelfTestStep(),
+            new HookVerifierSelfTestStep(),
             new EnterTerritorySelfTestStep(148, "Central Shroud"),
             new ItemPayloadSelfTestStep(),
             new ContextMenuSelfTestStep(),

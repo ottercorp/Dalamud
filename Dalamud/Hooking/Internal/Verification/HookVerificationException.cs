@@ -23,10 +23,11 @@ public class HookVerificationException : Exception
     /// <param name="enforced">The delegate we think is correct.</param>
     /// <param name="message">Additional context to show to the user.</param>
     /// <param name="name">The name of enforced hook location.</param>
+    /// <param name="canonicalSig">The canonical signature of the function being hooked.</param>
     /// <param name="failContext">The exact check that failed for hook verification.</param>
     /// <param name="hookCaller">The caller that is trying to create the hook.</param>
     /// <returns>The created exception.</returns>
-    internal static HookVerificationException Create(IntPtr address, Type passed, string enforced, string message, string name, string failContext, Assembly hookCaller)
+    internal static HookVerificationException Create(IntPtr address, Type passed, string enforced, string message, string name, string canonicalSig, string failContext, Assembly hookCaller)
     {
         var mainModule = Process.GetCurrentProcess().MainModule!;
 
@@ -38,6 +39,7 @@ public class HookVerificationException : Exception
             $"Fail Context:         {failContext}\n" +
             $"Passed Delegate:      {GetSignature(passed)}\n" +
             $"Correct Delegate:     {enforced}\n\n" +
+            $"Canonical Sig:        {canonicalSig}\n\n" +
             "The hook delegate must exactly match the provided signature to prevent memory corruption and wrong data passed to originals.");
     }
 
