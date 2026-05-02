@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 using Dalamud.Logging.Internal;
 
@@ -42,78 +43,111 @@ internal static partial class HookVerifier
 
         var verifyContainer = new List<VerificationEntry>(1024);
 
-        foreach (var csType in csTypes)
-        {
-            var methods = csType.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public);
-            if (methods.Length == 0)
-                continue;
-
-            var fullName = ClientStructsNamespaceTrim().Replace(csType.FullName!, string.Empty).Replace(".", "::");
-
-            Type? addressesType = null;
-            Type? delegateType = null;
-            foreach (var method in methods)
+        Parallel.ForEach(
+            csTypes,
+            csType =>
             {
-                if (method.GetCustomAttribute<ObsoleteAttribute>() is { }) continue;
+                var methods = csType.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public);
+                if (methods.Length == 0)
+                    return;
 
-                var memberFunctionAttribute = method.GetCustomAttribute<MemberFunctionAttribute>();
-                var staticAddressAttribute = method.GetCustomAttribute<StaticAddressAttribute>();
+                var fullName = ClientStructsNamespaceTrim().Replace(csType.FullName!, string.Empty).Replace(".", "::");
 
-                if (memberFunctionAttribute == null && staticAddressAttribute == null)
-                    continue;
-
-                addressesType ??= csAssembly.GetType(csType.FullName + "+Addresses");
-
-                if (addressesType == null)
+                Type? addressesType = null;
+                Type? delegateType = null;
+                foreach (var method in methods)
                 {
-                    Log.Warning("Could not find Addresses type for {Type}, skipping verification for all members", csType.FullName);
-                    continue;
-                }
+                    if (Attribute.IsDefined(method, typeof(ObsoleteAttribute))) continue;
 
-                var address = addressesType.GetField(method.Name, BindingFlags.Static | BindingFlags.Public)?.GetValue(null);
-                if (address is not Address addressValue)
-                {
-                    Log.Warning("Could not find address for {Type}.{Member}, skipping verification", csType.FullName, method.Name);
-                    continue;
-                }
+                    if (!Attribute.IsDefined(method, typeof(MemberFunctionAttribute)) &&
+                        !Attribute.IsDefined(method, typeof(StaticAddressAttribute)))
+                        continue;
 
-                var name = fullName + "." + method.Name;
-                if (memberFunctionAttribute != null)
-                {
-                    if (!method.IsStatic)
+                    addressesType ??= csAssembly.GetType(csType.FullName + "+Addresses");
+
+                    if (addressesType == null)
                     {
-                        delegateType ??= csAssembly.GetType(csType.FullName + "+Delegates");
-                        if (delegateType == null)
-                        {
-                            Log.Warning("Could not find delegate type for {Type}.{Member}, skipping verification", csType.FullName, method.Name);
-                            continue;
-                        }
+                        Log.Warning(
+                            "Could not find Addresses type for {Type}, skipping verification for all members",
+                            csType.FullName);
+                        continue;
+                    }
 
-                        var delegateMember = delegateType.GetMember(method.Name);
-                        if (delegateMember.Length != 0)
+                    var address = addressesType.GetField(method.Name, BindingFlags.Static | BindingFlags.Public)
+                                               ?.GetValue(null);
+                    if (address is not Address addressValue)
+                    {
+                        Log.Warning(
+                            "Could not find address for {Type}.{Member}, skipping verification",
+                            csType.FullName,
+                            method.Name);
+                        continue;
+                    }
+
+                    var name = fullName + "." + method.Name;
+                    if (method.GetCustomAttribute<MemberFunctionAttribute>() is { } memberFunctionAttribute)
+                    {
+                        if (!method.IsStatic)
                         {
-                            verifyContainer.Add(new VerificationEntry(name, memberFunctionAttribute.Signature, addressValue.Value, (Type)delegateMember[0]));
+                            delegateType ??= csAssembly.GetType(csType.FullName + "+Delegates");
+                            if (delegateType == null)
+                            {
+                                Log.Warning(
+                                    "Could not find delegate type for {Type}.{Member}, skipping verification",
+                                    csType.FullName,
+                                    method.Name);
+                                continue;
+                            }
+
+                            var delegateMember = delegateType.GetMember(method.Name);
+                            if (delegateMember.Length != 0)
+                            {
+                                verifyContainer.Add(
+                                    new VerificationEntry(
+                                        name,
+                                        memberFunctionAttribute.Signature,
+                                        addressValue.Value,
+                                        (Type)delegateMember[0]));
+                            }
+                            else
+                            {
+                                verifyContainer.Add(
+                                    new VerificationEntry(
+                                        name,
+                                        memberFunctionAttribute.Signature,
+                                        addressValue.Value,
+                                        Parameters: method.GetParameters(),
+                                        ReturnType: method.ReturnType));
+                            }
                         }
                         else
                         {
-                            verifyContainer.Add(new VerificationEntry(name, memberFunctionAttribute.Signature, addressValue.Value, Parameters: method.GetParameters(), ReturnType: method.ReturnType));
+                            verifyContainer.Add(
+                                new VerificationEntry(
+                                    name,
+                                    memberFunctionAttribute.Signature,
+                                    addressValue.Value,
+                                    Parameters: method.GetParameters(),
+                                    ReturnType: method.ReturnType));
                         }
                     }
-                    else
+                    else if (method.GetCustomAttribute<StaticAddressAttribute>() is { } staticAddressAttribute)
                     {
-                        verifyContainer.Add(new VerificationEntry(name, memberFunctionAttribute.Signature, addressValue.Value, Parameters: method.GetParameters(), ReturnType: method.ReturnType));
+                        verifyContainer.Add(
+                            new VerificationEntry(
+                                name,
+                                staticAddressAttribute.Signature,
+                                addressValue.Value,
+                                Parameters: method.GetParameters(),
+                                ReturnType: method.ReturnType));
                     }
                 }
-                else
-                {
-                    verifyContainer.Add(new VerificationEntry(name, staticAddressAttribute.Signature, addressValue.Value, Parameters: method.GetParameters(), ReturnType: method.ReturnType));
-                }
-            }
-        }
+            });
 
         verifyContainer.AddRange(ToVerify);
 
         allToVerify = verifyContainer.GroupBy(v => v.Address).ToFrozenDictionary(v => v.Key, v => v.ToArray());
+        Log.Verbose("Initialized HookVerifier with {Count} entries to verify", allToVerify.Sum(kv => kv.Value.Length));
 
         verifyContainer.Clear();
     }
