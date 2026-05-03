@@ -1,10 +1,13 @@
 using System.Numerics;
 
+using Dalamud.Utility;
+
 namespace Dalamud.Interface.Windowing;
 
 /// <summary>
 /// Structure detailing the size constraints of a window.
 /// </summary>
+[Api16ToDo("Interface? Rename to UnscaledX for clarity.")]
 public struct WindowSizeConstraints
 {
     /// <summary>

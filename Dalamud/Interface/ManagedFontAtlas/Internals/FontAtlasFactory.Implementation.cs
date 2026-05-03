@@ -495,7 +495,7 @@ internal sealed partial class FontAtlasFactory
                 Log.Verbose("[{name}] Building from {source}.", this.Name, nameof(this.BuildFontsImmediately));
 #endif
 
-                var scale = this.IsGlobalScaled ? ImGuiHelpers.GlobalScaleSafe : 1f;
+                var scale = this.IsGlobalScaled ? ImGuiHelpers.GlobalScale : 1f;
                 var r = this.RebuildFontsPrivate(false, scale);
                 r.Wait();
                 if (r.IsCompletedSuccessfully)
@@ -537,7 +537,7 @@ internal sealed partial class FontAtlasFactory
 
             lock (this.syncRoot)
             {
-                var scale = this.IsGlobalScaled ? ImGuiHelpers.GlobalScaleSafe : 1f;
+                var scale = this.IsGlobalScaled ? ImGuiHelpers.GlobalScale : 1f;
                 var rebuildIndex = Interlocked.Increment(ref this.buildIndex);
                 return this.buildTask = this.buildTask.ContinueWith(BuildInner).Unwrap();
 

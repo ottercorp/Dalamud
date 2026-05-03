@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 
@@ -21,6 +20,8 @@ using Dalamud.Logging.Internal;
 
 using FFXIVClientStructs.FFXIV.Client.UI;
 
+using TerraFX.Interop.Windows;
+
 namespace Dalamud.Interface.Windowing;
 
 /// <summary>
@@ -31,11 +32,16 @@ public class WindowHost
     private const float FadeInOutTime = 0.072f;
     private const float BlurNoiseOpacity = 0.17f;
     private const float MaxBlurStrength = 14f;
+    private const string AdditionsPopupName = "WindowSystemContextActions";
+
     private static readonly Vector4 BlurTintMultiplier = new(158 / 255f, 158 / 255f, 158 / 255f, 25 / 255f);
 
     private static readonly ModuleLog Log = ModuleLog.Create<WindowSystem>();
 
     private static bool wasEscPressedLastFrame = false;
+
+    private readonly TitleBarButton additionsButton;
+    private readonly List<TitleBarButton> allButtons = [];
 
     private bool internalLastIsOpen = false;
     private bool didPushInternalAlpha = false;
@@ -64,6 +70,20 @@ public class WindowHost
     internal WindowHost(IWindow window)
     {
         this.Window = window;
+
+        this.additionsButton = new()
+        {
+            Icon = FontAwesomeIcon.Bars,
+            IconOffset = new Vector2(2.5f, 1),
+            Click = _ =>
+            {
+                this.Window.IsClickthrough = false;
+                this.presetDirty = true;
+                ImGui.OpenPopup(AdditionsPopupName);
+            },
+            Priority = int.MinValue,
+            AvailableClickthrough = true,
+        };
     }
 
     /// <summary>
@@ -181,15 +201,23 @@ public class WindowHost
             }
         }
 
-        // TODO: We may have to allow for windows to configure if they should fade
-        if (this.internalAlpha.HasValue)
+        var isErrorStylePushed = false;
+        if (!this.hasError)
         {
-            ImGui.PushStyleVar(ImGuiStyleVar.Alpha, this.internalAlpha.Value);
-            this.didPushInternalAlpha = true;
-        }
+            if (this.internalAlpha.HasValue)
+            {
+                ImGui.PushStyleVar(ImGuiStyleVar.Alpha, this.internalAlpha.Value);
+                this.didPushInternalAlpha = true;
+            }
 
-        this.Window.PreDraw();
-        this.ApplyConditionals();
+            this.Window.PreDraw();
+            this.ApplyConditionals();
+        }
+        else
+        {
+            Style.StyleModelV1.DalamudStandard.Push();
+            isErrorStylePushed = true;
+        }
 
         if (this.Window.ForceMainWindow)
             ImGuiHelpers.ForceNextWindowMainViewport();
@@ -211,10 +239,22 @@ public class WindowHost
         var flags = this.Window.Flags;
 
         if (this.Window.IsPinned || this.Window.IsClickthrough)
+        {
             flags |= ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize;
+        }
 
         if (this.Window.IsClickthrough)
+        {
             flags |= ImGuiWindowFlags.NoInputs | ImGuiWindowFlags.NoNav | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoMouseInputs;
+        }
+
+        // If we have an error, reset all flags to default, and unlock window size.
+        if (this.hasError)
+        {
+            flags = ImGuiWindowFlags.None;
+            ImGui.SetNextWindowCollapsed(false, ImGuiCond.Once);
+            ImGui.SetNextWindowSizeConstraints(Vector2.Zero, Vector2.PositiveInfinity);
+        }
 
         // Determine window background alpha
         float effectiveWindowBgAlpha;
@@ -237,7 +277,6 @@ public class WindowHost
         var windowHasBackground = effectiveWindowBgAlpha != 0f;
 
         var isWindowOpen = this.Window.IsOpen;
-
         if (this.CanShowCloseButton ? ImGui.Begin(this.Window.WindowName, ref isWindowOpen, flags) : ImGui.Begin(this.Window.WindowName, flags))
         {
             // Apply background blur
@@ -269,17 +308,14 @@ public class WindowHost
                 ImGuiP.GetCurrentWindow().InheritNoInputs = this.Window.IsClickthrough;
             }
 
-            // Not supported yet on non-main viewports
-            if ((this.Window.IsPinned || this.Window.IsClickthrough || this.internalAlpha.HasValue) &&
-                ImGui.GetWindowViewport().ID != ImGui.GetMainViewport().ID)
+            if (ImGui.GetWindowViewport().ID != ImGui.GetMainViewport().ID)
             {
-                this.internalAlpha = null;
-                this.Window.IsPinned = false;
-                this.Window.IsClickthrough = false;
-                this.presetDirty = true;
+                if ((flags & ImGuiWindowFlags.NoInputs) == ImGuiWindowFlags.NoInputs)
+                    ImGui.GetWindowViewport().Flags |= ImGuiViewportFlags.NoInputs;
+                else
+                    ImGui.GetWindowViewport().Flags &= ~ImGuiViewportFlags.NoInputs;
             }
 
-            // Draw the actual window contents
             if (this.hasError)
             {
                 this.DrawErrorMessage();
@@ -306,7 +342,6 @@ public class WindowHost
             this.Window.IsOpen = false;
         }
 
-        const string additionsPopupName = "WindowSystemContextActions";
         var flagsApplicableForTitleBarIcons = !flags.HasFlag(ImGuiWindowFlags.NoDecoration) &&
                                               !flags.HasFlag(ImGuiWindowFlags.NoTitleBar);
         var showAdditions = (this.Window.AllowPinning || this.Window.AllowClickthrough || this.Window.AllowBackgroundBlur) &&
@@ -317,13 +352,8 @@ public class WindowHost
         {
             ImGui.PushStyleVar(ImGuiStyleVar.Alpha, 1f);
 
-            if (ImGui.BeginPopup(additionsPopupName, ImGuiWindowFlags.NoMove))
+            if (ImGui.BeginPopup(AdditionsPopupName, ImGuiWindowFlags.NoMove))
             {
-                var isAvailable = ImGuiHelpers.CheckIsWindowOnMainViewport();
-
-                if (!isAvailable)
-                    ImGui.BeginDisabled();
-
                 if (this.Window.IsClickthrough)
                     ImGui.BeginDisabled();
 
@@ -350,7 +380,6 @@ public class WindowHost
                             Loc.Localize("WindowSystemContextActionClickthrough", "Make clickthrough"),
                             ref isClickthrough))
                     {
-                        this.Window.IsClickthrough = isClickthrough;
                         this.presetDirty = true;
                     }
 
@@ -391,21 +420,11 @@ public class WindowHost
                     }
                 }
 
-                if (isAvailable)
-                {
-                    ImGui.TextColored(ImGuiColors.DalamudGrey,
-                                      Loc.Localize("WindowSystemContextActionClickthroughDisclaimer",
-                                                   "Open this menu again by clicking the three dashes to disable clickthrough."));
-                }
-                else
-                {
-                    ImGui.TextColored(ImGuiColors.DalamudGrey,
-                                      Loc.Localize("WindowSystemContextActionViewportDisclaimer",
-                                                   "These features are only available if this window is inside the game window."));
-                }
-
-                if (!isAvailable)
-                    ImGui.EndDisabled();
+                ImGui.TextColored(
+                    ImGuiColors.DalamudGrey,
+                    Loc.Localize(
+                        "WindowSystemContextActionClickthroughDisclaimer",
+                        "Open this menu again by clicking the three dashes to disable clickthrough."));
 
                 if (ImGui.Button(Loc.Localize("WindowSystemContextActionPrintWindow", "Print window")))
                     printWindow = true;
@@ -416,34 +435,15 @@ public class WindowHost
             ImGui.PopStyleVar();
         }
 
-        unsafe
+        if (flagsApplicableForTitleBarIcons)
         {
-            var window = ImGuiP.GetCurrentWindow();
-
-            ImRect outRect;
-            ImGuiP.TitleBarRect(&outRect, window);
-
-            var additionsButton = new TitleBarButton
-            {
-                Icon = FontAwesomeIcon.Bars,
-                IconOffset = new Vector2(2.5f, 1),
-                Click = _ =>
-                {
-                    this.Window.IsClickthrough = false;
-                    this.presetDirty = false;
-                    ImGui.OpenPopup(additionsPopupName);
-                },
-                Priority = int.MinValue,
-                AvailableClickthrough = true,
-            };
-
-            if (flagsApplicableForTitleBarIcons)
-            {
-                this.DrawTitleBarButtons(window, flags, outRect,
-                                         showAdditions
-                                             ? this.Window.TitleBarButtons.Append(additionsButton)
-                                             : this.Window.TitleBarButtons);
-            }
+            this.allButtons.Clear();
+            this.allButtons.EnsureCapacity(this.Window.TitleBarButtons.Count + 1);
+            this.allButtons.AddRange(this.Window.TitleBarButtons);
+            if (showAdditions)
+                this.allButtons.Add(this.additionsButton);
+            this.allButtons.Sort(static (a, b) => b.Priority - a.Priority);
+            this.DrawTitleBarButtons();
         }
 
         if (wasFocused && this.Window is not StyleEditorWindow)
@@ -489,7 +489,6 @@ public class WindowHost
         {
             this.fadeOutTexture = Service<TextureManager>.Get().CreateDrawListTexture(
                 "WindowFadeOutTexture");
-            Log.Verbose("Attempting to fade out {WindowName}", this.Window.WindowName);
             this.fadeOutTexture.ResizeAndDrawWindow(this.Window.WindowName, Vector2.One);
             this.fadeOutTimer = FadeInOutTime;
         }
@@ -505,13 +504,20 @@ public class WindowHost
                 Task.FromResult<IDalamudTextureWrap>(tex));
         }
 
-        if (this.didPushInternalAlpha)
+        if (isErrorStylePushed)
         {
-            ImGui.PopStyleVar();
-            this.didPushInternalAlpha = false;
+            Style.StyleModelV1.DalamudStandard.Pop();
         }
+        else
+        {
+            if (this.didPushInternalAlpha)
+            {
+                ImGui.PopStyleVar();
+                this.didPushInternalAlpha = false;
+            }
 
-        this.Window.PostDraw();
+            this.Window.PostDraw();
+        }
 
         this.PostHandlePreset(persistence);
 
@@ -599,6 +605,7 @@ public class WindowHost
         this.Window.IsPinned = this.presetWindow.IsPinned;
         this.Window.IsClickthrough = this.presetWindow.IsClickThrough;
         this.internalAlpha = this.presetWindow.Alpha;
+        this.internalBlurFactorOverride = this.presetWindow.BlurFactorOverride;
     }
 
     private void PostHandlePreset(WindowSystemPersistence? persistence)
@@ -613,6 +620,7 @@ public class WindowHost
             this.presetWindow.IsPinned = this.Window.IsPinned;
             this.presetWindow.IsClickThrough = this.Window.IsClickthrough;
             this.presetWindow.Alpha = this.internalAlpha;
+            this.presetWindow.BlurFactorOverride = this.internalBlurFactorOverride;
 
             var id = ImGui.GetID(this.Window.WindowName);
             persistence.SaveWindow(id, this.presetWindow!);
@@ -622,8 +630,11 @@ public class WindowHost
         }
     }
 
-    private unsafe void DrawTitleBarButtons(ImGuiWindowPtr window, ImGuiWindowFlags flags, ImRect titleBarRect, IEnumerable<TitleBarButton> buttons)
+    private unsafe void DrawTitleBarButtons()
     {
+        var window = ImGuiP.GetCurrentWindow();
+        var flags = window.Flags;
+        var titleBarRect = window.TitleBarRect();
         ImGui.PushClipRect(ImGui.GetWindowPos(), ImGui.GetWindowPos() + ImGui.GetWindowSize(), false);
 
         var style = ImGui.GetStyle();
@@ -658,26 +669,22 @@ public class WindowHost
             var max = pos + new Vector2(fontSize, fontSize);
             ImRect bb = new(pos, max);
             var isClipped = !ImGuiP.ItemAdd(bb, id, null, 0);
-            bool hovered, held;
-            var pressed = false;
+            bool hovered, held, pressed;
 
             if (this.Window.IsClickthrough)
             {
-                hovered = false;
-                held = false;
-
                 // ButtonBehavior does not function if the window is clickthrough, so we have to do it ourselves
-                if (ImGui.IsMouseHoveringRect(pos, max))
-                {
-                    hovered = true;
+                var pad = ImGui.GetStyle().TouchExtraPadding;
+                var rect = new ImRect(pos - pad, max + pad);
+                hovered = rect.Contains(ImGui.GetMousePos());
 
-                    // We can't use ImGui native functions here, because they don't work with clickthrough
-                    if ((global::Windows.Win32.PInvoke.GetKeyState((int)VirtualKey.LBUTTON) & 0x8000) != 0)
-                    {
-                        held = true;
-                        pressed = true;
-                    }
-                }
+                // Temporarily enable inputs
+                // This will be reset on next frame, and then enabled again if it is still being hovered
+                if (hovered && ImGui.GetWindowViewport().ID != ImGui.GetMainViewport().ID)
+                    ImGui.GetWindowViewport().Flags &= ~ImGuiViewportFlags.NoInputs;
+
+                // We can't use ImGui native functions here, because they don't work with clickthrough
+                pressed = held = hovered && (Windows.Win32.PInvoke.GetKeyState(VK.VK_LBUTTON) & 0x8000) != 0;
             }
             else
             {
@@ -706,10 +713,10 @@ public class WindowHost
             return pressed;
         }
 
-        foreach (var button in buttons.OrderBy(x => x.Priority))
+        foreach (var button in this.allButtons)
         {
             if (this.Window.IsClickthrough && !button.AvailableClickthrough)
-                return;
+                continue;
 
             Vector2 position = new(titleBarRect.Max.X - padR - buttonSize, titleBarRect.Min.Y + style.FramePadding.Y);
             padR += buttonSize + style.ItemInnerSpacing.X;
@@ -733,8 +740,9 @@ public class WindowHost
         style.Push(ImGuiStyleVar.FrameBorderSize, 0);
 
         const ImGuiWindowFlags flags = ImGuiWindowFlags.NoInputs | ImGuiWindowFlags.NoNav |
-                                           ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoMouseInputs |
-                                           ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoBackground;
+                                       ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoMouseInputs |
+                                       ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoBackground;
+
         if (ImGui.Begin(this.Window.WindowName, flags))
         {
             var dl = ImGui.GetWindowDrawList();
