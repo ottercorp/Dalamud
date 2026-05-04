@@ -625,9 +625,6 @@ internal partial class InterfaceManager : IInternalDisposableService
         while (this.runBeforeImGuiRender.TryDequeue(out var action))
             action.InvokeSafely();
 
-        // Process information needed by ImGuiHelpers each frame.
-        ImGuiHelpers.NewFrame();
-
         // Enable viewports if there are no issues.
         var viewportsEnable = this.dalamudConfiguration.IsDisableViewport ||
                               activeBackend.IsMainViewportFullScreen() ||

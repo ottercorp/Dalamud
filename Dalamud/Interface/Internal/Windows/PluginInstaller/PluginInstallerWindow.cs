@@ -698,7 +698,7 @@ internal class PluginInstallerWindow : Window, IDisposable
         var headerText = Locs.Header_Hint;
         var headerTextSize = ImGui.CalcTextSize(headerText);
         ImGui.Text(headerText);
-        ImGui.TextColored(ImGuiColors.DalamudRed, "插件使用过程中出现问题请优先通过内置反馈或GitHub Issue进行");
+        ImGui.TextColored(ImGuiColors.AttentionForeground, "插件使用过程中出现问题请优先通过内置反馈或GitHub Issue进行");
 
         ImGui.SameLine();
 
@@ -1325,8 +1325,8 @@ internal class PluginInstallerWindow : Window, IDisposable
         {
             var plugin = this.pluginListInstalled
                              .FirstOrDefault(plugin => plugin.Manifest.InternalName == availableManifest.InternalName &&
-                                                       plugin.Manifest.RepoUrl == availableManifest.RepoUrl &&
-                                                       !plugin.IsDev);
+                                        (!availableManifest.SourceRepo.IsThirdParty || plugin.Manifest.InstalledFromUrl == availableManifest.SourceRepo.PluginMasterUrl) &&
+                                        !plugin.IsDev);
 
             // We "consumed" this plugin from the pile and remove it.
             if (plugin != null)

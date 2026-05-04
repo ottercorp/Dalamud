@@ -17,6 +17,7 @@ using Dalamud.Interface.ImGuiSeStringRenderer.Internal;
 using Dalamud.Interface.ManagedFontAtlas;
 using Dalamud.Interface.ManagedFontAtlas.Internals;
 using Dalamud.Interface.Utility.Raii;
+using Dalamud.Utility;
 
 using VirtualKey = Dalamud.Game.ClientState.Keys.VirtualKey;
 
@@ -35,7 +36,8 @@ public static partial class ImGuiHelpers
     /// <summary>
     /// Gets the global Dalamud scale.
     /// </summary>
-    public static float GlobalScale { get; private set; }
+    public static float GlobalScale =>
+        IsImGuiInitialized ? ImGui.GetIO().FontGlobalScale : Service<DalamudConfiguration>.Get().GlobalUiScale;
 
     /// <summary>
     /// Gets a value indicating whether ImGui is initialized and ready for use.<br />
@@ -48,8 +50,9 @@ public static partial class ImGuiHelpers
     /// Gets the global Dalamud scale; even available before drawing is ready.<br />
     /// If you are sure that drawing is ready, at the point of using this, use <see cref="GlobalScale"/> instead.
     /// </summary>
-    public static float GlobalScaleSafe =>
-        IsImGuiInitialized ? ImGui.GetIO().FontGlobalScale : Service<DalamudConfiguration>.Get().GlobalUiScale;
+    [Obsolete("Use GlobalScale. It's always safe now.")]
+    [Api16ToDo("Remove this property and replace usages with GlobalScale.")]
+    public static float GlobalScaleSafe => GlobalScale;
 
     /// <summary>
     /// Check if the current ImGui window is on the main viewport.
@@ -834,14 +837,6 @@ public static partial class ImGuiHelpers
         }
 
         return false;
-    }
-
-    /// <summary>
-    /// Get data needed for each new frame.
-    /// </summary>
-    internal static void NewFrame()
-    {
-        GlobalScale = ImGui.GetIO().FontGlobalScale;
     }
 
     /// <summary>

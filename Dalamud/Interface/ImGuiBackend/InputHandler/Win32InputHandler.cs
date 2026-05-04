@@ -622,6 +622,19 @@ internal sealed unsafe partial class Win32InputHandler : IImGuiInputHandler
                 // window is via clicking, it does not appear on the taskbar or alt-tab, so we just
                 // brute force behavior here.
 
+                // Bring the clicked viewport window to the top of the Z-order without activating it.
+                // Without this, returning MA_NOACTIVATE suppresses the default OS Z-reordering on
+                // click, so the window stays behind other viewport windows forever (it only moved
+                // before when ImGui explicitly called PlatformSetWindowFocus, e.g. on collapse).
+                SetWindowPos(
+                    hWndCurrent,
+                    HWND.HWND_TOP,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP.SWP_NOMOVE | SWP.SWP_NOSIZE | SWP.SWP_NOACTIVATE);
+
                 // Make the game the foreground window. This prevents ImGui windows from becoming
                 // choppy when users have the "limit FPS" option enabled in-game
                 SetForegroundWindow(this.hWnd);
