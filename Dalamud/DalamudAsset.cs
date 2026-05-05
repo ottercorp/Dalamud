@@ -149,17 +149,7 @@ public enum DalamudAsset
     [DalamudAsset(DalamudAssetPurpose.TextureFromPng)]
     [DalamudAssetPath("UIRes", "missingFont.png")]
     MissingFontTips = 1014,
-
-
-    /// <summary>
-    /// <see cref="DalamudAssetPurpose.Font"/>: 虚假的Noto Sans CJK JP Medium.
-    /// </summary>
-    [DalamudAsset(DalamudAssetPurpose.Font)]
-    [DalamudAssetPath("UIRes", "NotoSansCJKsc-Regular.otf")]
-    [DalamudAssetPath("UIRes", "NotoSansCJKsc-Medium.otf")]
-    NotoSansJpMedium = 1999,
-
-
+    
     /// <summary>
     /// <see cref="DalamudAssetPurpose.Font"/>: Noto Sans CJK SC Medium.
     /// </summary>
