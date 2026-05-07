@@ -61,7 +61,7 @@ internal sealed class LocalDevPlugin : LocalPlugin
     /// </summary>
     public bool StartOnBoot
     {
-        get => this.devSettings.StartOnBoot;
+        get => this.devSettings.StartOnBoot && this.manifest.DalamudApiLevel == PluginManager.DalamudApiLevel;
         set => this.devSettings.StartOnBoot = value;
     }
 

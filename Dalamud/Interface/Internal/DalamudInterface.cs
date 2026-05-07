@@ -189,12 +189,12 @@ internal class DalamudInterface : IInternalDisposableService
                     () => Service<DalamudInterface>.GetNullable()?.ToggleDevMenu(),
                     VirtualKey.SHIFT);
 
-                if (Versioning.GetActiveTrack() != "release")
+                if (Versioning.GetActiveTrack() != "release" || configuration.DevMode == true)
                 {
                     titleScreenMenu.AddEntryCore(
                         Loc.Localize("TSMDalamudDevMenu", "Developer Menu"),
                         new ForwardingSharedImmediateTexture(dalamudAssetManager.GetDalamudTextureWrap(DalamudAsset.LogoSmall)),
-                        () => this.isImGuiDrawDevMenu = true);
+                        () => this.isImGuiDrawDevMenu = !this.isImGuiDrawDevMenu);
                 }
             });
 
@@ -974,7 +974,7 @@ internal class DalamudInterface : IInternalDisposableService
                     }
 
                     ImGui.MenuItem(this.dalamud.StartInfo.GameVersion?.ToString() ?? "Unknown version", false, false);
-                    ImGui.MenuItem($"D: {Versioning.GetScmVersion()} CS: {Versioning.GetGitHashClientStructs()}[{FFXIVClientStructs.ThisAssembly.Git.Commits}]", false, false);
+                    ImGui.MenuItem($"D: {Versioning.GetScmVersion()} CS: {typeof(FFXIVClientStructs.ThisAssembly).Assembly.GetName().Version!}[{FFXIVClientStructs.ThisAssembly.Git.Commit}]", false, false);
                     ImGui.MenuItem($"CLR: {Environment.Version}", false, false);
 
                     ImGui.EndMenu();
@@ -1116,11 +1116,6 @@ internal class DalamudInterface : IInternalDisposableService
                     }
 
                     ImGui.Separator();
-
-                    if (ImGui.MenuItem("Load all API levels"u8, (byte*)null, pluginManager.LoadAllApiLevels))
-                    {
-                        pluginManager.LoadAllApiLevels ^= true;
-                    }
 
                     if (ImGui.MenuItem("Load blacklisted plugins"u8, (byte*)null, pluginManager.LoadBannedPlugins))
                     {

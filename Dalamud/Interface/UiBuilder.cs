@@ -1,5 +1,8 @@
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+
+using CheapLoc;
 
 using Dalamud.Bindings.ImGui;
 using Dalamud.Configuration.Internal;
@@ -7,10 +10,16 @@ using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Gui;
+using Dalamud.Interface.Colors;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.FontIdentifier;
+using Dalamud.Interface.ImGuiNotification;
+using Dalamud.Interface.ImGuiNotification.Internal;
 using Dalamud.Interface.Internal;
 using Dalamud.Interface.ManagedFontAtlas;
 using Dalamud.Interface.ManagedFontAtlas.Internals;
+using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Plugin.Internal.Types;
 using Dalamud.Utility;
 
@@ -298,6 +307,7 @@ public sealed class UiBuilder : IDisposable, IUiBuilder
     private readonly DisposeSafety.ScopedFinalizer scopedFinalizer = new();
 
     private bool hasErrorWindow = false;
+    private Exception? lastError = null;
     private bool lastFrameUiHideState = false;
 
     private IFontHandle? defaultFontHandle;
@@ -769,45 +779,108 @@ public sealed class UiBuilder : IDisposable, IUiBuilder
             this.ShowUi?.InvokeSafely();
         }
 
-        ImGui.PushID(this.namespaceName);
         if (DoStats) this.PluginDrawStatistics.StartUpdate();
 
         if (this.hasErrorWindow)
         {
-            if (ImGui.Begin($"{this.namespaceName} Error", ref this.hasErrorWindow, ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize))
+            this.DrawErrorWindow();
+        }
+        else
+        {
+            try
             {
-                ImGui.Text($"The plugin {this.namespaceName} ran into an error.\nContact the plugin developer for support.\n\nPlease try restarting your game.");
-                ImGui.Spacing();
-
-                if (ImGui.Button("OK"u8))
-                {
-                    this.hasErrorWindow = false;
-                }
+                this.Draw?.Invoke();
             }
-
-            ImGui.End();
-        }
-
-        try
-        {
-            this.Draw?.InvokeSafely();
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "[{0}] UiBuilder OnBuildUi caught exception", this.namespaceName);
-            this.Draw = null;
-            this.OpenConfigUi = null;
-
-            this.hasErrorWindow = true;
+            catch (Exception ex)
+            {
+                Log.Error(ex, "[{0}] UiBuilder OnBuildUi caught exception", this.namespaceName);
+                this.hasErrorWindow = true;
+                this.lastError = ex;
+            }
         }
 
         this.FrameCount++;
 
         if (DoStats) this.PluginDrawStatistics.EndUpdate();
 
-        ImGui.PopID();
-
         this.hitchDetector.Stop();
+    }
+
+    private void DrawErrorWindow()
+    {
+        if (!ImGui.Begin($"{this.namespaceName} Error", ref this.hasErrorWindow, ImGuiWindowFlags.NoCollapse))
+        {
+            ImGui.End();
+            return;
+        }
+
+        ImGui.TextColoredWrapped(ImGuiColors.ErrorForeground, Loc.Localize("UiBuilderErrorOccurred", "An error occurred while rendering this plugin's UI. Please contact the developer for details."));
+        ImGuiHelpers.ScaledDummy(5);
+
+        if (ImGui.Button(Loc.Localize("UiBuilderErrorRecoverButton", "Attempt to retry")))
+        {
+            this.hasErrorWindow = false;
+            this.lastError = null;
+        }
+
+        ImGui.SameLine();
+
+        if (ImGui.Button(Loc.Localize("UiBuilderErrorReloadButton", "Reload Plugin")))
+        {
+            var pluginName = this.plugin.Name;
+            this.hasErrorWindow = false;
+            this.lastError = null;
+            _ = this.plugin.ReloadAsync().ContinueWith(
+                t =>
+                {
+                    var notificationManager = Service<NotificationManager>.Get();
+                    if (t.IsCompletedSuccessfully)
+                    {
+                        notificationManager.AddNotification(
+                            string.Format(
+                                Loc.Localize("UiBuilderReloadSuccess", "The plugin '{0}' was reloaded successfully."),
+                                pluginName),
+                            Loc.Localize("UiBuilderReloadSuccessTitle", "Plugin reloaded!"),
+                            NotificationType.Success);
+                    }
+                    else
+                    {
+                        notificationManager.AddNotification(
+                            string.Format(
+                                Loc.Localize("UiBuilderReloadFailure", "The plugin '{0}' could not be reloaded."),
+                                pluginName),
+                            Loc.Localize("UiBuilderReloadFailureTitle", "Plugin reload failed!"),
+                            NotificationType.Error);
+                    }
+                });
+        }
+
+        if (this.lastError != null)
+        {
+            ImGuiHelpers.ScaledDummy(5);
+
+            using var child = ImRaii.Child("##ErrorDetails", new Vector2(0, 200 * ImGuiHelpers.GlobalScale), true);
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
+            {
+                ImGui.TextWrapped(Loc.Localize("UiBuilderErrorDetails", "Error Details:"));
+                ImGui.Separator();
+                ImGui.TextWrapped(this.lastError.ToString());
+            }
+
+            if (child.Success)
+            {
+                var childWindowSize = ImGui.GetWindowSize();
+                var copyText = Loc.Localize("UiBuilderErrorCopy", "Copy");
+                var buttonWidth = ImGuiComponents.GetIconButtonWithTextWidth(FontAwesomeIcon.Copy, copyText);
+                ImGui.SetCursorPos(new Vector2(
+                                       childWindowSize.X - buttonWidth - ImGui.GetStyle().FramePadding.X,
+                                       ImGui.GetStyle().FramePadding.Y));
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Copy, copyText))
+                    ImGui.SetClipboardText(this.lastError.ToString());
+            }
+        }
+
+        ImGui.End();
     }
 
     private void OnResizeBuffers()

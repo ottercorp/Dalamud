@@ -79,7 +79,7 @@ public static class Troubleshooting
                 Language = startInfo.Language.ToString(),
                 BetaKey = Versioning.GetActiveTrack(),
                 DoPluginTest = configuration.DoPluginTest,
-                LoadAllApiLevels = pluginManager?.LoadAllApiLevels == true,
+                LoadAllApiLevels = false,
                 InterfaceLoaded = interfaceManager?.IsReady ?? false,
                 HasThirdRepo = configuration.ThirdRepoList is { Count: > 0 },
                 ForcedMinHook = EnvironmentConfiguration.DalamudForceMinHook,
