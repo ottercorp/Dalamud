@@ -5,9 +5,8 @@ using CheapLoc;
 
 using Dalamud.Bindings.ImGui;
 using Dalamud.Configuration.Internal;
-using Dalamud.Console;
-using Dalamud.Game.Player;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Internal.DesignSystem;
 using Dalamud.Interface.Internal.Windows.Settings.Tabs;
 using Dalamud.Interface.ManagedFontAtlas.Internals;
 using Dalamud.Interface.Utility;
@@ -160,8 +159,6 @@ internal sealed class SettingsWindow : Window
             ImGui.InputTextWithHint("###searchInput"u8, Loc.Localize("DalamudSettingsSearchPlaceholder", "Search for settings..."), ref this.searchInput, 100, ImGuiInputTextFlags.AutoSelectAll);
         ImGui.Spacing();
 
-        var windowSize = ImGui.GetWindowSize();
-
         using (var tabBar = ImRaii.TabBar("###settingsTabs"u8))
         {
             if (tabBar)
@@ -173,34 +170,22 @@ internal sealed class SettingsWindow : Window
             }
         }
 
-        ImGui.SetCursorPos(windowSize - ImGuiHelpers.ScaledVector2(70));
+        var hasInvalidEntries = this.tabs.Any(x => x.Entries.Any(y => !y.IsValid));
 
-        using (var buttonChild = ImRaii.Child("###settingsFinishButton"u8))
+        if (DalamudComponents.DrawFloatingSaveDiscardButtons(
+                out var saveClicked,
+                saveDisabled: hasInvalidEntries,
+                saveDisabledTooltip: Loc.Localize("DalamudSettingsSaveBlocked", "Some settings have invalid values and cannot be saved.")))
         {
-            if (buttonChild)
-            {
-                using var disabled = ImRaii.Disabled(this.tabs.Any(x => x.Entries.Any(y => !y.IsValid)));
+            this.IsOpen = false;
+        }
 
-                using (ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, 100f))
-                {
-                    using var font = ImRaii.PushFont(InterfaceManager.IconFont);
+        if (saveClicked)
+        {
+            this.Save();
 
-                    if (ImGui.Button(FontAwesomeIcon.Save.ToIconString(), new Vector2(40)))
-                    {
-                        this.Save();
-
-                        if (!ImGui.IsKeyDown(ImGuiKey.ModShift))
-                            this.IsOpen = false;
-                    }
-                }
-
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.SetTooltip(!ImGui.IsKeyDown(ImGuiKey.ModShift)
-                                         ? Loc.Localize("DalamudSettingsSaveAndExit", "Save changes and close")
-                                         : Loc.Localize("DalamudSettingsSave", "Save changes"));
-                }
-            }
+            if (!ImGui.IsKeyDown(ImGuiKey.ModShift))
+                this.IsOpen = false;
         }
     }
 

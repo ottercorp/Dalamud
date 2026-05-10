@@ -9,6 +9,7 @@ using Dalamud.Game.ClientState.Keys;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Internal;
+using Dalamud.Interface.Internal.DesignSystem;
 using Dalamud.Interface.Internal.Windows.StyleEditor;
 using Dalamud.Interface.Textures.Internal;
 using Dalamud.Interface.Textures.TextureWraps;
@@ -293,10 +294,10 @@ public class WindowHost
                         ImGui.GetWindowDrawList(),
                         wPos,
                         wPos + ImGui.GetWindowSize(),
-                        effectiveBlurFactor * MaxBlurStrength,
+                        float.Lerp(0.005f, effectiveBlurFactor, this.internalAlpha ?? 1f) * MaxBlurStrength,
                         ImGui.GetStyle().WindowRounding,
                         tintColor: ImGui.GetStyle().Colors[ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) ? (int)ImGuiCol.TitleBgActive : (int)ImGuiCol.TitleBg] * BlurTintMultiplier,
-                        noiseOpacity: BlurNoiseOpacity * effectiveWindowBgAlpha);
+                        noiseOpacity: float.Lerp(0.09f, 1f, effectiveWindowBgAlpha * this.internalAlpha ?? 1f) * BlurNoiseOpacity);
                 }
             }
 
@@ -432,6 +433,10 @@ public class WindowHost
                                       100f, "%.1f%%"))
                 {
                     this.internalAlpha = Math.Clamp(alpha / 100f, 0.2f, 1f);
+                }
+
+                if (ImGui.IsItemDeactivatedAfterEdit())
+                {
                     this.presetDirty = true;
                 }
 
@@ -445,6 +450,10 @@ public class WindowHost
                         if (ImGui.Button(Loc.Localize("WindowSystemContextActionReset", "Reset") + "##resetBlur"))
                         {
                             this.internalBlurFactorOverride = null;
+                        }
+
+                        if (ImGui.IsItemDeactivatedAfterEdit())
+                        {
                             this.presetDirty = true;
                         }
                     }
@@ -811,47 +820,22 @@ public class WindowHost
     private void DrawErrorMessage()
     {
         // TODO: Once window systems are services, offer to reload the plugin
-        ImGui.TextColoredWrapped(ImGuiColors.ErrorForeground, Loc.Localize("WindowSystemErrorOccurred", "An error occurred while rendering this window. Please contact the developer for details."));
-
-        ImGuiHelpers.ScaledDummy(5);
-
-        if (ImGui.Button(Loc.Localize("WindowSystemErrorRecoverButton", "Attempt to retry")))
-        {
-            this.hasError = false;
-            this.lastError = null;
-        }
-
-        ImGui.SameLine();
-
-        if (ImGui.Button(Loc.Localize("WindowSystemErrorClose", "Close Window")))
-        {
-            this.Window.IsOpen = false;
-            this.hasError = false;
-            this.lastError = null;
-        }
-
-        ImGuiHelpers.ScaledDummy(10);
-
-        if (this.lastError != null)
-        {
-            using var child = ImRaii.Child("##ErrorDetails", new Vector2(0, 200 * ImGuiHelpers.GlobalScale), true);
-            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
-            {
-                ImGui.TextWrapped(Loc.Localize("WindowSystemErrorDetails", "Error Details:"));
-                ImGui.Separator();
-                ImGui.TextWrapped(this.lastError.ToString());
-            }
-
-            var childWindowSize = ImGui.GetWindowSize();
-            var copyText = Loc.Localize("WindowSystemErrorCopy", "Copy");
-            var buttonWidth = ImGuiComponents.GetIconButtonWithTextWidth(FontAwesomeIcon.Copy, copyText);
-            ImGui.SetCursorPos(new Vector2(childWindowSize.X - buttonWidth - ImGui.GetStyle().FramePadding.X,
-                                           ImGui.GetStyle().FramePadding.Y));
-            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Copy, copyText))
-            {
-                ImGui.SetClipboardText(this.lastError.ToString());
-            }
-        }
+        DalamudComponents.DrawErrorDisplay(
+            Loc.Localize("WindowSystemErrorOccurred", "An error occurred while rendering this window. Please contact the developer for details."),
+            this.lastError,
+            [
+                (Loc.Localize("WindowSystemErrorRecoverButton", "Attempt to retry"), () =>
+                    {
+                        this.hasError = false;
+                        this.lastError = null;
+                    }),
+                (Loc.Localize("WindowSystemErrorClose", "Close Window"), () =>
+                {
+                    this.Window.IsOpen = false;
+                    this.hasError = false;
+                    this.lastError = null;
+                })
+            ]);
     }
 
     /// <summary>
