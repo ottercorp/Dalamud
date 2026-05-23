@@ -113,7 +113,8 @@ internal class ProfileManagerWidget
         {
             if (popup)
             {
-                using var scrolling = ImRaii.Child("###scrolling"u8, new Vector2(-1, -1));
+                var buttonHeight = ImGui.GetFrameHeight() + (ImGui.GetStyle().ItemSpacing.Y * 2);
+                using var scrolling = ImRaii.Child("###scrolling"u8, new Vector2(-1, ImGui.GetContentRegionAvail().Y - buttonHeight));
                 if (scrolling)
                 {
                     ImGui.TextWrapped(Locs.TutorialParagraphOne);
@@ -141,14 +142,14 @@ internal class ProfileManagerWidget
                     ImGui.TextWrapped(Locs.TutorialCommandsToggle);
 
                     ImGui.TextWrapped(Locs.TutorialCommandsEnd);
-                    ImGuiHelpers.ScaledDummy(5);
+                }
 
-                    var buttonWidth = 120f;
-                    ImGui.SetCursorPosX((ImGui.GetWindowWidth() - buttonWidth) / 2);
-                    if (ImGui.Button("OK"u8, new Vector2(buttonWidth, 40)))
-                    {
-                        ImGui.CloseCurrentPopup();
-                    }
+                ImGuiHelpers.ScaledDummy(4);
+                var buttonWidth = 120f;
+                ImGui.SetCursorPosX((ImGui.GetWindowWidth() - buttonWidth) / 2);
+                if (ImGui.Button("OK"u8, new Vector2(buttonWidth, 0)))
+                {
+                    ImGui.CloseCurrentPopup();
                 }
             }
         }
@@ -329,7 +330,20 @@ internal class ProfileManagerWidget
                     .ContinueWith(this.installer.DisplayErrorContinuation, Locs.ErrorCouldNotChangeState);
             },
             plugin => !plugin.Manifest.SupportsProfiles ||
-                      profile.Plugins.Any(x => x.WorkingPluginId == plugin.EffectiveWorkingPluginId));
+                      profile.Plugins.Any(x => x.WorkingPluginId == plugin.EffectiveWorkingPluginId),
+            getAnnotation: plugin =>
+            {
+                var count = profman.Profiles.Count(
+                    p => !p.IsDefaultProfile &&
+                         p.Guid != this.editingProfileGuid &&
+                         p.Plugins.Any(x => x.WorkingPluginId == plugin.EffectiveWorkingPluginId));
+                return count switch
+                {
+                    0 => null,
+                    1 => Locs.InOneCollection,
+                    _ => Locs.InNCollections(count),
+                };
+            });
 
         // Reapply states when closing plugin picker, as we might have changed want states for some plugins. Only do this when closing, to avoid doing it multiple times while picking.
         var isPickingPlugin = ImGui.IsPopupOpen("###addPluginToProfilePicker");
@@ -450,27 +464,25 @@ internal class ProfileManagerWidget
 
         var model = (ProfileModelV1)profile.Model;
 
-        if (Service<DalamudConfiguration>.Get().ProfilesEnableCharacters)
-        {
-            var enableForCharacters = model.EnableForCharacters;
-            ImGui.Checkbox(
-                Locs.EnableForSpecificCharacters,
-                ref enableForCharacters);
-            if (enableForCharacters != model.EnableForCharacters)
-            {
-                model.EnableForCharacters = enableForCharacters;
-                Service<DalamudConfiguration>.Get().QueueSave();
+        var enableForCharacters = model.EnableForCharacters;
+        ImGui.Checkbox(
+            Locs.EnableForSpecificCharacters,
+            ref enableForCharacters);
 
-                // Profile might now no longer want active
-                Task.Run(async () =>
-                    {
-                        await profman.ApplyAllWantStatesAsync("Toggle enable for characters");
-                    })
-                    .ContinueWith(t =>
-                    {
-                        this.installer.DisplayErrorContinuation(t, Locs.ErrorCouldNotChangeState);
-                    });
-            }
+        if (enableForCharacters != model.EnableForCharacters)
+        {
+            model.EnableForCharacters = enableForCharacters;
+            Service<DalamudConfiguration>.Get().QueueSave();
+
+            // Profile might now no longer want active
+            Task.Run(async () =>
+                {
+                    await profman.ApplyAllWantStatesAsync("Toggle enable for characters");
+                })
+                .ContinueWith(t =>
+                {
+                    this.installer.DisplayErrorContinuation(t, Locs.ErrorCouldNotChangeState);
+                });
         }
 
         // If the profile is configured to enable by specific characters, show the character list and controls
@@ -478,59 +490,50 @@ internal class ProfileManagerWidget
         {
             ulong? wantRemoveContentId = null;
 
-            ImGui.Indent();
-
-            foreach (var entry in model.EnabledCharacters.ToArray())
-            {
-                if (ImGuiComponents.IconButton($"###removeChar{entry.ContentId}", FontAwesomeIcon.Trash))
-                {
-                    wantRemoveContentId = entry.ContentId;
-                }
-
-                if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip(Loc.Localize("ProfileManagerRemoveCharacter", "Remove character"));
-
-                ImGui.SameLine();
-                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (5 * ImGuiHelpers.GlobalScale));
-
-                string characterDisplay;
-                if (!string.IsNullOrEmpty(entry.DisplayName) && !string.IsNullOrEmpty(entry.ServerName))
-                {
-                    characterDisplay =
-                        $"{entry.DisplayName} <icon({(int)BitmapFontIcon.CrossWorld})> {entry.ServerName}";
-                }
-                else
-                {
-                    characterDisplay = entry.ContentId.ToString();
-                }
-
-                ImGuiHelpers.CompileSeStringWrapped(characterDisplay);
-
-                if (entry != model.EnabledCharacters.LastOrDefault())
-                {
-                    ImGui.PushStyleColor(ImGuiCol.Border, ImGuiColors.DalamudGrey.WithAlpha(0.2f));
-                    ImGui.Separator();
-                    ImGui.PopStyleColor();
-                }
-            }
-
             if (model.EnabledCharacters.Count == 0)
             {
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudGrey);
                 ImGui.TextColoredWrapped(
                     ImGuiColors.DalamudGrey,
                     Loc.Localize(
                         "ProfileManagerNoCharactersAdded",
                         "This collection will not be active for any characters until you add some with the button below."));
-                ImGui.PopStyleColor();
             }
+            else if (ImGui.BeginTable(
+                         "###charFilterTable",
+                         2,
+                         ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
+            {
+                ImGui.TableSetupColumn("###remove"u8, ImGuiTableColumnFlags.WidthFixed);
+                ImGui.TableSetupColumn("###charname"u8, ImGuiTableColumnFlags.WidthStretch);
 
-            ImGui.Unindent();
+                foreach (var entry in model.EnabledCharacters.ToArray())
+                {
+                    ImGui.TableNextRow();
+
+                    ImGui.TableSetColumnIndex(0);
+                    if (ImGuiComponents.IconButton($"###removeChar{entry.ContentId}", FontAwesomeIcon.Trash))
+                        wantRemoveContentId = entry.ContentId;
+
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip(Loc.Localize("ProfileManagerRemoveCharacter", "Remove character"));
+
+                    ImGui.TableSetColumnIndex(1);
+                    string characterDisplay;
+                    if (!string.IsNullOrEmpty(entry.DisplayName) && !string.IsNullOrEmpty(entry.ServerName))
+                        characterDisplay = $"{entry.DisplayName} <icon({(int)BitmapFontIcon.CrossWorld})> {entry.ServerName}";
+                    else
+                        characterDisplay = entry.ContentId.ToString();
+
+                    ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (ImGui.GetFrameHeight() / 2f) - (ImGui.GetTextLineHeight() / 2f));
+                    ImGuiHelpers.CompileSeStringWrapped(characterDisplay);
+                }
+
+                ImGui.EndTable();
+            }
 
             if (wantRemoveContentId != null)
             {
-                var toRem =
-                    model.EnabledCharacters.FirstOrDefault(x => x.ContentId == wantRemoveContentId.Value);
+                var toRem = model.EnabledCharacters.FirstOrDefault(x => x.ContentId == wantRemoveContentId.Value);
                 if (toRem != null)
                 {
                     model.EnabledCharacters.Remove(toRem);
@@ -843,8 +846,14 @@ internal class ProfileManagerWidget
         public static string ChoiceConfirmation =>
             Loc.Localize("ProfileManagerChoiceConfirmation", "Yes, enable Plugin Collections");
 
+        public static string InOneCollection =>
+            Loc.Localize("ProfileManagerPickerInOneCollection", "(in 1 other collection)");
+
         public static string NotInstalled(string name) =>
             Loc.Localize("ProfileManagerNotInstalled", "{0} (Not Installed)").Format(name);
+
+        public static string InNCollections(int count) =>
+            Loc.Localize("ProfileManagerPickerInNCollections", "(in {0} other collections)").Format(count);
 
         public static string PolicyToLocalisedName(ProfileModelV1.ProfileStartupPolicy policy)
         {
