@@ -45,7 +45,7 @@ internal class PluginImageCache : IInternalDisposableService
     /// </summary>
     public const int PluginIconHeight = 512;
 
-    private const string MainRepoDip17ImageUrl = "https://raw.githubusercontent.com/goatcorp/PluginDistD17/main/{0}/{1}/images/{2}";
+    private const string MainRepoDip17ImageUrl = "https://s3test.ffxiv.wang/plugindistd17/{0}/{1}/images/{2}";
 
     [ServiceManager.ServiceDependency]
     private readonly HappyHttpClient happyHttpClient = Service<HappyHttpClient>.Get();
@@ -628,9 +628,6 @@ internal class PluginImageCache : IInternalDisposableService
 
         if (manifest.Dip17Channel.IsNullOrEmpty())
             return null;
-
-        if (manifest.IconUrl.Contains(".ffxiv.wang"))
-            return manifest.IconUrl;
 
         return MainRepoDip17ImageUrl.Format(manifest.Dip17Channel!, manifest.InternalName, "icon.png");
     }
