@@ -23,11 +23,23 @@ internal record PluginManifest : IPluginManifest
 
     /// <inheritdoc/>
     [JsonProperty]
+    public string? NameLoc { get; init; }
+
+    /// <inheritdoc/>
+    [JsonProperty]
     public string? Punchline { get; init; }
 
     /// <inheritdoc/>
     [JsonProperty]
+    public string? PunchlineLoc { get; init; }
+
+    /// <inheritdoc/>
+    [JsonProperty]
     public string? Description { get; init; }
+
+    /// <inheritdoc/>
+    [JsonProperty]
+    public string? DescriptionLoc { get; init; }
 
     /// <inheritdoc/>
     [JsonProperty]

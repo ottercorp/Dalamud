@@ -2225,9 +2225,31 @@ internal class PluginInstallerWindow : Window, IDisposable
         return ready;
     }
 
-    private bool DrawPluginCollapsingHeader(string label, LocalPlugin? plugin, IPluginManifest manifest, PluginHeaderFlags flags, Action drawContextMenuAction, int index)
+    /// <summary>
+    /// Draws wrapped text, using its localized variant when available, with the original shown on hover.
+    /// </summary>
+    /// <param name="original">The original (untranslated) text.</param>
+    /// <param name="localized">The localized text, if any.</param>
+    private void DrawLocalizableTextWrapped(string original, string? localized)
+    {
+        if (!string.IsNullOrWhiteSpace(localized) && localized != original)
+        {
+            ImGui.TextWrapped(localized);
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip(original);
+        }
+        else
+        {
+            ImGui.TextWrapped(original);
+        }
+    }
+
+    private bool DrawPluginCollapsingHeader(string label, LocalPlugin? plugin, IPluginManifest manifest, PluginHeaderFlags flags, Action drawContextMenuAction, int index, IPluginManifest? locManifest = null)
     {
         var isOpen = this.openPluginCollapsibles.Contains(index);
+
+        // Localized metadata source (remote manifest for installed plugins).
+        locManifest ??= manifest;
 
         var sectionSize = ImGuiHelpers.GlobalScale * 66;
 
@@ -2380,7 +2402,26 @@ internal class PluginInstallerWindow : Window, IDisposable
         var cursor = ImGui.GetCursorPos();
 
         // Name
-        ImGui.Text(label);
+        if (!string.IsNullOrWhiteSpace(locManifest.NameLoc) &&
+            locManifest.NameLoc != manifest.Name)
+        {
+            ImGui.Text(manifest.Name);
+
+            ImGui.SameLine(0, ImGui.GetStyle().ItemInnerSpacing.X);
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
+                ImGui.Text($"· {locManifest.NameLoc}");
+
+            var suffix = label.Length > manifest.Name.Length ? label[manifest.Name.Length..] : string.Empty;
+            if (suffix.Length > 0)
+            {
+                ImGui.SameLine(0, 0);
+                ImGui.Text(suffix);
+            }
+        }
+        else
+        {
+            ImGui.Text(label);
+        }
 
         // Verified Checkmark or dev plugin wrench
         {
@@ -2549,16 +2590,28 @@ internal class PluginInstallerWindow : Window, IDisposable
         {
             if (!string.IsNullOrWhiteSpace(manifest.Punchline))
             {
-                ImGui.TextWrapped(manifest.Punchline);
+                this.DrawLocalizableTextWrapped(manifest.Punchline, locManifest.PunchlineLoc);
             }
             else if (!string.IsNullOrWhiteSpace(manifest.Description))
             {
                 const int punchlineLen = 200;
-                var firstLine = manifest.Description.Split(['\r', '\n'])[0];
+
+                var useLoc = !string.IsNullOrWhiteSpace(locManifest.DescriptionLoc) &&
+                             locManifest.DescriptionLoc != manifest.Description;
+                var source = useLoc ? locManifest.DescriptionLoc! : manifest.Description;
+                var firstLine = source.Split(['\r', '\n'])[0];
 
                 ImGui.TextWrapped(firstLine.Length < punchlineLen
                                                  ? firstLine
                                                  : firstLine[..punchlineLen]);
+
+                if (useLoc && ImGui.IsItemHovered())
+                {
+                    var originalFirstLine = manifest.Description.Split(['\r', '\n'])[0];
+                    ImGui.SetTooltip(originalFirstLine.Length < punchlineLen
+                                         ? originalFirstLine
+                                         : originalFirstLine[..punchlineLen]);
+                }
             }
         }
 
@@ -2725,7 +2778,7 @@ internal class PluginInstallerWindow : Window, IDisposable
             // Description
             if (!string.IsNullOrWhiteSpace(manifest.Description))
             {
-                ImGui.TextWrapped(manifest.Description);
+                this.DrawLocalizableTextWrapped(manifest.Description, manifest.DescriptionLoc);
             }
 
             ImGuiHelpers.ScaledDummy(5);
@@ -3017,17 +3070,26 @@ internal class PluginInstallerWindow : Window, IDisposable
         if (plugin.IsTesting)
             flags |= PluginHeaderFlags.IsTesting;
 
-        if (this.DrawPluginCollapsingHeader(label, plugin, plugin.Manifest, flags, () => this.DrawInstalledPluginContextMenu(plugin, remoteManifest, testingOptIn), index))
+        if (this.DrawPluginCollapsingHeader(label, plugin, plugin.Manifest, flags, () => this.DrawInstalledPluginContextMenu(plugin, remoteManifest, testingOptIn), index, remoteManifest))
         {
             if (!this.WasPluginSeen(plugin.Manifest.InternalName))
                 configuration.SeenPluginInternalName.Add(plugin.Manifest.InternalName);
 
             var manifest = plugin.Manifest;
+            var locManifest = remoteManifest ?? (IPluginManifest)manifest;
 
             ImGui.Indent();
 
             // Name
             ImGui.Text(manifest.Name);
+
+            if (!string.IsNullOrWhiteSpace(locManifest.NameLoc) &&
+                locManifest.NameLoc != manifest.Name)
+            {
+                ImGui.SameLine(0, ImGui.GetStyle().ItemInnerSpacing.X);
+                using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey2))
+                    ImGui.Text($"（{locManifest.NameLoc}）");
+            }
 
             // Download count
             var downloadText = plugin.IsDev
@@ -3067,7 +3129,7 @@ internal class PluginInstallerWindow : Window, IDisposable
             // Description
             if (!string.IsNullOrWhiteSpace(manifest.Description))
             {
-                ImGui.TextWrapped(manifest.Description);
+                this.DrawLocalizableTextWrapped(manifest.Description, locManifest.DescriptionLoc);
             }
 
             // Working Plugin ID

@@ -21,9 +21,19 @@ public interface IPluginManifest
     public string Name { get; }
 
     /// <summary>
+    /// Gets the localized public name of the plugin, if any.
+    /// </summary>
+    public string? NameLoc { get; }
+
+    /// <summary>
     /// Gets a punchline of the plugins functions.
     /// </summary>
     public string? Punchline { get; }
+
+    /// <summary>
+    /// Gets the localized punchline of the plugins functions, if any.
+    /// </summary>
+    public string? PunchlineLoc { get; }
 
     /// <summary>
     /// Gets the author/s of the plugin.
@@ -90,6 +100,11 @@ public interface IPluginManifest
     /// Gets a description of the plugins functions.
     /// </summary>
     public string? Description { get; }
+
+    /// <summary>
+    /// Gets the localized description of the plugins functions, if any.
+    /// </summary>
+    public string? DescriptionLoc { get; }
 
     /// <summary>
     /// Gets a message that is shown to users when sending feedback.
