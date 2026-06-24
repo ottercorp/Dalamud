@@ -2342,7 +2342,9 @@ internal class PluginInstallerWindow : Window, IDisposable
         if (ImGui.IsRectVisible(rectOffset + cursorBeforeImage, rectOffset + cursorBeforeImage + iconSize))
         {
             var iconTex = this.imageCache.DefaultIcon;
-            var hasIcon = this.imageCache.TryGetIcon(plugin, manifest, flags.HasFlag(PluginHeaderFlags.IsThirdParty), out var cachedIconTex, out var loadedSince);
+
+            // Use the remote manifest so installed plugins fall back to the repo icon.
+            var hasIcon = this.imageCache.TryGetIcon(plugin, locManifest, flags.HasFlag(PluginHeaderFlags.IsThirdParty), out var cachedIconTex, out var loadedSince);
             if (hasIcon && cachedIconTex != null)
             {
                 iconTex = cachedIconTex;

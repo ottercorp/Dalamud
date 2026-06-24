@@ -629,7 +629,7 @@ internal class PluginImageCache : IInternalDisposableService
         if (manifest.Dip17Channel.IsNullOrEmpty())
             return null;
 
-        return MainRepoDip17ImageUrl.Format(manifest.Dip17Channel!, manifest.InternalName, "icon.png");
+        return MainRepoDip17ImageUrl.Format(manifest.IsTestingExclusive ? manifest.Dip17Channel! : "stable", manifest.InternalName, "icon.png");
     }
 
     private List<string?>? GetPluginImageUrls(IPluginManifest manifest, bool isThirdParty)
@@ -648,7 +648,7 @@ internal class PluginImageCache : IInternalDisposableService
         var output = new List<string>();
         for (var i = 1; i <= 5; i++)
         {
-            output.Add(MainRepoDip17ImageUrl.Format(manifest.Dip17Channel!, manifest.InternalName, $"image{i}.png"));
+            output.Add(MainRepoDip17ImageUrl.Format(manifest.IsTestingExclusive ? manifest.Dip17Channel! : "stable", manifest.InternalName, $"image{i}.png"));
         }
 
         return output;
