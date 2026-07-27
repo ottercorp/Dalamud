@@ -315,7 +315,7 @@ internal class LocalPlugin : IAsyncDisposable
             }
 
             if (pluginManager.IsManifestBanned(this.manifest) && !this.IsDev)
-                throw new BannedPluginException($"Unable to load {this.Name}, banned");
+                throw new BannedPluginException($"Unable to load {this.Name} as it was banned");
 
             if (this.manifest.ApplicableVersion < dalamud.StartInfo.GameVersion)
                 throw new PluginPreconditionFailedException($"Unable to load {this.Name}, game is newer than applicable version {this.manifest.ApplicableVersion}");

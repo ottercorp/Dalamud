@@ -1806,18 +1806,17 @@ internal class PluginManager : IInternalDisposableService
     /// Reload the PluginMaster for each repo, filter, and event that the list has updated.
     /// </summary>
     /// <param name="notify">Whether to notify that available plugins have changed afterward.</param>
-    /// <param name="skipCache">Skip MemoryCache.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    private async Task ReloadAllReposInternalAsync(bool notify = true, bool skipCache = false)
+    private async Task ReloadAllReposInternalAsync(bool notify = true)
     {
         Log.Information("Now reloading all repos...");
 
         try
         {
             Debug.Assert(!this.Repos.First().IsThirdParty, "First repository should be main repository");
-            await this.Repos.First().ReloadAsync(skipCache); // Load official repo first
+            await this.Repos.First().ReloadAsync(); // Load official repo first
 
-            await Task.WhenAll(this.Repos.Skip(1).Select(repo => repo.ReloadAsync(skipCache)));
+            await Task.WhenAll(this.Repos.Skip(1).Select(repo => repo.ReloadAsync()));
 
             Log.Information("Repos reloaded, now refiltering...");
 

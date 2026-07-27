@@ -22,11 +22,7 @@ public class DalamudBuild : NukeBuild
     public static int Main() => Execute<DalamudBuild>(x => x.Compile);
 
     [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
-#if DEBUG
     readonly Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
-#else
-    readonly Configuration Configuration = Configuration.Release;
-#endif
 
     [Parameter("Whether we are building for documentation - emits generated files")]
     readonly bool IsDocsBuild = false;

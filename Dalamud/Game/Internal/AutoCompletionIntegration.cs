@@ -1,3 +1,8 @@
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+
 using Dalamud.Game.Command;
 using Dalamud.Hooking;
 using Dalamud.Utility;
@@ -9,12 +14,8 @@ using FFXIVClientStructs.FFXIV.Component.Completion;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 using Iced.Intel;
-using static Iced.Intel.AssemblerRegisters;
 
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
+using static Iced.Intel.AssemblerRegisters;
 
 namespace Dalamud.Game.Internal;
 
@@ -28,6 +29,8 @@ internal sealed unsafe class AutoCompletionIntegration : IInternalDisposableServ
     // as raw strings instead of as lookups into an EXD sheet
     private const int GroupNumber = 0xFF;
 
+    private static MyHookDelegate callback = null!;
+
     [ServiceManager.ServiceDependency]
     private readonly CommandManager commandManager = Service<CommandManager>.Get();
 
@@ -36,16 +39,10 @@ internal sealed unsafe class AutoCompletionIntegration : IInternalDisposableServ
 
     private readonly Dictionary<string, EntryStrings> cachedCommands = [];
 
-    private static MyHookDelegate callback;
-
     private EntryStrings? dalamudCategory;
 
-    //private Hook<AtkTextInput.Delegates.OpenCompletion> openSuggestionsHook;
     private AsmHook openSuggestionsHook;
     private Hook<CompletionModule.Delegates.GetSelection>? getSelectionHook;
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    public delegate void MyHookDelegate();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AutoCompletionIntegration"/> class.
@@ -55,6 +52,12 @@ internal sealed unsafe class AutoCompletionIntegration : IInternalDisposableServ
     {
         this.framework.RunOnTick(this.Setup);
     }
+
+    /// <summary>
+    /// Invokes the completion data update injected by the CN client hook.
+    /// </summary>
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void MyHookDelegate();
 
     /// <inheritdoc/>
     void IInternalDisposableService.DisposeService()
@@ -81,10 +84,6 @@ internal sealed unsafe class AutoCompletionIntegration : IInternalDisposableServ
 
         this.dalamudCategory = new EntryStrings("【Dalamud】");
 
-        //this.openSuggestionsHook = Hook<AtkTextInput.Delegates.OpenCompletion>.FromAddress(
-        //    (nint)AtkTextInput.MemberFunctionPointers.OpenCompletion,
-        //    this.OpenSuggestionsDetour);
-
         var openSuggestionsAddress = Service<TargetSigScanner>.Get().ScanText("4C 8D 86 ?? ?? ?? ?? 48 8B CE 48 8D 96 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 4E");
         callback = this.UpdateCompletionData;
         var callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
@@ -106,12 +105,6 @@ internal sealed unsafe class AutoCompletionIntegration : IInternalDisposableServ
         this.openSuggestionsHook.Enable();
         this.getSelectionHook.Enable();
     }
-
-    //private void OpenSuggestionsDetour(AtkTextInput* thisPtr)
-    //{
-    //    this.UpdateCompletionData();
-    //    this.openSuggestionsHook!.Original(thisPtr);
-    //}
 
     private int GetSelectionDetour(CompletionModule* thisPtr, CategoryData.CompletionDataStruct* dataStructs, int index, Utf8String* outputString, Utf8String* outputDisplayString)
     {
@@ -202,6 +195,7 @@ internal sealed unsafe class AutoCompletionIntegration : IInternalDisposableServ
         var raptureAtkModule = RaptureAtkModule.Instance();
         if (raptureAtkModule == null)
             return false;
+
         var textInputEventInterface = raptureAtkModule->TextInput.TargetTextInputEventInterface;
         if (textInputEventInterface == null)
             return false;

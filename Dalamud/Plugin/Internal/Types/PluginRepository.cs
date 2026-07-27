@@ -7,13 +7,14 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Caching.Abstractions;
-using Microsoft.Extensions.Caching.InMemory;
 
 using Dalamud.Logging.Internal;
 using Dalamud.Networking.Http;
 using Dalamud.Plugin.Internal.Types.Manifest;
 using Dalamud.Utility;
+
+using Microsoft.Extensions.Caching.Abstractions;
+using Microsoft.Extensions.Caching.InMemory;
 
 using Newtonsoft.Json;
 
@@ -32,7 +33,6 @@ internal class PluginRepository
     private const int HttpRequestTimeoutSeconds = 20;
 
     private static readonly ModuleLog Log = ModuleLog.Create<PluginRepository>();
-    private readonly HttpClient httpClient;
 
     private static readonly InMemoryCacheHandler CacheHandler = new(
         new SocketsHttpHandler
@@ -40,7 +40,12 @@ internal class PluginRepository
             AutomaticDecompression = DecompressionMethods.All,
             ConnectCallback = Service<HappyHttpClient>.Get().SharedHappyEyeballsCallback.ConnectCallback,
         },
-        CacheExpirationProvider.CreateSimple(TimeSpan.FromHours(3), TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(0)));
+        CacheExpirationProvider.CreateSimple(
+            TimeSpan.FromHours(3),
+            TimeSpan.Zero,
+            TimeSpan.Zero));
+
+    private readonly HttpClient httpClient;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PluginRepository"/> class.
@@ -58,10 +63,6 @@ internal class PluginRepository
                 Accept =
                 {
                     new MediaTypeWithQualityHeaderValue("application/json"),
-                },
-                CacheControl = new CacheControlHeaderValue
-                {
-                    NoCache = true,
                 },
                 UserAgent =
                 {
@@ -110,9 +111,8 @@ internal class PluginRepository
     /// <summary>
     /// Reload the plugin master asynchronously in a task.
     /// </summary>
-    /// <param name="skipCache">Skip MemoryCache.</param>
     /// <returns>The new state.</returns>
-    public async Task ReloadAsync(bool skipCache)
+    public async Task ReloadAsync()
     {
         this.State = PluginRepositoryState.InProgress;
         this.PluginMaster = new List<RemotePluginManifest>().AsReadOnly();
@@ -121,13 +121,6 @@ internal class PluginRepository
         {
             Log.Information($"Fetching repo: {this.PluginMasterUrl}");
 
-            if (skipCache)
-            {
-                CacheHandler.InvalidateCache(new Uri(this.PluginMasterUrl));
-                Log.Information($"Cache Clear: {this.PluginMasterUrl}");
-            }
-
-            // using var response = await HttpClient.GetAsync(this.PluginMasterUrl);
             using var response = await this.GetPluginMaster(this.PluginMasterUrl);
 
             response.EnsureSuccessStatusCode();
@@ -186,7 +179,8 @@ internal class PluginRepository
             this.State = PluginRepositoryState.Success;
 
             var stats = CacheHandler.StatsProvider.GetStatistics().Total;
-            Log.Information($"Cache: TotalRequests:{stats.TotalRequests}/CacheHit:{stats.CacheHit}/CacheMiss:{stats.CacheMiss}");
+            Log.Information(
+                $"Cache: TotalRequests:{stats.TotalRequests}/CacheHit:{stats.CacheHit}/CacheMiss:{stats.CacheMiss}");
         }
         catch (Exception ex)
         {
@@ -228,11 +222,8 @@ internal class PluginRepository
 
     private async Task<HttpResponseMessage> GetPluginMaster(string url, int timeout = HttpRequestTimeoutSeconds)
     {
-        //var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
-
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
 
         using var requestCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeout));
 

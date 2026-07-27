@@ -1,7 +1,5 @@
 using System.Runtime.InteropServices;
-
 using Dalamud.Common.Game;
-
 using Newtonsoft.Json;
 
 namespace Dalamud.Common;
@@ -169,5 +167,8 @@ public record DalamudStartInfo
     /// </summary>
     public UnhandledExceptionHandlingMode UnhandledException { get; set; }
 
+    /// <summary>
+    /// Gets or sets the launcher directory used for launcher-specific integrations.
+    /// </summary>
     public string? LauncherDirectory { get; set; }
 }

@@ -6,7 +6,7 @@
 
 Dalamud is a plugin development framework for FFXIV that provides access to game data and native interoperability with the game itself to add functionality and quality-of-life.
 
-It is meant to be used in conjunction with [XIVLauncherCN](https://github.com/ottercorp/FFXIVQuickLauncher), which manages and launches Dalamud for you. __It is generally not recommended for users to try to run Dalamud manually as there are multiple dependencies and assumed folder paths.__
+It is meant to be used in conjunction with [XIVLauncherCN](https://github.com/ottercorp/FFXIVQuickLauncher), which manages and launches Dalamud for you. __It is generally not recommended for end users to try to run Dalamud manually as XIVLauncher manages multiple required dependencies.__
 
 ## Hold Up!
 

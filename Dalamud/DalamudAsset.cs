@@ -1,4 +1,4 @@
-using Dalamud.Storage.Assets;
+﻿using Dalamud.Storage.Assets;
 
 using TerraFX.Interop.DirectX;
 
@@ -138,6 +138,13 @@ public enum DalamudAsset
     [DalamudAssetPath("UIRes", "NotoSansCJK-Regular.ttc")]
     NotoSansCjkRegular = 2001,
 
+    /// <summary>
+    /// <see cref="DalamudAssetPurpose.Font"/>: Legacy alias for the Noto Sans CJK regular font.
+    /// </summary>
+    [Obsolete("Use NotoSansCjkRegular instead.")]
+    [DalamudAsset(DalamudAssetPurpose.Font)]
+    [DalamudAssetPath("UIRes", "NotoSansCJK-Regular.ttc")]
+    NotoSansKrRegular = 2001,
 
     /// <summary>
     /// <see cref="DalamudAssetPurpose.TextureFromPng"/>: Atlas containing badges.
@@ -146,25 +153,20 @@ public enum DalamudAsset
     [DalamudAssetPath("UIRes", "badgeAtlas.png")]
     BadgeAtlas = 1015,
 
+    /// <summary>
+    /// <see cref="DalamudAssetPurpose.TextureFromPng"/>: Missing-font help image.
+    /// </summary>
     [DalamudAsset(DalamudAssetPurpose.TextureFromPng)]
     [DalamudAssetPath("UIRes", "missingFont.png")]
     MissingFontTips = 1014,
-    
+
     /// <summary>
     /// <see cref="DalamudAssetPurpose.Font"/>: Noto Sans CJK SC Medium.
     /// </summary>
     [DalamudAsset(DalamudAssetPurpose.Font)]
-    [DalamudAssetPath("UIRes", "NotoSansCJKsc-Regular.otf")]
     [DalamudAssetPath("UIRes", "NotoSansCJKsc-Medium.otf")]
-    NotoSansScMedium = 2000,
-
-    /// <summary>
-    /// <see cref="DalamudAssetPurpose.Font"/>: Noto Sans CJK KR Regular.
-    /// </summary>
-    [DalamudAsset(DalamudAssetPurpose.Font,required: false)]
-    [DalamudAssetPath("UIRes", "NotoSansCJKkr-Regular.otf")]
-    [DalamudAssetPath("UIRes", "NotoSansKR-Regular.otf")]
-    NotoSansKrRegular = 2001,
+    [DalamudAssetPath("UIRes", "NotoSansCJKsc-Regular.otf")]
+    NotoSansScMedium = 2005,
 
     /// <summary>
     /// <see cref="DalamudAssetPurpose.Font"/>: Inconsolata Regular.
@@ -184,6 +186,5 @@ public enum DalamudAsset
     /// <see cref="DalamudAssetPurpose.Font"/>: Game symbol fonts being used as webfonts at Lodestone.
     /// </summary>
     [DalamudAsset(DalamudAssetPurpose.Font, required: false)]
-    //[DalamudAssetOnlineSource("https://img.finalfantasyxiv.com/lds/pc/global/fonts/FFXIV_Lodestone_SSF.ttf")]
     LodestoneGameSymbol = 2004,
 }

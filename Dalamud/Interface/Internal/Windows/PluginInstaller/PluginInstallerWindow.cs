@@ -69,7 +69,6 @@ internal class PluginInstallerWindow : Window, IDisposable
     private DalamudChangelogManager? dalamudChangelogManager;
     private Task? dalamudChangelogRefreshTask;
     private CancellationTokenSource? dalamudChangelogRefreshTaskCts;
-    private DateTime lastRefreshTime = DateTime.MinValue;
 
     #region Image Tester State
 
@@ -1243,10 +1242,7 @@ internal class PluginInstallerWindow : Window, IDisposable
 
             ImGui.Spacing();
 
-            ImGui.BeginDisabled();
             ImGui.Checkbox(Locs.FeedbackModal_IncludeLastError, ref this.feedbackModalIncludeException);
-            ImGui.EndDisabled();
-
             ImGui.TextColored(ImGuiColors.DalamudGrey, Locs.FeedbackModal_IncludeLastErrorHint);
 
             ImGui.Spacing();
@@ -1323,7 +1319,7 @@ internal class PluginInstallerWindow : Window, IDisposable
             {
                 this.feedbackModalBody = string.Empty;
                 this.feedbackModalContact = Service<DalamudConfiguration>.Get().LastFeedbackContactDetails;
-                this.feedbackModalIncludeException = true;
+                this.feedbackModalIncludeException = false;
             }
             else
             {
@@ -3194,7 +3190,7 @@ internal class PluginInstallerWindow : Window, IDisposable
 
             ImGuiHelpers.ScaledDummy(5);
 
-            if (this.DrawPluginImages(plugin, manifest, isThirdParty, index))
+            if (this.DrawPluginImages(plugin, locManifest, isThirdParty, index))
                 ImGuiHelpers.ScaledDummy(5);
 
             ImGui.Unindent();

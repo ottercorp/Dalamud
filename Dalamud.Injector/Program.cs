@@ -11,9 +11,8 @@ using System.Text.RegularExpressions;
 
 using Dalamud.Common;
 using Dalamud.Common.Game;
-
-using FfxivArgLauncher;
 using Dalamud.Common.Util;
+using FfxivArgLauncher;
 using Newtonsoft.Json;
 using Reloaded.Memory.Buffers;
 using Serilog;
@@ -53,18 +52,14 @@ namespace Dalamud.Injector
                 DalamudStartInfo? startInfo = null;
                 if (args.Count == 1)
                 {
-#if !DEBUG
-                    Log.Error("You must provide at least one argument.");
-                    return 1;
-#endif
+    #if DEBUG
                     // No command defaults to inject
                     args.Add("inject");
                     args.Add("--all");
-
-    #if !DEBUG
-                    args.Add("--warn");
+    #else
+                    Log.Error("You must provide at least one argument.");
+                    return 1;
     #endif
-
                 }
                 else if (int.TryParse(args[1], out var _))
                 {
@@ -379,6 +374,7 @@ namespace Dalamud.Injector
             var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var xivlauncherDir = Path.Combine(appDataDir, "XIVLauncherCN");
 
+            launcherDirectory ??= xivlauncherDir;
             workingDirectory ??= Directory.GetCurrentDirectory();
             configurationPath ??= Path.Combine(xivlauncherDir, "dalamudConfig.json");
             pluginDirectory ??= Path.Combine(xivlauncherDir, "installedPlugins");
@@ -808,10 +804,6 @@ namespace Dalamud.Injector
             else if (mode.Length > 0 && mode.Length <= 6 && "inject"[0..mode.Length] == mode)
             {
                 dalamudStartInfo.LoadMethod = LoadMethod.DllInject;
-            }
-            else if (mode.Length > 0 && mode.Length <= 6 && "inject"[0..mode.Length] == mode)
-            {
-                mode = "inject";
             }
             else
             {

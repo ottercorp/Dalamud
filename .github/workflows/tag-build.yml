@@ -1,10 +1,10 @@
 name: Tag Build
-on: [push]
-  # push:
-  #   branches:
-  #     - master
-  #   tags-ignore:
-  #     - '*' # don't needlessly execute on tags
+on:
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - '*' # don't needlessly execute on tags
 
 jobs:
   tag:
@@ -14,7 +14,6 @@ jobs:
       - name: Determine Tag
         id: s1
         run: |
-          # version=$(echo "${{github.event.head_commit.message}}" | perl -nle 'm/build:\s*([0-9]+.[0-9]+.[0-9]+.[0-9]+)/; print $1');
           version=$(echo "${{github.event.head_commit.message}}" | perl -nle 'm/build:\s*(\d+\.\d+\.\d+\.\d+(?:-[A-Za-z0-9_.-]+)?)/; print $1')
           if [ -z "$version" ];
           then

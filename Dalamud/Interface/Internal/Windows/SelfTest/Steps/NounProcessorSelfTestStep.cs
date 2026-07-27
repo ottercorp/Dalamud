@@ -1,4 +1,5 @@
 using Dalamud.Bindings.ImGui;
+using Dalamud.Data;
 using Dalamud.Game;
 using Dalamud.Game.Text.Noun;
 using Dalamud.Game.Text.Noun.Enums;
@@ -15,8 +16,6 @@ internal class NounProcessorSelfTestStep : ISelfTestStep
 {
     private NounTestEntry[] tests =
     [
-        // No multi language for CN client
-        /*
         new(nameof(LSheets.BNpcName), 1330, ClientLanguage.Japanese, 1, (int)JapaneseArticleType.NearListener, 1, "その蜂蜜酒の運び人"),
         new(nameof(LSheets.BNpcName), 1330, ClientLanguage.Japanese, 1, (int)JapaneseArticleType.Distant, 1, "蜂蜜酒の運び人"),
         new(nameof(LSheets.BNpcName), 1330, ClientLanguage.Japanese, 2, (int)JapaneseArticleType.NearListener, 1, "それらの蜂蜜酒の運び人"),
@@ -216,7 +215,6 @@ internal class NounProcessorSelfTestStep : ISelfTestStep
 
         new(nameof(LSheets.GlassesStyle), 1, ClientLanguage.English, 1, (int)EnglishArticleType.Indefinite, 1, "a shaded spectacles"),
         new(nameof(LSheets.GlassesStyle), 1, ClientLanguage.English, 1, (int)EnglishArticleType.Definite, 1, "the shaded spectacles"),
-        */
     ];
 
     private enum GermanCases
@@ -233,6 +231,9 @@ internal class NounProcessorSelfTestStep : ISelfTestStep
     /// <inheritdoc/>
     public unsafe SelfTestStepResult RunStep()
     {
+        if (Service<DataManager>.Get().Language == ClientLanguage.ChineseSimplified)
+            return SelfTestStepResult.Pass;
+
         var nounProcessor = Service<NounProcessor>.Get();
 
         for (var i = 0; i < this.tests.Length; i++)

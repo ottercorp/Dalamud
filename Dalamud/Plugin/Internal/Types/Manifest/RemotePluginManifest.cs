@@ -12,6 +12,12 @@ namespace Dalamud.Plugin.Internal.Types.Manifest;
 internal record RemotePluginManifest : PluginManifest
 {
     /// <summary>
+    /// Gets a value indicating whether the CN repository supplies this plugin.
+    /// </summary>
+    [JsonProperty("_cn")]
+    public bool IsCn { get; init; }
+
+    /// <summary>
     /// Gets or sets the plugin repository this manifest came from. Used in reporting which third party repo a manifest
     /// may have come from in the plugins available view. This functionality should not be included in the plugin master.
     /// </summary>

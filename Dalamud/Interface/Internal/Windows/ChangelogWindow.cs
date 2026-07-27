@@ -34,7 +34,7 @@ namespace Dalamud.Interface.Internal.Windows;
 /// </summary>
 internal sealed class ChangelogWindow : Window, IDisposable
 {
-    private const string WarrantsChangelogForMajorMinor = "14.0.";
+    private const string WarrantsChangelogForMajorMinor = "15.0.";
 
     private const string ChangeLog =
         @"• 更新了 Dalamud 以兼容版本 7.4
@@ -277,7 +277,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
         ImGui.Dummy(new Vector2(dummySize));
         ImGui.SameLine();
 
-        using (var child = ImRaii.Child("###textContainer", new Vector2((windowSize.X * 0.8f) - dummySize * 4, windowSize.Y), false))
+        using (var child = ImRaii.Child("###textContainer"u8, new Vector2((windowSize.X * 0.8f) - dummySize * 4, windowSize.Y), false))
         {
             if (!child)
                 return;

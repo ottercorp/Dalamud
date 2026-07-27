@@ -614,7 +614,7 @@ public static partial class Util
     internal static string GetRandomName()
     {
         var data = Service<DataManager>.Get();
-        var names = data.GetExcelSheet<BNpcName>(ClientLanguage.ChineseSimplified)!;
+        var names = data.GetExcelSheet<BNpcName>(data.Language)!;
         var rng = new Random();
 
         return names.GetRowAt(rng.Next(0, names.Count - 1)).Singular.ExtractText();

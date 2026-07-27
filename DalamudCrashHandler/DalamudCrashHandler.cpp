@@ -27,7 +27,6 @@
 #include <ShlGuid.h>
 #include <ShObjIdl.h>
 #include <shlobj_core.h>
-#include <winhttp.h>
 
 #include <dxgi.h>
 #pragma comment(lib, "dxgi.lib")

@@ -29,6 +29,8 @@ namespace Dalamud.Data;
 #pragma warning restore SA1015
 internal sealed class DataManager : IInternalDisposableService, IDataManager
 {
+    private static readonly Lumina.Data.Language SupportedExcelLanguage = ClientLanguage.ChineseSimplified.ToLumina();
+
     private readonly Thread luminaResourceThread;
     private readonly CancellationTokenSource luminaCancellationTokenSource;
     private readonly RsvResolver rsvResolver;
@@ -36,8 +38,8 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
     [ServiceManager.ServiceConstructor]
     private DataManager(Dalamud dalamud)
     {
-        this.Language = (ClientLanguage)dalamud.StartInfo.Language;
         this.Language = ClientLanguage.ChineseSimplified;
+
         this.rsvResolver = new();
 
         try
@@ -52,7 +54,7 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
                     CacheFileResources = true,
                     PanicOnSheetChecksumMismatch = true,
                     RsvResolver = this.rsvResolver.TryResolve,
-                    DefaultExcelLanguage = this.Language.ToLumina(),
+                    DefaultExcelLanguage = SupportedExcelLanguage,
                 };
 
                 try
@@ -128,9 +130,6 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
         }
     }
 
-    /// <summary>
-    /// Gets the current game client language.
-    /// </summary>
     /// <inheritdoc/>
     public ClientLanguage Language { get; private set; }
 
@@ -147,31 +146,15 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
 
     /// <inheritdoc/>
     public ExcelSheet<T> GetExcelSheet<T>(ClientLanguage? language = null, string? name = null) where T : struct, IExcelRow<T>
-        //=> this.Excel.GetSheet<T>(ClientLanguage.ChineseSimplified.ToLumina(), name);
-    {
-        if (language != null)
-        {
-            language = ClientLanguage.ChineseSimplified;
-        }
-
-        return this.Excel.GetSheet<T>(language?.ToLumina(), name);
-    }
+        => this.Excel.GetSheet<T>(SupportedExcelLanguage, name);
 
     /// <inheritdoc/>
     public SubrowExcelSheet<T> GetSubrowExcelSheet<T>(ClientLanguage? language = null, string? name = null) where T : struct, IExcelSubrow<T>
-        //=> this.Excel.GetSubrowSheet<T>(ClientLanguage.ChineseSimplified.ToLumina(), name);
-    {
-        if (language != null)
-        {
-            language = ClientLanguage.ChineseSimplified;
-        }
-
-        return this.Excel.GetSubrowSheet<T>(language?.ToLumina(), name);
-    }
+        => this.Excel.GetSubrowSheet<T>(SupportedExcelLanguage, name);
 
     /// <inheritdoc/>
     public FileResource? GetFile(string path)
-            => this.GetFile<FileResource>(path);
+        => this.GetFile<FileResource>(path);
 
     /// <inheritdoc/>
     public T? GetFile<T>(string path) where T : FileResource

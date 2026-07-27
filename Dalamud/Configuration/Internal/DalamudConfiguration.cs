@@ -569,7 +569,8 @@ internal sealed class DalamudConfiguration : IInternalDisposableService
         }
 
         deserialized ??= new DalamudConfiguration();
-        deserialized.configPath = path;    
+        deserialized.configPath = path;
+
         try
         {
             deserialized.SetDefaults();

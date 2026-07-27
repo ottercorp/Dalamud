@@ -15,10 +15,10 @@ namespace Dalamud.Support;
 /// </summary>
 internal static class BugBait
 {
-    private const string BugBaitUrl = ServerAddress.MainAddress + "/plugin/feedback";
+    private const string BugBaitUrl = ServerAddress.MainAddress + "/Plugin/Feedback";
 
     /// <summary>
-    /// Send feedback to Discord.
+    /// Send feedback to the CN service.
     /// </summary>
     /// <param name="plugin">The plugin to send feedback about.</param>
     /// <param name="isTesting">Whether the plugin is a testing plugin.</param>
@@ -49,7 +49,7 @@ internal static class BugBait
         var httpClient = Service<HappyHttpClient>.Get().SharedHttpClient;
 
         var postContent = new StringContent(JsonConvert.SerializeObject(model), Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync(BugBaitUrl, postContent);
+        using var response = await httpClient.PostAsync(BugBaitUrl, postContent);
 
         response.EnsureSuccessStatusCode();
     }

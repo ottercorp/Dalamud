@@ -193,7 +193,6 @@ public struct GameFontStyle
             GameFontFamily.Undefined => GameFontFamilyAndSize.Undefined,
             GameFontFamily.Axis => size switch
             {
-                //<= ((int)((9.6f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis96,
                 <= ((int)((12f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis12,
                 <= ((int)((14f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis14,
                 <= ((int)((18f * 4f / 3f) + 0.5f) * 3f / 4f) + 0.001f => GameFontFamilyAndSize.Axis18,

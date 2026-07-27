@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -45,7 +46,9 @@ internal class PluginImageCache : IInternalDisposableService
     /// </summary>
     public const int PluginIconHeight = 512;
 
-    private const string MainRepoDip17ImageUrl = "https://s3test.ffxiv.wang/plugindistd17/{0}/{1}/images/{2}";
+    private const string MainRepoDip17IconUrl = ServerAddress.PluginImageAddress + "/{0}/{1}/images/{2}";
+    private const string MainRepoGlobalDip17ImageUrl = "https://raw.githubusercontent.com/goatcorp/PluginDistD17/main/{0}/{1}/images/{2}";
+    private const string MainRepoCnDip17ImageUrl = "https://raw.githubusercontent.com/ottercorp/PluginDistD17/main/{0}/{1}/images/{2}";
 
     [ServiceManager.ServiceDependency]
     private readonly HappyHttpClient happyHttpClient = Service<HappyHttpClient>.Get();
@@ -221,8 +224,7 @@ internal class PluginImageCache : IInternalDisposableService
             }
             catch (Exception ex)
             {
-                // Log.Error(ex, $"An unexpected error occurred with the icon for {manifest.InternalName}");
-                Log.Verbose($"An unexpected error occurred with the icon for {manifest.InternalName}");
+                Log.Error(ex, $"An unexpected error occurred with the icon for {manifest.InternalName}");
             }
         });
 
@@ -262,8 +264,7 @@ internal class PluginImageCache : IInternalDisposableService
             }
             catch (Exception ex)
             {
-                // Log.Error(ex, $"An unexpected error occurred with the images for {manifest.InternalName}");
-                Log.Verbose($"An unexpected error occurred with the images for {manifest.InternalName}");
+                Log.Error(ex, $"An unexpected error occurred with the images for {manifest.InternalName}");
             }
         });
 
@@ -562,35 +563,56 @@ internal class PluginImageCache : IInternalDisposableService
             isThirdParty = true;
         }
 
-        var urls = this.GetPluginImageUrls(manifest, isThirdParty);
-        urls = urls?.Where(x => !string.IsNullOrEmpty(x)).ToList();
-        if (urls?.Any() != true)
+        var urlCandidates = this.GetPluginImageUrlCandidates(manifest, isThirdParty);
+        if (urlCandidates.All(x => x.Count == 0))
         {
             Log.Verbose($"Images for {manifest.InternalName} are not available");
             return;
         }
 
         var tasks = new List<Task>();
-        for (var i = 0; i < urls.Count && i < pluginImages.Length; i++)
+        for (var i = 0; i < urlCandidates.Count && i < pluginImages.Length; i++)
         {
             var i2 = i;
-            var url = urls[i];
+            var candidates = urlCandidates[i];
+            if (candidates.Count == 0)
+                continue;
+
             tasks.Add(Task.Run(async () =>
             {
-                Log.Verbose($"Downloading image{i2 + 1} for {manifest.InternalName} from {url}");
-                // ReSharper disable once RedundantTypeArgumentsOfMethod
-                var bytes = await this.RunInDownloadQueue<byte[]?>(
-                                async () =>
-                                {
-                                    var httpClient = this.happyHttpClient.SharedHttpClient;
-                                    var data = await httpClient.GetAsync(url);
-                                    if (data.StatusCode == HttpStatusCode.NotFound)
-                                        return null;
+                byte[]? bytes = null;
+                string? loadedUrl = null;
+                foreach (var url in candidates)
+                {
+                    Log.Verbose($"Downloading image{i2 + 1} for {manifest.InternalName} from {url}");
+                    try
+                    {
+                        // ReSharper disable once RedundantTypeArgumentsOfMethod
+                        bytes = await this.RunInDownloadQueue<byte[]?>(
+                                    async () =>
+                                    {
+                                        var httpClient = this.happyHttpClient.SharedHttpClient;
+                                        using var data = await httpClient.GetAsync(url);
+                                        if (data.StatusCode == HttpStatusCode.NotFound)
+                                            return null;
 
-                                    data.EnsureSuccessStatusCode();
-                                    return await data.Content.ReadAsByteArrayAsync();
-                                },
-                                requestedFrame);
+                                        data.EnsureSuccessStatusCode();
+                                        return await data.Content.ReadAsByteArrayAsync();
+                                    },
+                                    requestedFrame);
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        Log.Warning(ex, $"Failed to download image{i2 + 1} for {manifest.InternalName} from {url}");
+                        continue;
+                    }
+
+                    if (bytes != null)
+                    {
+                        loadedUrl = url;
+                        break;
+                    }
+                }
 
                 if (bytes == null)
                     return;
@@ -598,7 +620,7 @@ internal class PluginImageCache : IInternalDisposableService
                 var image = await this.TryLoadImage(
                                 bytes,
                                 $"image{i2 + 1}",
-                                "queue",
+                                loadedUrl!,
                                 manifest,
                                 PluginImageWidth,
                                 PluginImageHeight,
@@ -623,32 +645,52 @@ internal class PluginImageCache : IInternalDisposableService
 
     private string? GetPluginIconUrl(IPluginManifest manifest, bool isThirdParty)
     {
-        if (isThirdParty)
+        if (isThirdParty || !manifest.IconUrl.IsNullOrEmpty())
             return manifest.IconUrl;
 
         if (manifest.Dip17Channel.IsNullOrEmpty())
             return null;
 
-        return MainRepoDip17ImageUrl.Format(manifest.IsTestingExclusive ? manifest.Dip17Channel! : "stable", manifest.InternalName, "icon.png");
+        return MainRepoDip17IconUrl.Format(manifest.Dip17Channel!, manifest.InternalName, "icon.png");
     }
 
-    private List<string?>? GetPluginImageUrls(IPluginManifest manifest, bool isThirdParty)
+    private List<List<string>> GetPluginImageUrlCandidates(IPluginManifest manifest, bool isThirdParty)
     {
-        if (isThirdParty)
-        {
-            if (manifest.ImageUrls?.Count > 5)
-            {
-                Log.Warning($"Plugin {manifest.InternalName} has too many images");
-                return manifest.ImageUrls.Take(5).ToList();
-            }
+        if (manifest.ImageUrls is { Count: > 5 })
+            Log.Warning($"Plugin {manifest.InternalName} has too many images");
 
-            return manifest.ImageUrls;
+        var output = Enumerable.Range(0, 5).Select(_ => new List<string>()).ToList();
+        if (manifest.ImageUrls != null)
+        {
+            for (var i = 0; i < manifest.ImageUrls.Count && i < output.Count; i++)
+            {
+                var url = manifest.ImageUrls[i];
+                if (Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                {
+                    output[i].Add(url);
+                }
+            }
         }
 
-        var output = new List<string>();
-        for (var i = 1; i <= 5; i++)
+        if (isThirdParty)
+            return output;
+
+        if (manifest.Dip17Channel.IsNullOrEmpty())
+            return output;
+
+        for (var i = 0; i < output.Count; i++)
         {
-            output.Add(MainRepoDip17ImageUrl.Format(manifest.IsTestingExclusive ? manifest.Dip17Channel! : "stable", manifest.InternalName, $"image{i}.png"));
+            var imageName = $"image{i + 1}.png";
+            var cdnUrl = MainRepoDip17IconUrl.Format(manifest.Dip17Channel!, manifest.InternalName, imageName);
+            var repositoryUrl = (manifest is RemotePluginManifest { IsCn: true }
+                                     ? MainRepoCnDip17ImageUrl
+                                     : MainRepoGlobalDip17ImageUrl)
+                .Format(manifest.Dip17Channel!, manifest.InternalName, imageName);
+            if (!output[i].Contains(cdnUrl))
+                output[i].Add(cdnUrl);
+            if (!output[i].Contains(repositoryUrl))
+                output[i].Add(repositoryUrl);
         }
 
         return output;
