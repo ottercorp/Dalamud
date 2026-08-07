@@ -2,6 +2,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Dalamud.Data.Excel;
 using Dalamud.Game;
 using Dalamud.IoC;
 using Dalamud.IoC.Internal;
@@ -34,6 +35,7 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
     private readonly Thread luminaResourceThread;
     private readonly CancellationTokenSource luminaCancellationTokenSource;
     private readonly RsvResolver rsvResolver;
+    private readonly ExcelLanguagePackLoader excelLanguagePackLoader;
 
     [ServiceManager.ServiceConstructor]
     private DataManager(Dalamud dalamud)
@@ -78,6 +80,14 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
                 }
 
                 Log.Information("Lumina is ready: {0}", this.GameData.DataPath);
+
+                using (Timings.Start("Excel Language Packs"))
+                {
+                    this.excelLanguagePackLoader = ExcelLanguagePackLoader.LoadFromAssetDirectory(
+                        dalamud.AssetDirectory,
+                        this.GameData,
+                        dalamud.StartInfo.GameVersion);
+                }
 
                 if (!dalamud.StartInfo.TroubleshootingPackData.IsNullOrEmpty())
                 {
@@ -146,11 +156,11 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
 
     /// <inheritdoc/>
     public ExcelSheet<T> GetExcelSheet<T>(ClientLanguage? language = null, string? name = null) where T : struct, IExcelRow<T>
-        => this.Excel.GetSheet<T>(SupportedExcelLanguage, name);
+        => this.Excel.GetSheet<T>(SelectExcelLanguage(language, this.excelLanguagePackLoader.IsLanguageLoaded), name);
 
     /// <inheritdoc/>
     public SubrowExcelSheet<T> GetSubrowExcelSheet<T>(ClientLanguage? language = null, string? name = null) where T : struct, IExcelSubrow<T>
-        => this.Excel.GetSubrowSheet<T>(SupportedExcelLanguage, name);
+        => this.Excel.GetSubrowSheet<T>(SelectExcelLanguage(language, this.excelLanguagePackLoader.IsLanguageLoaded), name);
 
     /// <inheritdoc/>
     public FileResource? GetFile(string path)
@@ -187,6 +197,23 @@ internal sealed class DataManager : IInternalDisposableService, IDataManager
         this.luminaCancellationTokenSource.Cancel();
         this.GameData.Dispose();
         this.rsvResolver.Dispose();
+    }
+
+    /// <summary>
+    /// Selects the requested Excel language when it is available, or Simplified Chinese otherwise.
+    /// </summary>
+    /// <param name="language">The requested language.</param>
+    /// <param name="isLanguageLoaded">Determines whether a sidecar language has been loaded.</param>
+    /// <returns>The language to request from Lumina.</returns>
+    internal static Lumina.Data.Language SelectExcelLanguage(
+        ClientLanguage? language,
+        Func<Lumina.Data.Language, bool> isLanguageLoaded)
+    {
+        var requestedLanguage = language?.ToLumina() ?? SupportedExcelLanguage;
+        return requestedLanguage == SupportedExcelLanguage ||
+               isLanguageLoaded(requestedLanguage)
+                   ? requestedLanguage
+                   : SupportedExcelLanguage;
     }
 
     private class LauncherTroubleshootingInfo
