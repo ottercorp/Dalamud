@@ -50,6 +50,14 @@ public sealed class CsvOverlayPackTests
                 { "column": 0, "value": "English" }
               ]
             }
+          ],
+          "macroRows": [
+            {
+              "rowId": 42,
+              "cells": [
+                { "column": 2, "value": "<icon(1)>" }
+              ]
+            }
           ]
         }
         """;
@@ -64,7 +72,19 @@ public sealed class CsvOverlayPackTests
 
         Assert.Equal("2026.06.18.0000.0000", pack.Manifest.GameVersion);
         Assert.Equal(["str", "uint32", "uint32", "bit&01"], sheet.Definition.ColumnTypes);
-        Assert.Equal("English", Assert.Single(Assert.Single(sheet.Rows).Cells).Value);
+        var row = Assert.Single(sheet.Rows);
+        Assert.Collection(
+            row.Cells.OrderBy(cell => cell.Column),
+            cell =>
+            {
+                Assert.Equal("English", cell.Value);
+                Assert.False(cell.IsMacroString);
+            },
+            cell =>
+            {
+                Assert.Equal("<icon(1)>", cell.Value);
+                Assert.True(cell.IsMacroString);
+            });
     }
 
     [Fact]
@@ -181,6 +201,34 @@ public sealed class CsvOverlayPackTests
             originalSecondOffset + (uint)Encoding.UTF8.GetByteCount("English") + 1,
             resultSecondOffset);
         Assert.Equal(originalSecondRow, resultPage.AsSpan(checked((int)resultSecondOffset)));
+    }
+
+    [Fact]
+    public void Create_EncodesMacroStringAsSeStringPayload()
+    {
+        var header = CreateHeader(ExcelVariant.Default);
+        var module = (ExcelModule)RuntimeHelpers.GetUninitializedObject(typeof(ExcelModule));
+        var rawFactory = new LuminaRawSheetFactory();
+        var baseSheet = rawFactory.Create(
+            module,
+            header,
+            Language.ChineseSimplified,
+            0x12345678,
+            [CreatePage()]);
+        var overlay = CreateOverlay(["str", "uint32", "str", "str"]);
+        overlay.Rows[0].Cells[0].Value = "<icon(1)>";
+        overlay.Rows[0].Cells[0].IsMacroString = true;
+
+        var result = new CsvOverlayRawSheetFactory().Create(
+            module,
+            header,
+            Language.English,
+            baseSheet,
+            overlay);
+        var value = CreateRawRow(result).ReadStringColumn(0);
+
+        Assert.Equal("<icon(1)>", value.ToMacroString());
+        Assert.NotEqual("<icon(1)>", value.ExtractText());
     }
 
     private static MemoryStream CreatePack(

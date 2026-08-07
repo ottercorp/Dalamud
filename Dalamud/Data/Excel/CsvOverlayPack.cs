@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 
 using Newtonsoft.Json;
 
@@ -41,7 +42,21 @@ internal sealed class CsvOverlayPack
             var content = ReadJson<CsvOverlaySheetContent>(archive, definition.Entry);
             if (content.FormatVersion != CurrentFormatVersion)
                 throw new InvalidDataException($"CSV overlay sheet '{definition.Name}' has an unsupported format.");
-            sheets.Add(definition.Name, new CsvOverlaySheet(definition, content.Rows));
+
+            foreach (var cell in content.MacroRows.SelectMany(row => row.Cells))
+                cell.IsMacroString = true;
+
+            var rows = content.Rows
+                              .Concat(content.MacroRows)
+                              .GroupBy(row => row.RowId)
+                              .Select(
+                                  group => new CsvOverlayRow
+                                  {
+                                      RowId = group.Key,
+                                      Cells = group.SelectMany(row => row.Cells).ToList(),
+                                  })
+                              .ToList();
+            sheets.Add(definition.Name, new CsvOverlaySheet(definition, rows));
         }
 
         return new CsvOverlayPack(manifest, sheets);
@@ -99,6 +114,9 @@ internal sealed class CsvOverlaySheetContent
 
     [JsonProperty("rows", Required = Required.Always)]
     public List<CsvOverlayRow> Rows { get; set; } = [];
+
+    [JsonProperty("macroRows")]
+    public List<CsvOverlayRow> MacroRows { get; set; } = [];
 }
 
 internal sealed record CsvOverlaySheet(
@@ -121,4 +139,7 @@ internal sealed class CsvOverlayCell
 
     [JsonProperty("value", Required = Required.Always)]
     public string Value { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    public bool IsMacroString { get; set; }
 }

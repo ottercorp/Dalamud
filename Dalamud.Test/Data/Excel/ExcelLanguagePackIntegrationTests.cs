@@ -50,6 +50,13 @@ public sealed class ExcelLanguagePackIntegrationTests
             new GameVersion(gameVersion!));
         Assert.True(loader.HasLoadedPacks);
         Assert.True(loader.IsLanguageLoaded(Language.English));
+        var packPath = Assert.Single(
+            Directory.GetFiles(assetPath!, "*.xlcsvpack", SearchOption.AllDirectories));
+        using (var stream = File.OpenRead(packPath))
+        {
+            foreach (var sheetName in CsvOverlayPack.Read(stream).Sheets.Keys)
+                _ = primaryGameData.Excel.GetSheet<RawRow>(Language.English, sheetName);
+        }
 
         var dataManager = (DataManager)RuntimeHelpers.GetUninitializedObject(typeof(DataManager));
         SetField(dataManager, "<GameData>k__BackingField", primaryGameData);
@@ -80,6 +87,11 @@ public sealed class ExcelLanguagePackIntegrationTests
                                           .GetRow(1)
                                           .Name
                                           .ToString();
+        var macroDescription = pluginDataManager.Excel
+                                               .GetSheet<ActionTransient>(Language.English)
+                                               .GetRow(3)
+                                               .Description
+                                               .ToMacroString();
         var fallbackSubrow = default(AkatsukiNote);
         var foundFallbackSubrow = false;
         foreach (var row in pluginDataManager
@@ -114,6 +126,8 @@ public sealed class ExcelLanguagePackIntegrationTests
         Assert.Equal(viaWrapper, viaGameData);
         Assert.NotEqual(viaWrapper, chinese);
         Assert.Equal(chinese, unavailableLanguageFallback);
+        Assert.Contains("<colortype(504)>", macroDescription);
+        Assert.DoesNotContain("<UIForeground>", macroDescription);
         Assert.True(foundFallbackSubrow);
         Assert.Equal(Language.None, fallbackSubrow.ExcelPage.Language);
         Assert.Equal(Language.None, fallbackSubrow.Title.Language);

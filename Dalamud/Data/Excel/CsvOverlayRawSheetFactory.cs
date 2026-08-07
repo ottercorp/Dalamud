@@ -8,6 +8,8 @@ using Lumina.Data;
 using Lumina.Data.Files.Excel;
 using Lumina.Data.Structs.Excel;
 using Lumina.Excel;
+using Lumina.Text.Parse;
+using Lumina.Text.ReadOnly;
 
 #pragma warning disable SA1600 // Internal raw-sheet implementation.
 
@@ -17,6 +19,11 @@ internal sealed class CsvOverlayRawSheetFactory
 {
     private const int ExcelDataHeaderSize = 32;
     private const int ExcelDataOffsetSize = 8;
+
+    private static readonly MacroStringParseOptions StrictMacroOptions = new()
+    {
+        ExceptionMode = MacroStringParseExceptionMode.Throw,
+    };
 
     private readonly LuminaRawSheetFactory rawSheetFactory = new();
 
@@ -147,7 +154,7 @@ internal sealed class CsvOverlayRawSheetFactory
         foreach (var cell in overlay.Cells)
         {
             var column = physicalColumns[cell.Column];
-            var bytes = Encoding.UTF8.GetBytes(cell.Value);
+            var bytes = EncodeCell(cell);
             appendedSize = checked(appendedSize + bytes.Length + 1);
             encodedCells.Add((column, bytes));
         }
@@ -171,6 +178,22 @@ internal sealed class CsvOverlayRawSheetFactory
             result.AsSpan(0, sizeof(uint)),
             checked(rowSize + (uint)appendedSize));
         return result;
+    }
+
+    private static byte[] EncodeCell(CsvOverlayCell cell)
+    {
+        if (!cell.IsMacroString)
+        {
+            if (cell.Value.IndexOfAny(['\0', '\u0002', '\u0003']) >= 0)
+                throw new InvalidDataException("The CSV overlay UTF-8 cell contains a reserved control character.");
+            return Encoding.UTF8.GetBytes(cell.Value);
+        }
+
+        var value = ReadOnlySeString.FromMacroString(cell.Value, StrictMacroOptions);
+        ReadOnlySpan<byte> bytes = value;
+        if (bytes.Contains((byte)0))
+            throw new InvalidDataException("The CSV overlay cell contains an embedded null byte.");
+        return bytes.ToArray();
     }
 
     private readonly record struct PageRow(uint RowId, int Offset, int Length, int IndexOffset);
