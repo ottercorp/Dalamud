@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using Dalamud.Configuration.Internal;
 using Dalamud.Hooking.Internal;
 using Dalamud.Hooking.Internal.Verification;
+using Dalamud.Utility;
 
 using Serilog;
 
@@ -159,18 +160,22 @@ public abstract class Hook<T> : IDalamudHook where T : Delegate
     /// <summary>
     /// Creates a hook. Hooking address is inferred by calling to GetProcAddress() function.
     /// The hook is not activated until Enable() method is called.
-    /// Please do not use MinHook unless you have thoroughly troubleshot why Reloaded does not work.
     /// </summary>
     /// <param name="moduleName">A name of the module currently loaded in the memory. (e.g. ws2_32.dll).</param>
     /// <param name="exportName">A name of the exported function name (e.g. send).</param>
     /// <param name="detour">Callback function. Delegate must have a same original function prototype.</param>
-    /// <param name="useMinHook">Use the MinHook hooking library instead of Reloaded.</param>
+    /// <param name="useMinHook">Ignored.</param>
     /// <param name="callingAssembly">Calling assembly.</param>
     /// <returns>The hook with the supplied parameters.</returns>
-    internal static Hook<T> FromSymbol(string moduleName, string exportName, T detour, bool useMinHook = false, Assembly? callingAssembly = null)
+    internal static Hook<T> FromSymbol(
+        string moduleName,
+        string exportName,
+        T detour,
+        [Api16ToDo("Remove this parameter and ThrowMinHookRemoved()")] bool useMinHook = false,
+        Assembly? callingAssembly = null)
     {
-        if (EnvironmentConfiguration.DalamudForceMinHook)
-            useMinHook = true;
+        if (useMinHook)
+            ThrowMinHookRemoved();
 
         var moduleHandle = Windows.Win32.PInvoke.GetModuleHandle(moduleName);
         if (moduleHandle.IsNull)
@@ -181,25 +186,28 @@ public abstract class Hook<T> : IDalamudHook where T : Delegate
             throw new Exception($"Could not get the address of {moduleName}::{exportName}");
 
         var address = HookManager.FollowJmp(procAddress.Value);
-        return CreateBackend(address, detour, useMinHook, callingAssembly ?? Assembly.GetCallingAssembly());
+        return CreateBackend(address, detour, callingAssembly ?? Assembly.GetCallingAssembly());
     }
 
     /// <summary>
     /// Creates a hook. Hooking address is inferred by calling to GetProcAddress() function.
     /// The hook is not activated until Enable() method is called.
-    /// Please do not use MinHook unless you have thoroughly troubleshot why Reloaded does not work.
     /// </summary>
     /// <param name="procAddress">A memory address to install a hook.</param>
     /// <param name="detour">Callback function. Delegate must have a same original function prototype.</param>
-    /// <param name="useMinHook">Use the MinHook hooking library instead of Reloaded.</param>
+    /// <param name="useMinHook">Ignored.</param>
     /// <param name="callingAssembly">Calling assembly.</param>
     /// <returns>The hook with the supplied parameters.</returns>
-    internal static Hook<T> FromAddress(IntPtr procAddress, T detour, bool useMinHook = false, Assembly? callingAssembly = null)
+    internal static Hook<T> FromAddress(
+        IntPtr procAddress,
+        T detour,
+        [Api16ToDo("Remove this parameter and ThrowMinHookRemoved()")] bool useMinHook = false,
+        Assembly? callingAssembly = null)
     {
-        if (EnvironmentConfiguration.DalamudForceMinHook)
-            useMinHook = true;
-
         var assembly = callingAssembly ?? Assembly.GetCallingAssembly();
+
+        if (useMinHook)
+            ThrowMinHookRemoved();
 
         // TODO: Only log verification exceptions for now, figure out how to handle this
         if (!HookVerifier.TryVerify<T>(procAddress, assembly, out var exceptions))
@@ -209,7 +217,7 @@ public abstract class Hook<T> : IDalamudHook where T : Delegate
         }
 
         procAddress = HookManager.FollowJmp(procAddress);
-        return CreateBackend(procAddress, detour, useMinHook, assembly);
+        return CreateBackend(procAddress, detour, assembly);
     }
 
     /// <summary>
@@ -225,18 +233,19 @@ public abstract class Hook<T> : IDalamudHook where T : Delegate
     /// </summary>
     /// <param name="address">A memory address to install a hook.</param>
     /// <param name="detour">Callback function. Delegate must have a same original function prototype.</param>
-    /// <param name="useMinHook">Use the MinHook hooking library instead of the default one.</param>
     /// <param name="callingAssembly">Calling assembly.</param>
     /// <returns>The hook with the supplied parameters.</returns>
-    private static Hook<T> CreateBackend(IntPtr address, T detour, bool useMinHook, Assembly callingAssembly)
+    private static Hook<T> CreateBackend(IntPtr address, T detour, Assembly callingAssembly)
     {
-        if (useMinHook)
-            return new MinHookHook<T>(address, detour, callingAssembly);
-
         if (EnvironmentConfiguration.DalamudUseSafetyHook)
             return new SafetyHookHook<T>(address, detour, callingAssembly);
 
         return new ReloadedHook<T>(address, detour, callingAssembly);
+    }
+
+    private static void ThrowMinHookRemoved()
+    {
+        throw new InvalidOperationException("MinHook is no longer supported.");
     }
 
     private static unsafe IntPtr FromImportHelper(IntPtr baseAddress, ref IMAGE_IMPORT_DESCRIPTOR desc, ref IMAGE_DATA_DIRECTORY dir, string functionName, uint hintOrOrdinal)
