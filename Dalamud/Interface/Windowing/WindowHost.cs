@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 
 using CheapLoc;
+
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Interface.Colors;
@@ -553,6 +554,12 @@ public class WindowHost
             {
                 wasEscPressedLastFrame = false;
             }
+        }
+
+        // Allow the window to be closed with a gamepad
+        if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceRight) && !this.Window.IsPinned && this.Window.IsFocused && ImGui.GetCurrentContext() is { NavId: 0, NavFocusScopeId: 0 })
+        {
+            this.Window.IsOpen = false;
         }
 
         this.fadeOutSize = ImGui.GetWindowSize();

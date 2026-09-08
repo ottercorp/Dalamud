@@ -737,7 +737,7 @@ internal partial class InterfaceManager : IInternalDisposableService
             if (configuration.SavedStyles == null ||
                 configuration.SavedStyles.All(x => x.Name != builtInStyles[0].Name))
             {
-                configuration.SavedStyles = [..builtInStyles];
+                configuration.SavedStyles = [.. builtInStyles];
                 configuration.ChosenStyle = builtInStyles[0].Name;
             }
 
@@ -1177,9 +1177,7 @@ internal partial class InterfaceManager : IInternalDisposableService
             && gamepadState.Raw(GamepadButtons.L1) > 0
             && gamepadState.Pressed(GamepadButtons.L3) > 0)
         {
-            io.ConfigFlags ^= ImGuiConfigFlags.NavEnableGamepad;
-            gamepadState.NavEnableGamepad ^= true;
-            dalamudInterface.ToggleGamepadModeNotifierWindow();
+            gamepadState.EnableGamepadNav ^= true;
         }
 
         if (gamepadEnabled && (io.ConfigFlags & ImGuiConfigFlags.NavEnableGamepad) > 0)
