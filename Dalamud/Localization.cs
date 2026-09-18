@@ -66,8 +66,8 @@ public class Localization : IServiceType
     public static CultureInfo GetCultureInfoFromLangCode(string langCode) =>
         CultureInfo.GetCultureInfo(langCode switch
         {
-            "tw" => "zh-hant",
-            "zh" => "zh-hans",
+            "tw" or "cht" => "zh-hant",
+            "zh" or "chs" => "zh-hans",
             _ => langCode,
         });
 
