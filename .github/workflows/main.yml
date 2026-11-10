@@ -135,7 +135,7 @@ jobs:
         if (Test-Path -Path $branchName) {
             $versionData = Get-Content ".\${branchName}\version" | ConvertFrom-Json
             $oldVersion = $versionData.AssemblyVersion
-            if ($oldVersion -eq $newVersion) {
+            if ($oldVersion -eq $newVersion -and $versionData.GitSha -eq $commitHash) {
               Remove-Item .\canary.zip
               Remove-Item .\canary.7z
             } else {
