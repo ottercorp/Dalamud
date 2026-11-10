@@ -21,6 +21,7 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Internal;
 using Dalamud.Plugin.Internal.AutoUpdate;
+using Dalamud.Plugin.Internal.Types;
 using Dalamud.Plugin.Services;
 using Dalamud.Storage.Assets;
 using Dalamud.Utility;
@@ -48,7 +49,6 @@ internal sealed class ChangelogWindow : Window, IDisposable
     private readonly TitleScreenMenuWindow tsmWindow;
 
     private readonly GameGui gameGui;
-
     private readonly DisposeSafety.ScopedFinalizer scopedFinalizer = new();
     private readonly IFontAtlas privateAtlas;
     private readonly Lazy<IFontHandle> bannerFont;
@@ -93,6 +93,8 @@ internal sealed class ChangelogWindow : Window, IDisposable
 
     private DateTime? isEligibleSince;
     private bool openedThroughEligibility;
+    private PluginManager? pluginManager;
+    private List<LocalPlugin> installedPlugins = [];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ChangelogWindow"/> class.
@@ -126,7 +128,7 @@ internal sealed class ChangelogWindow : Window, IDisposable
         this.fontTipsTexture = new(() => assets.GetDalamudTextureWrap(DalamudAsset.MissingFontTips));
 
         // If we are going to show a changelog, make sure we have the font ready, otherwise it will hitch
-        if (WarrantsChangelog())
+        if (this.WarrantsChangelog())
             _ = this.bannerFont.Value;
 
         framework.Update += this.FrameworkOnUpdate;
@@ -146,14 +148,24 @@ internal sealed class ChangelogWindow : Window, IDisposable
     /// Check if a changelog should be shown.
     /// </summary>
     /// <returns>True if a changelog should be shown.</returns>
-    public static bool WarrantsChangelog()
+    public bool WarrantsChangelog()
     {
+        if (this.pluginManager == null)
+        {
+            this.pluginManager = Service<PluginManager>.GetNullable();
+
+            if (this.pluginManager != null)
+            {
+                this.UpdateInstalledPlugins();
+                this.pluginManager.OnInstalledPluginsChanged += this.UpdateInstalledPlugins;
+                this.scopedFinalizer.Add(() => this.pluginManager.OnInstalledPluginsChanged -= this.UpdateInstalledPlugins);
+            }
+        }
+
         var configuration = Service<DalamudConfiguration>.Get();
-        var pm = Service<PluginManager>.GetNullable();
-        var pmWantsChangelog = pm?.InstalledPlugins.Any() ?? true;
         return (string.IsNullOrEmpty(configuration.LastChangelogMajorMinor) ||
                 (!WarrantsChangelogForMajorMinor.StartsWith(configuration.LastChangelogMajorMinor) &&
-                 Versioning.GetAssemblyVersion().StartsWith(WarrantsChangelogForMajorMinor))) && pmWantsChangelog;
+                 Versioning.GetAssemblyVersion().StartsWith(WarrantsChangelogForMajorMinor))) && this.installedPlugins.Count != 0;
     }
 
     /// <inheritdoc/>
@@ -563,9 +575,15 @@ internal sealed class ChangelogWindow : Window, IDisposable
         this.scopedFinalizer.Dispose();
     }
 
+    private void UpdateInstalledPlugins()
+    {
+        if (this.pluginManager != null)
+            this.installedPlugins = this.pluginManager.InstalledPlugins.ToList();
+    }
+
     private void FrameworkOnUpdate(IFramework unused)
     {
-        if (!WarrantsChangelog())
+        if (!this.WarrantsChangelog())
             return;
 
         if (this.IsOpen)
